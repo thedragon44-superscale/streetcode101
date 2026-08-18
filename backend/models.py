@@ -16,6 +16,7 @@ class Product(SQLModel, table=True):
     title: str
     description: str
     price: float
+    category: str = Field(default="uncategorized", index=True)
     image_url: str
     in_stock: bool
     supplier_sku: Optional[str] = None 

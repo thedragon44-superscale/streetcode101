@@ -100,7 +100,7 @@ export default function Storefront() {
     <div className="min-h-screen bg-slate-100 font-sans text-slate-800">
       
       {/* Global Navbar with Search Enabled */}
-      <Navbar showSearch={true} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+      <Navbar showSearch={true} searchQuery={searchQuery} setSearchQuery={setSearchQuery} searchResults={filteredProducts} />
 
       {/* Storefront Category Bar */}
       <div className="bg-slate-800 text-slate-300 text-sm overflow-x-auto shadow-md">

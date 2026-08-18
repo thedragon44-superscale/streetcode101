@@ -94,7 +94,7 @@ export function CartProvider({ children }) {
 
   // Calculate totals factoring in potential quantities
   const cartTotal = cart.reduce((total, item) => total + (item.price * (item.cart_quantity || 1)), 0);
-  const cartCount = cart.reduce((count, item) => count + (item.cart_quantity || 1), 0);
+  const cartItemCount = cart.reduce((count, item) => count + (item.cart_quantity || 1), 0);
 
   return (
     <CartContext.Provider value={{ 
@@ -106,7 +106,7 @@ export function CartProvider({ children }) {
       isCartOpen, 
       setIsCartOpen,
       cartTotal,
-      cartCount
+      cartItemCount
     }}>
       {children}
     </CartContext.Provider>

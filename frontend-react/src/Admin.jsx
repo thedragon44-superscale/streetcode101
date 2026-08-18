@@ -18,7 +18,7 @@ export default function Admin() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [newProduct, setNewProduct] = useState({
-    sku: '', title: '', price: '', description: '', in_stock: true, image: null
+    sku: '', title: '', price: '', description: '', category: 'peripherals', in_stock: true, image: null
   });
 
   // ==========================================
@@ -153,6 +153,7 @@ export default function Admin() {
     formData.append('title', newProduct.title);
     formData.append('price', newProduct.price);
     formData.append('description', newProduct.description);
+    formData.append('category', newProduct.category);
     formData.append('in_stock', newProduct.in_stock);
     if (newProduct.image) {
       formData.append('file', newProduct.image); 
@@ -171,7 +172,7 @@ export default function Admin() {
 
       toast.success('Product successfully added to catalog!');
       fetchData(); // Refresh the table to show the real database entry!
-      setNewProduct({ sku: '', title: '', price: '', description: '', in_stock: true, image: null });
+      setNewProduct({ sku: '', title: '', price: '', description: '', category: 'peripherals', in_stock: true, image: null });
       setIsAddModalOpen(false);
     } catch (err) { 
       toast.error(err.message); 
@@ -359,9 +360,20 @@ export default function Admin() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Price ($)</label>
-                <input required type="number" step="0.01" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" placeholder="49.99" />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Price ($)</label>
+                  <input required type="number" step="0.01" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" placeholder="49.99" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                  <select required value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium bg-white">
+                    <option value="peripherals">Peripherals</option>
+                    <option value="displays">Displays</option>
+                    <option value="accessories">Accessories</option>
+                    <option value="components">Components</option>
+                  </select>
+                </div>
               </div>
 
               <div>

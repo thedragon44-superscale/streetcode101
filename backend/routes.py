@@ -221,6 +221,7 @@ def create_product(
     title: str = Form(...),
     description: str = Form(...),
     price: float = Form(...),
+    category: str = Form(...),
     in_stock: str = Form(...), 
     file: UploadFile = File(None),
     session: Session = Depends(get_session),
@@ -251,6 +252,7 @@ def create_product(
         title=title,
         description=description,
         price=price,
+        category=category,
         in_stock=is_in_stock,
         image_url=image_url
     )

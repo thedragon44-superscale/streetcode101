@@ -9,8 +9,8 @@ import CheckoutForm from './CheckoutForm';
 const API_BASE = 'http://127.0.0.1:8000/api';
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-export default function Navbar({ showSearch = false, searchQuery, setSearchQuery }) {
-  const { cart, removeFromCart, clearCart, isCartOpen, setIsCartOpen, cartItemCount, cartTotal } = useCart();
+export default function Navbar({ showSearch = false, searchQuery, setSearchQuery, searchResults = [] }) {
+  const { cart, removeFromCart, updateQuantity, clearCart, isCartOpen, setIsCartOpen, cartItemCount, cartTotal } = useCart();
   const [currentUser, setCurrentUser] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -22,6 +22,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
   const [checkoutEmail, setCheckoutEmail] = useState('');
   const [checkoutName, setCheckoutName] = useState('');
   const [checkoutStreet, setCheckoutStreet] = useState('');
+  const [checkoutApt, setCheckoutApt] = useState('');
   const [checkoutCity, setCheckoutCity] = useState('');
   const [checkoutState, setCheckoutState] = useState('');
   const [checkoutZip, setCheckoutZip] = useState('');
@@ -65,7 +66,8 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
     if (cart.length === 0) return;
     setIsSubmitting(true);
 
-    const fullShippingAddress = `${checkoutName} | ${checkoutStreet}, ${checkoutCity}, ${checkoutState} ${checkoutZip}`;
+    const aptString = checkoutApt ? ` ${checkoutApt}` : '';
+    const fullShippingAddress = `${checkoutName} | ${checkoutStreet}${aptString}, ${checkoutCity}, ${checkoutState} ${checkoutZip}`;
 
     try {
       for (const item of cart) {
@@ -106,7 +108,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
           {/* Optional Search Bar (Only shows on Storefront) */}
           <div className="flex-1 max-w-3xl flex justify-center px-4">
             {showSearch && (
-              <div className="flex w-full max-w-xl">
+              <div className="flex w-full max-w-xl relative">
                 <input 
                   type="text" 
                   placeholder="Search catalog..." 
@@ -117,6 +119,41 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
                 <button className="bg-orange-500 hover:bg-orange-600 px-6 py-2 rounded-r-xl text-white transition-colors flex items-center justify-center border border-orange-500">
                   <i className="fa-solid fa-magnifying-glass"></i>
                 </button>
+
+                {/* Auto-fill Search Dropdown */}
+                {searchQuery.trim().length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-50 flex flex-col">
+                    
+                    {searchResults.slice(0, 5).map(item => (
+                      <Link 
+                        key={item.sku} 
+                        to={`/product/${item.sku}`}
+                        onClick={() => setSearchQuery('')} // Clears search & closes dropdown on click!
+                        className="flex items-center gap-3 p-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors text-left"
+                      >
+                        <img src={item.image_url} alt={item.title} className="w-10 h-10 object-contain rounded-md bg-slate-50 border border-slate-100 p-1 mix-blend-multiply" />
+                        <div className="flex-1 overflow-hidden">
+                          <h4 className="text-sm font-bold text-slate-900 truncate">{item.title}</h4>
+                          <p className="text-xs text-orange-600 font-black">${item.price.toFixed(2)}</p>
+                        </div>
+                      </Link>
+                    ))}
+
+                    {/* Zero Results State */}
+                    {searchResults.length === 0 && (
+                      <div className="p-4 text-center text-sm font-bold text-slate-500">
+                        No products found matching "{searchQuery}".
+                      </div>
+                    )}
+
+                    {/* Show remaining count if there are lots of matches */}
+                    {searchResults.length > 5 && (
+                      <a href="#catalog" className="p-2 text-center text-xs font-black text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors bg-white border-t border-slate-100 uppercase tracking-wider block">
+                        + {searchResults.length - 5} more results below
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -221,18 +258,56 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
               Your Street Cart is empty.
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-2 mt-2 px-1">
               {cart.map(item => (
-                <div key={item.sku} className="flex gap-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                  <img src={item.image_url} alt={item.title} className="w-20 h-20 object-contain mix-blend-multiply bg-slate-50 border border-slate-100 rounded-md" />
-                  <div className="flex-1">
-                    <h3 className="font-bold text-sm text-slate-900 line-clamp-2">{item.title}</h3>
-                    <p className="text-slate-900 font-black text-lg mt-1">${item.price.toFixed(2)}</p>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded-md shadow-sm">Qty: {item.quantity}</span>
-                      <button type="button" onClick={() => removeFromCart(item.sku)} className="text-xs font-bold text-red-500 hover:text-red-700 hover:underline">Remove</button>
+                <div key={item.sku} className="relative flex flex-col bg-white p-2 rounded-lg border border-slate-200 shadow-sm group hover:border-orange-300 transition-colors">
+                  
+                  {/* Floating Remove Button (Popped outside the box) */}
+                  <button 
+                    type="button" 
+                    onClick={() => removeFromCart(item.sku)} 
+                    className="absolute -top-2 -right-2 z-10 w-5 h-5 bg-white hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-full flex items-center justify-center shadow-md border border-slate-200 transition-all text-[9px] font-black"
+                    title="Remove item"
+                  >✕</button>
+
+                  {/* Micro Product Image */}
+                  <img 
+                    src={item.image_url} 
+                    alt={item.title} 
+                    className="w-full h-14 object-contain mix-blend-multiply bg-slate-50 border border-slate-100 rounded mb-1.5 p-0.5" 
+                  />
+                  
+                  {/* Micro Product Details */}
+                  <div className="flex flex-col flex-1">
+                    <h3 className="font-bold text-[10px] text-slate-900 line-clamp-2 leading-tight mb-1 flex-1">{item.title}</h3>
+                    
+                    <div className="flex flex-col items-center justify-between mt-auto border-t border-slate-50 pt-1">
+                      <p className="text-slate-900 font-black text-xs">${item.price.toFixed(2)}</p>
+                      
+                      {/* Micro Quantity Toggler */}
+                      <div className="flex items-center justify-between bg-slate-100 border border-slate-200 rounded shadow-sm w-full mt-1">
+                        <button 
+                          type="button" 
+                          onClick={() => updateQuantity(item.sku, (item.cart_quantity || item.quantity || 1) - 1)}
+                          className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-red-500 hover:bg-slate-200 rounded-l transition-colors font-black text-[10px]"
+                        >
+                          -
+                        </button>
+                        <span className="text-[9px] font-black text-slate-700">
+                          {item.cart_quantity || item.quantity || 1}
+                        </span>
+                        <button 
+                          type="button" 
+                          onClick={() => updateQuantity(item.sku, (item.cart_quantity || item.quantity || 1) + 1)}
+                          className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-slate-200 rounded-r transition-colors font-black text-[10px]"
+                        >
+                          +
+                        </button>
+                      </div>
+
                     </div>
                   </div>
+                  
                 </div>
               ))}
             </div>
@@ -252,7 +327,12 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
                 <div className="space-y-2">
                   <input type="email" placeholder="Email Address *" value={checkoutEmail} onChange={(e) => setCheckoutEmail(e.target.value)} className="w-full px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium" />
                   <input type="text" placeholder="Full Name *" value={checkoutName} onChange={(e) => setCheckoutName(e.target.value)} className="w-full px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium" />
-                  <input type="text" placeholder="Street Address *" value={checkoutStreet} onChange={(e) => setCheckoutStreet(e.target.value)} className="w-full px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium" />
+                  
+                  <div className="flex gap-2">
+                    <input type="text" placeholder="Street Address *" value={checkoutStreet} onChange={(e) => setCheckoutStreet(e.target.value)} className="flex-1 px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium" />
+                    <input type="text" placeholder="Apt/Suite (Opt)" value={checkoutApt} onChange={(e) => setCheckoutApt(e.target.value)} className="w-1/3 px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium" />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <input type="text" placeholder="City *" value={checkoutCity} onChange={(e) => setCheckoutCity(e.target.value)} className="w-full px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium" />
                     <div className="grid grid-cols-2 gap-2">
