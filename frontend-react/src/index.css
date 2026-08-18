@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+/* --- STREET CODE 101 CUSTOM SCROLLBAR --- */
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #f97316 #1e293b; /* Orange thumb, Slate-800 track */
+}
+
+/* For Chrome, Edge, and Safari */
+::-webkit-scrollbar {
+  width: 8px;  /* Vertical scrollbar width */
+  height: 8px; /* Horizontal scrollbar height */
+}
+
+::-webkit-scrollbar-track {
+  background: #1e293b; /* Tailwind slate-800 */
+  border-radius: 0px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #f97316; /* Tailwind orange-500 */
+  border-radius: 10px;
+  border: 2px solid #1e293b; /* Creates a sleek "padding" look */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ea580c; /* Tailwind orange-600 */
+}

@@ -1,0 +1,21 @@
+# Security & Secrets
+backend/.env
+**/.env
+.env.local
+
+# Python Environments
+backend/venv/
+backend/__pycache__/
+*.pyc
+
+# Node & Frontend
+frontend-react/node_modules/
+frontend-react/dist/
+
+# Local Database & Storage
+backend/*.db
+backend/*.sqlite3
+minio-data/
+
+# OS Files
+.DS_Store
