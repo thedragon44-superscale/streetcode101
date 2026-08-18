@@ -312,6 +312,21 @@ def submit_order(order_data: Order, session: Session = Depends(get_session)):
     session.add(order_data)
     session.commit()
     session.refresh(order_data)
+    
+    # --- SEND AUTOMATED CONFIRMATION EMAIL ---
+    email_body = (
+        f"Thanks for dropping with us!\n\n"
+        f"We've successfully received your order for '{product.title}' (SKU: {order_data.sku}).\n"
+        f"Quantity: {order_data.quantity}\n\n"
+        f"Shipping to:\n{order_data.shipping_address}\n\n"
+        f"We will email you again the moment your tracking number is generated. Stay tuned!"
+    )
+    
+    send_automated_email(
+        to_email=order_data.customer_email,
+        subject=f"Street Code 101 - Order Confirmation #{order_data.id}",
+        body=email_body
+    )
 
     return {
         "order_id": order_data.id,
