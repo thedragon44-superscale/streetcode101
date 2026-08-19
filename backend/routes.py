@@ -643,9 +643,14 @@ def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_
     if existing:
         raise HTTPException(status_code=400, detail=f"Product {target_sku} is already in your store!")
 
-    # 3. Search CJ for this exact SKU
-    products_url = f"https://developers.cjdropshipping.com/api2.0/v1/product/listV2?page=1&size=10&keyWord={target_sku}"
-    prod_res = requests.get(products_url, headers=auth_headers, timeout=15)
+    # 3. Search CJ safely (Bulletproof encoding for exact SKUs)
+    products_url = "https://developers.cjdropshipping.com/api2.0/v1/product/listV2"
+    safe_params = {
+        "page": 1,
+        "size": 10,
+        "keyWord": target_sku
+    }
+    prod_res = requests.get(products_url, headers=auth_headers, params=safe_params, timeout=15)
     
     if not prod_res.ok:
         raise HTTPException(status_code=500, detail="Failed to reach CJ API.")
