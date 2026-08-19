@@ -6,7 +6,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import CheckoutForm from './CheckoutForm';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 export default function Navbar({ showSearch = false, searchQuery, setSearchQuery, searchResults = [] }) {
