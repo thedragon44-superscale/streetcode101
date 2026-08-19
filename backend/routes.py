@@ -635,8 +635,9 @@ def sync_cj_dropshipping(session: Session = Depends(get_session), token: dict = 
         
     access_token = auth_res.json()["data"].get("accessToken")
 
-    # 2. Fetch products from their live database (Page 1, 20 items)
-    products_url = "https://developers.cjdropshipping.com/api2.0/v1/product/listV2?page=1&size=20"
+    # 2. Fetch products using a specific keyword so CJ doesn't return an empty list
+    search_term = "keyboard" # Change this to your niche (e.g., "hoodie", "mouse", "tech")
+    products_url = f"https://developers.cjdropshipping.com/api2.0/v1/product/listV2?page=1&size=20&keyWord={search_term}"
     
     # Combine the disguise with the new auth token
     auth_headers = {**base_headers, "CJ-Access-Token": access_token}
