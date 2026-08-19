@@ -652,9 +652,40 @@ def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_
     }
     prod_res = requests.get(products_url, headers=auth_headers, params=safe_params, timeout=15)
     
-    # --- ULTIMATE DEBUGGER ---
-    # Force the backend to stop and print CJ's exact raw response to your screen!
-    raise HTTPException(status_code=400, detail=f"RAW CJ RESPONSE: {prod_res.text}")
+    # 4. Extract data using the deeply nested V2 Dictionary Keys
+    json_data = prod_res.json()
+    content_list = json_data.get("data", {}).get("content", [])
+    
+    # Check if 'content' is empty OR if 'productList' inside it is empty
+    if not content_list or not content_list[0].get("productList"):
+        raise HTTPException(status_code=404, detail=f"CJ returned 0 results for: {target_sku}")
+        
+    p = content_list[0].get("productList")[0] # Grab the first exact match!
+    
+    # CJ's V2 API uses 'sku' as the primary ID here
+    actual_sku = p.get("sku", target_sku)
+    
+    # Prevent duplicate insertions
+    existing = session.exec(select(Product).where(Product.supplier_sku == actual_sku)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Product {actual_sku} is already in your store!")
+    
+    base_price = float(p.get("sellPrice", 15.00))
+    markup_price = base_price * 2.5
+    
+    new_prod = Product(
+        sku=f"101-{actual_sku[:8]}", 
+        title=p.get("nameEn", "Premium CJ Drop"),
+        description=f"Authentic dropshipped item. Supplier Ref: {actual_sku}",
+        price=markup_price,
+        image_url=p.get("bigImage", "/sb.png"), 
+        in_stock=True,
+        supplier_sku=actual_sku,
+        category="uncategorized"
+    )
+    session.add(new_prod)
+    session.commit()
+    return {"message": f"Successfully imported {p.get('nameEn')}!"}
 # --- WEBSOCKET CONNECTION MANAGER ---
 class ConnectionManager:
     def __init__(self):
