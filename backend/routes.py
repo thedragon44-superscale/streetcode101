@@ -655,22 +655,31 @@ def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_
     if not prod_res.ok:
         raise HTTPException(status_code=500, detail="Failed to reach CJ API.")
         
-    products = prod_res.json().get("data", {}).get("list", [])
+    # 4. Extract data using the correct V2 Dictionary Keys!
+    products = prod_res.json().get("data", {}).get("productList", [])
     if not products:
-        raise HTTPException(status_code=404, detail=f"CJ returned 0 results for SKU: {target_sku}")
+        raise HTTPException(status_code=404, detail=f"CJ returned 0 results for: {target_sku}")
         
     p = products[0] # Grab the exact match
+    
+    # Grab the real SPU from the API, even if we searched by title
+    actual_spu = p.get("spu", target_sku)
+    
+    # Prevent duplicate insertions if we search by title instead of SPU
+    if session.exec(select(Product).where(Product.supplier_sku == actual_spu)).first():
+        raise HTTPException(status_code=400, detail=f"Product {actual_spu} is already in your store!")
+    
     base_price = float(p.get("sellPrice", 15.00))
     markup_price = base_price * 2.5
     
     new_prod = Product(
-        sku=f"101-{target_sku[:8]}", 
-        title=p.get("productName", "Premium CJ Drop"),
-        description=f"Authentic dropshipped item. Supplier Ref: {target_sku}",
+        sku=f"101-{actual_spu[:8]}", 
+        title=p.get("nameEn", "Premium CJ Drop"),
+        description=f"Authentic dropshipped item. Supplier Ref: {actual_spu}",
         price=markup_price,
-        image_url=p.get("productImage", "/sb.png"), 
+        image_url=p.get("bigImage", "/sb.png"), 
         in_stock=True,
-        supplier_sku=target_sku,
+        supplier_sku=actual_spu,
         category="uncategorized"
     )
     session.add(new_prod)
