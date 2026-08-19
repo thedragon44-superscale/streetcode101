@@ -241,7 +241,7 @@ def create_product(
                 unique_filename,
                 ExtraArgs={"ContentType": file.content_type}
             )
-            image_url = f"{os.getenv('AWS_ENDPOINT_URL')}/{BUCKET_NAME}/{unique_filename}"
+            image_url = f"https://streetcode101.com/{BUCKET_NAME}/{unique_filename}"
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
 
@@ -368,7 +368,7 @@ def upload_product_image(file: UploadFile = File(...), token: dict = Depends(ver
             ExtraArgs={"ContentType": file.content_type}
         )
         
-        file_url = f"{os.getenv('AWS_ENDPOINT_URL')}/{BUCKET_NAME}/{unique_filename}"
+        file_url = f"https://streetcode101.com/{BUCKET_NAME}/{unique_filename}"
         
         return {"message": "Upload successful", "image_url": file_url}
         
@@ -511,7 +511,7 @@ def upload_profile_image(file: UploadFile = File(...), session: Session = Depend
             ExtraArgs={"ContentType": file.content_type}
         )
         
-        file_url = f"{os.getenv('AWS_ENDPOINT_URL')}/{BUCKET_NAME}/{unique_filename}"
+        file_url = f"https://streetcode101.com/{BUCKET_NAME}/{unique_filename}"
         
         # Save the new image URL directly to the user's database record
         user.profile_image_url = file_url
@@ -552,7 +552,7 @@ def create_vendor_listing(
                 unique_filename,
                 ExtraArgs={"ContentType": file.content_type}
             )
-            image_url = f"{os.getenv('AWS_ENDPOINT_URL')}/{BUCKET_NAME}/{unique_filename}"
+            image_url = f"https://streetcode101.com/{BUCKET_NAME}/{unique_filename}"
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to upload listing image: {str(e)}")
 
