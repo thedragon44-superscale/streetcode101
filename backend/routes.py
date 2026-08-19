@@ -609,9 +609,12 @@ def get_global_social_feed(session: Session = Depends(get_session)):
         
     return feed
 
+class CJSyncRequest(BaseModel):
+    sku: str
+
 @router.post("/api/admin/sync-cj")
-def sync_cj_dropshipping(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Fetches products from the CJ Dropshipping API and imports them into your PostgreSQL database."""
+def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Fetches a specific product from CJ Dropshipping API by SKU."""
     username = token.get("sub")
     if username != "admin":
         raise HTTPException(status_code=403, detail="Unauthorized. Master Admin only.")
@@ -620,62 +623,54 @@ def sync_cj_dropshipping(session: Session = Depends(get_session), token: dict = 
     if not cj_api_key:
         raise HTTPException(status_code=500, detail="CJ_API_KEY is missing from .env file!")
 
-    # 1. Authenticate with CJ to get a temporary access token
+    target_sku = payload.sku.strip()
+    if not target_sku:
+        raise HTTPException(status_code=400, detail="No SKU provided.")
+
+    # 1. Authenticate with CJ
     auth_url = "https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken"
-    
-    # Disguise the Python script as a normal web browser
-    base_headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
+    base_headers = {"User-Agent": "Mozilla/5.0"}
     
     auth_res = requests.post(auth_url, json={"apiKey": cj_api_key}, headers=base_headers, timeout=15)
-    
     if not auth_res.ok or not auth_res.json().get("data"):
         raise HTTPException(status_code=500, detail=f"CJ API Auth Failed: {auth_res.text}")
         
     access_token = auth_res.json()["data"].get("accessToken")
-
-    # 2. Fetch products using a specific keyword so CJ doesn't return an empty list
-    search_term = "keyboard" # Change this to your niche (e.g., "hoodie", "mouse", "tech")
-    products_url = f"https://developers.cjdropshipping.com/api2.0/v1/product/listV2?page=1&size=20&keyWord={search_term}"
-    
-    # Combine the disguise with the new auth token
     auth_headers = {**base_headers, "CJ-Access-Token": access_token}
-    
+
+    # 2. Prevent Duplicate Imports
+    existing = session.exec(select(Product).where(Product.supplier_sku == target_sku)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Product {target_sku} is already in your store!")
+
+    # 3. Search CJ for this exact SKU
+    products_url = f"https://developers.cjdropshipping.com/api2.0/v1/product/listV2?page=1&size=10&keyWord={target_sku}"
     prod_res = requests.get(products_url, headers=auth_headers, timeout=15)
+    
     if not prod_res.ok:
-        raise HTTPException(status_code=500, detail="Failed to fetch product list.")
+        raise HTTPException(status_code=500, detail="Failed to reach CJ API.")
         
     products = prod_res.json().get("data", {}).get("list", [])
+    if not products:
+        raise HTTPException(status_code=404, detail=f"CJ returned 0 results for SKU: {target_sku}")
+        
+    p = products[0] # Grab the exact match
+    base_price = float(p.get("sellPrice", 15.00))
+    markup_price = base_price * 2.5
     
-    synced_count = 0
-    for p in products:
-        supplier_sku = p.get("productSku", str(p.get("pid", "")))
-        
-        # Prevent importing duplicates
-        existing = session.exec(select(Product).where(Product.supplier_sku == supplier_sku)).first()
-        if existing:
-            continue
-            
-        # Automatically mark up the price by 2.5x for your profit margin!
-        base_price = float(p.get("sellPrice", 15.00))
-        markup_price = base_price * 2.5
-        
-        new_prod = Product(
-            sku=f"101-{supplier_sku[:8]}", # Custom Street Code 101 SKU format
-            title=p.get("productName", "Premium Streetwear Item"),
-            description=f"Authentic dropshipped item. Supplier Ref: {supplier_sku}",
-            price=markup_price,
-            image_url=p.get("productImage", "/sb.png"), 
-            in_stock=True,
-            supplier_sku=supplier_sku
-        )
-        session.add(new_prod)
-        synced_count += 1
-        
+    new_prod = Product(
+        sku=f"101-{target_sku[:8]}", 
+        title=p.get("productName", "Premium CJ Drop"),
+        description=f"Authentic dropshipped item. Supplier Ref: {target_sku}",
+        price=markup_price,
+        image_url=p.get("productImage", "/sb.png"), 
+        in_stock=True,
+        supplier_sku=target_sku,
+        category="uncategorized"
+    )
+    session.add(new_prod)
     session.commit()
-    return {"message": f"Successfully imported {synced_count} new products from CJ Dropshipping!"}
-
+    return {"message": f"Successfully imported {target_sku}!"}
 # --- WEBSOCKET CONNECTION MANAGER ---
 class ConnectionManager:
     def __init__(self):

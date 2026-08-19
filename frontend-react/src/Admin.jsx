@@ -17,6 +17,7 @@ export default function Admin() {
   // --- MODAL STATE ---
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [cjSku, setCjSku] = useState('');
   const [newProduct, setNewProduct] = useState({
     sku: '', title: '', price: '', description: '', category: 'peripherals', in_stock: true, image: null
   });
@@ -127,16 +128,19 @@ export default function Admin() {
   };
 
   const handleSyncCJ = async () => {
+    if (!cjSku.trim()) return toast.error('Please enter a CJ SKU first!');
     setIsSyncing(true);
     try {
       const response = await fetch(`${API_BASE}/admin/sync-cj`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sku: cjSku })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Failed to sync with CJ');
       toast.success(data.message);
-      fetchData(); // Instantly refresh your table to show the new items!
+      setCjSku(''); 
+      fetchData(); 
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -286,9 +290,18 @@ export default function Admin() {
                 <p className="text-slate-500 mt-1 font-medium">Manage your storefront products.</p>
               </div>
               <div className="flex gap-3">
-                <button onClick={handleSyncCJ} disabled={isSyncing} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50">
-                  {isSyncing ? '🔄 Syncing API...' : '⚡ Auto-Sync CJ Catalog'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    value={cjSku}
+                    onChange={(e) => setCjSku(e.target.value)}
+                    placeholder="Enter CJ SKU..."
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500 font-medium"
+                  />
+                  <button onClick={handleSyncCJ} disabled={isSyncing} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50">
+                    {isSyncing ? '🔄 Syncing API...' : '⚡ Import SKU'}
+                  </button>
+                </div>
                 <button onClick={() => setIsAddModalOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2">
                   <span>➕</span> Add Product
                 </button>
