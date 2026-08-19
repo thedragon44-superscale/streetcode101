@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
 const CartContext = createContext();
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);

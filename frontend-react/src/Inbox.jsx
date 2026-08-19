@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from './Navbar';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
 export default function Inbox() {
   const [conversations, setConversations] = useState([]);

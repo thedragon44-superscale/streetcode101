@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import Navbar from './Navbar';
 import { useCart } from './CartContext';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
 export default function Profile() {
   const { username } = useParams(); // 'me' or an actual username
