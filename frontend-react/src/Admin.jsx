@@ -20,7 +20,7 @@ export default function Admin() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [cjSku, setCjSku] = useState('');
   const [newProduct, setNewProduct] = useState({
-    sku: '', title: '', price: '', description: '', category: 'peripherals', in_stock: true, image: null
+    sku: '', title: '', price: '', description: '', category: 'mens-clothing', in_stock: true, image: null
   });
   const [editingProduct, setEditingProduct] = useState({
     sku: '', title: '', price: '', description: '', category: ''
@@ -423,10 +423,12 @@ export default function Admin() {
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
                   <select required value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium bg-white">
-                    <option value="peripherals">Peripherals</option>
-                    <option value="displays">Displays</option>
+                    <option value="mens-clothing">Men's Clothing</option>
+                    <option value="womens-clothing">Women's Clothing</option>
+                    <option value="mens-jewelry">Men's Jewelry</option>
+                    <option value="womens-jewelry">Women's Jewelry</option>
                     <option value="accessories">Accessories</option>
-                    <option value="components">Components</option>
+                    <option value="electronics">Electronics</option>
                   </select>
                 </div>
               </div>
@@ -486,7 +488,15 @@ export default function Admin() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
-                  <input required type="text" value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" />
+                  <select required value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium bg-white">
+                    <option value="uncategorized">Uncategorized</option>
+                    <option value="mens-clothing">Men's Clothing</option>
+                    <option value="womens-clothing">Women's Clothing</option>
+                    <option value="mens-jewelry">Men's Jewelry</option>
+                    <option value="womens-jewelry">Women's Jewelry</option>
+                    <option value="accessories">Accessories</option>
+                    <option value="electronics">Electronics</option>
+                  </select>
                 </div>
               </div>
 
