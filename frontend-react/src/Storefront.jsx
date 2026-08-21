@@ -26,6 +26,8 @@ export default function Storefront() {
     { id: 'All', label: 'All Drops' },
     { id: 'mens-clothing', label: "Men's Clothing" },
     { id: 'womens-clothing', label: "Women's Clothing" },
+    { id: 'mens-shoes', label: "Men's Shoes" },
+    { id: 'womens-shoes', label: "Women's Shoes" },
     { id: 'mens-jewelry', label: "Men's Jewelry" },
     { id: 'womens-jewelry', label: "Women's Jewelry" },
     { id: 'accessories', label: 'Accessories' },

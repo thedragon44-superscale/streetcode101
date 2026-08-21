@@ -437,6 +437,8 @@ export default function Admin() {
                   <select required value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium bg-white">
                     <option value="mens-clothing">Men's Clothing</option>
                     <option value="womens-clothing">Women's Clothing</option>
+                    <option value="mens-shoes">Men's Shoes</option>
+                    <option value="womens-shoes">Women's Shoes</option>
                     <option value="mens-jewelry">Men's Jewelry</option>
                     <option value="womens-jewelry">Women's Jewelry</option>
                     <option value="accessories">Accessories</option>
@@ -504,6 +506,8 @@ export default function Admin() {
                     <option value="uncategorized">Uncategorized</option>
                     <option value="mens-clothing">Men's Clothing</option>
                     <option value="womens-clothing">Women's Clothing</option>
+                    <option value="mens-shoes">Men's Shoes</option>
+                    <option value="womens-shoes">Women's Shoes</option>
                     <option value="mens-jewelry">Men's Jewelry</option>
                     <option value="womens-jewelry">Women's Jewelry</option>
                     <option value="accessories">Accessories</option>
