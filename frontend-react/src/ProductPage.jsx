@@ -15,6 +15,11 @@ export default function ProductPage() {
   // Global Cart
   const { addToCart } = useCart();
 
+  // Variant States
+  const [selectedColor, setSelectedColor] = useState('Default');
+  const [selectedSize, setSelectedSize] = useState('OS');
+  const [currentVariant, setCurrentVariant] = useState(null);
+
   // Fetch the single product
   useEffect(() => {
     fetch(`${API_BASE}/products/${sku}`)
@@ -24,6 +29,12 @@ export default function ProductPage() {
       })
       .then((data) => {
         setProduct(data);
+        if (data.variants && data.variants.length > 0) {
+          const initial = data.variants[0];
+          setSelectedColor(initial.color);
+          setSelectedSize(initial.size);
+          setCurrentVariant(initial);
+        }
         setLoading(false);
       })
       .catch((err) => {
@@ -32,10 +43,32 @@ export default function ProductPage() {
       });
   }, [sku]);
 
-  // Wrapper for global addToCart since this page only has one product
+  // Update active variant when selections change
+  useEffect(() => {
+    if (product?.variants?.length > 0) {
+      const matched = product.variants.find(v => v.color === selectedColor && v.size === selectedSize);
+      if (matched) setCurrentVariant(matched);
+    }
+  }, [selectedColor, selectedSize, product]);
+
   const handleAddToCart = () => {
-    addToCart(product);
+    const itemToCart = currentVariant ? {
+      ...product,
+      sku: currentVariant.variant_sku, // Send the specific variant SKU to the cart!
+      price: currentVariant.price,
+      image_url: currentVariant.image_url,
+      title: selectedColor !== 'Default' ? `${product.title} (${selectedColor} / ${selectedSize})` : product.title
+    } : product;
+    addToCart(itemToCart);
   };
+
+  // Derive available options for the UI
+  const hasVariants = product?.variants?.length > 0;
+  const availableColors = hasVariants ? [...new Set(product.variants.map(v => v.color))] : [];
+  const availableSizes = hasVariants ? [...new Set(product.variants.filter(v => v.color === selectedColor).map(v => v.size))] : [];
+  
+  const displayPrice = currentVariant ? currentVariant.price : product?.price || 0;
+  const displayImage = currentVariant ? currentVariant.image_url : product?.image_url;
 
   // --- SKELETON LOADER ---
   if (loading) return (
@@ -77,7 +110,7 @@ export default function ProductPage() {
         
         {/* Left Column: Image */}
         <div className="md:col-span-5 flex justify-center p-8 bg-slate-50 rounded-3xl border border-slate-100 shadow-inner">
-          <img src={product.image_url} alt={product.title} className="max-w-full h-auto object-contain mix-blend-multiply hover:scale-105 transition-transform duration-500" />
+          <img src={displayImage} alt={product.title} className="max-w-full h-auto object-contain mix-blend-multiply hover:scale-105 transition-transform duration-500" />
         </div>
 
         {/* Center Column: Details */}
@@ -94,9 +127,56 @@ export default function ProductPage() {
 
           <div className="flex items-start mb-6 text-slate-900">
             <span className="text-sm font-black mt-1">$</span>
-            <span className="text-5xl font-black">{Math.floor(product.price)}</span>
-            <span className="text-sm font-black mt-1">{(product.price % 1).toFixed(2).substring(2)}</span>
+            <span className="text-5xl font-black">{Math.floor(displayPrice)}</span>
+            <span className="text-sm font-black mt-1">{(displayPrice % 1).toFixed(2).substring(2)}</span>
           </div>
+
+          {/* Variant Selectors */}
+          {hasVariants && availableColors.length > 0 && availableColors[0] !== 'Default' && (
+            <div className="mb-6 space-y-6">
+              
+              {/* Color Picker */}
+              <div>
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-3">Color: <span className="text-orange-500">{selectedColor}</span></h3>
+                <div className="flex flex-wrap gap-2">
+                  {availableColors.map(color => (
+                    <button
+                      key={color}
+                      onClick={() => {
+                        setSelectedColor(color);
+                        // Auto-select first available size for this new color to prevent dead states
+                        const sizesForColor = product.variants.filter(v => v.color === color).map(v => v.size);
+                        if (sizesForColor.length > 0 && !sizesForColor.includes(selectedSize)) {
+                          setSelectedSize(sizesForColor[0]);
+                        }
+                      }}
+                      className={`px-4 py-2 text-sm font-bold rounded-xl border-2 transition-all ${selectedColor === color ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
+                    >
+                      {color}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Size Picker */}
+              {availableSizes.length > 0 && availableSizes[0] !== 'OS' && (
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-3">Size: <span className="text-orange-500">{selectedSize}</span></h3>
+                  <div className="flex flex-wrap gap-2">
+                    {availableSizes.map(size => (
+                      <button
+                        key={size}
+                        onClick={() => setSelectedSize(size)}
+                        className={`px-4 py-2 text-sm font-bold rounded-xl border-2 transition-all min-w-[3.5rem] ${selectedSize === size ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-4 text-sm text-slate-600 leading-relaxed bg-slate-50 p-6 rounded-2xl border border-slate-100">
             <p className="font-black text-slate-900 text-base uppercase tracking-wide">About this drop</p>
@@ -112,7 +192,7 @@ export default function ProductPage() {
         {/* Right Column: Buy Box */}
         <div className="md:col-span-3">
           <div className="border border-slate-200 rounded-3xl p-6 shadow-xl shadow-slate-200/50 sticky top-24">
-            <div className="text-3xl font-black text-slate-900 mb-4">${product.price.toFixed(2)}</div>
+            <div className="text-3xl font-black text-slate-900 mb-4">${displayPrice.toFixed(2)}</div>
             
             <div className="text-sm text-slate-600 mb-4">
               <span className="font-bold text-cyan-700 hover:underline cursor-pointer">FREE Returns</span>

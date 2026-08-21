@@ -640,66 +640,68 @@ def get_global_social_feed(session: Session = Depends(get_session)):
 class CJSyncRequest(BaseModel):
     sku: str
 
-@router.post("/api/admin/sync-cj")
-def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Fetches a specific product from CJ Dropshipping API by SKU."""
-    username = token.get("sub")
-    if username != "admin":
-        raise HTTPException(status_code=403, detail="Unauthorized. Master Admin only.")
-        
-    cj_api_key = os.getenv("CJ_API_KEY")
-    if not cj_api_key:
-        raise HTTPException(status_code=500, detail="CJ_API_KEY is missing from .env file!")
-
-    target_sku = payload.sku.strip()
-    if not target_sku:
-        raise HTTPException(status_code=400, detail="No SKU provided.")
-
-    # 1. Authenticate with CJ
+def fetch_cj_product_data(target_sku: str, cj_api_key: str):
+    """Helper function to ping CJ and extract base data + variants."""
     auth_url = "https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken"
     base_headers = {"User-Agent": "Mozilla/5.0"}
     
     auth_res = requests.post(auth_url, json={"apiKey": cj_api_key}, headers=base_headers, timeout=15)
     if not auth_res.ok or not auth_res.json().get("data"):
-        raise HTTPException(status_code=500, detail=f"CJ API Auth Failed: {auth_res.text}")
+        return None
         
     access_token = auth_res.json()["data"].get("accessToken")
     auth_headers = {**base_headers, "CJ-Access-Token": access_token}
 
-    # 2. Prevent Duplicate Imports
-    existing = session.exec(select(Product).where(Product.supplier_sku == target_sku)).first()
-    if existing:
-        raise HTTPException(status_code=400, detail=f"Product {target_sku} is already in your store!")
-
-    # 3. Search CJ safely (Bulletproof encoding for exact SKUs)
     products_url = "https://developers.cjdropshipping.com/api2.0/v1/product/listV2"
-    safe_params = {
-        "page": 1,
-        "size": 10,
-        "keyWord": target_sku
-    }
+    safe_params = {"page": 1, "size": 10, "keyWord": target_sku}
     prod_res = requests.get(products_url, headers=auth_headers, params=safe_params, timeout=15)
     
-    # 4. Extract data using the deeply nested V2 Dictionary Keys
-    json_data = prod_res.json()
-    content_list = json_data.get("data", {}).get("content", [])
-    
-    # Check if 'content' is empty OR if 'productList' inside it is empty
+    content_list = prod_res.json().get("data", {}).get("content", [])
     if not content_list or not content_list[0].get("productList"):
+        return None
+        
+    p = content_list[0].get("productList")[0]
+    
+    # Extract Variants dynamically
+    base_price = float(p.get("sellPrice", 15.00))
+    cj_variants = p.get("variantList", [])
+    parsed_variants = []
+    
+    for v in cj_variants:
+        parsed_variants.append({
+            "variant_sku": v.get("variantSku", ""),
+            "color": v.get("variantKey", "Default").split("-")[0] if "-" in v.get("variantKey", "") else "Default",
+            "size": v.get("variantKey", "OS").split("-")[-1] if "-" in v.get("variantKey", "") else "OS",
+            "price": float(v.get("sellPrice", base_price)) * 2.5,
+            "image_url": v.get("variantImage", p.get("bigImage"))
+        })
+        
+    if not parsed_variants:
+        parsed_variants = [{"variant_sku": f"101-{target_sku[:8]}-DEF", "color": "Default", "size": "OS", "price": base_price * 2.5, "image_url": p.get("bigImage")}]
+        
+    return {"base_data": p, "variants": parsed_variants}
+
+@router.post("/api/admin/sync-cj")
+def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Fetches a specific product from CJ Dropshipping API by SKU, including variants."""
+    username = token.get("sub")
+    if username != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized.")
+        
+    cj_api_key = os.getenv("CJ_API_KEY")
+    target_sku = payload.sku.strip()
+    
+    existing = session.exec(select(Product).where(Product.supplier_sku == target_sku)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Product already exists. Use Resync.")
+
+    cj_data = fetch_cj_product_data(target_sku, cj_api_key)
+    if not cj_data:
         raise HTTPException(status_code=404, detail=f"CJ returned 0 results for: {target_sku}")
         
-    p = content_list[0].get("productList")[0] # Grab the first exact match!
-    
-    # CJ's V2 API uses 'sku' as the primary ID here
+    p = cj_data["base_data"]
     actual_sku = p.get("sku", target_sku)
-    
-    # Prevent duplicate insertions
-    existing = session.exec(select(Product).where(Product.supplier_sku == actual_sku)).first()
-    if existing:
-        raise HTTPException(status_code=400, detail=f"Product {actual_sku} is already in your store!")
-    
-    base_price = float(p.get("sellPrice", 15.00))
-    markup_price = base_price * 2.5
+    markup_price = float(p.get("sellPrice", 15.00)) * 2.5
     
     new_prod = Product(
         sku=f"101-{actual_sku[:8]}", 
@@ -709,12 +711,35 @@ def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_
         image_url=p.get("bigImage", "/sb.png"), 
         in_stock=True,
         supplier_sku=actual_sku,
-        category="uncategorized"
+        variants=cj_data["variants"]
     )
     session.add(new_prod)
     session.commit()
-    session.refresh(new_prod)
-    return {"message": f"Successfully imported {p.get('nameEn')}!", "product": new_prod}
+    return {"message": f"Successfully imported {new_prod.title} with variants!"}
+
+@router.post("/api/admin/resync-all-variants")
+def resync_all_variants(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Loops through all products and fetches their latest variants from CJ."""
+    username = token.get("sub")
+    if username != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized.")
+        
+    cj_api_key = os.getenv("CJ_API_KEY")
+    products = session.exec(select(Product)).all()
+    updated = 0
+    
+    for prod in products:
+        if not prod.supplier_sku:
+            continue
+            
+        cj_data = fetch_cj_product_data(prod.supplier_sku, cj_api_key)
+        if cj_data:
+            prod.variants = cj_data["variants"]
+            session.add(prod)
+            updated += 1
+            
+    session.commit()
+    return {"message": f"Successfully resynced variants for {updated} products!"}
 
 @router.post("/api/profile/spin")
 def spin_vault_wheel(session: Session = Depends(get_session), token: dict = Depends(verify_token)):

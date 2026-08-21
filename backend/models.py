@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
 from datetime import datetime, timezone
+from sqlalchemy import Column, JSON
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -22,6 +23,7 @@ class Product(SQLModel, table=True):
     image_url: str
     in_stock: bool
     supplier_sku: Optional[str] = None 
+    variants: list = Field(default=[], sa_column=Column(JSON)) 
 
 class Order(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
