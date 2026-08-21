@@ -107,111 +107,105 @@ export default function Storefront() {
       {/* Global Navbar with Search Enabled */}
       <Navbar showSearch={true} searchQuery={searchQuery} setSearchQuery={setSearchQuery} searchResults={filteredProducts} />
 
-      
+      {/* --- PROFESSIONAL SUB-HEADER / CATEGORY NAV --- */}
+      <div className="bg-white border-b border-slate-200 sticky top-0 sm:top-[73px] z-[90] shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          
+          {/* Minimalist Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
+              className="flex items-center gap-2 text-slate-800 font-black hover:text-orange-500 transition-colors py-1 focus:outline-none"
+            >
+              <i className="fa-solid fa-bars text-lg"></i>
+              <span className="uppercase tracking-widest text-sm">
+                {categories.find(c => c.id === selectedCategory)?.label || 'All Drops'}
+              </span>
+              <i className={`fa-solid fa-chevron-down text-xs ml-1 transition-transform ${isCategoryMenuOpen ? 'rotate-180' : ''}`}></i>
+            </button>
+
+            {isCategoryMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsCategoryMenuOpen(false)}></div>
+                <div className="absolute left-0 mt-3 w-64 bg-white border border-slate-200 shadow-2xl z-50 rounded-xl overflow-hidden py-2">
+                  {categories.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        setSelectedCategory(cat.id);
+                        setIsCategoryMenuOpen(false);
+                      }}
+                      className={`block w-full text-left px-6 py-2.5 text-sm font-bold transition-colors ${
+                        selectedCategory === cat.id
+                          ? 'text-orange-600 bg-orange-50 border-l-4 border-orange-500'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-l-4 border-transparent'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Results text */}
+          <div className="text-xs text-slate-500 font-medium">
+            Showing <span className="font-bold text-slate-900">{filteredProducts.length}</span> results
+            {searchQuery && <span> for "<span className="text-slate-900 font-bold">{searchQuery}</span>"</span>}
+          </div>
+        </div>
+      </div>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         
         {/* --- HIGH-FASHION FEATURED DROP BANNER --- */}
-        <div className="relative mb-10 rounded-3xl overflow-hidden bg-slate-950 text-white p-8 md:p-12 border border-slate-800 shadow-[0_0_50px_rgba(249,115,22,0.1)] flex flex-col md:flex-row items-center justify-between gap-8">
-          
-          {/* Dual Ambient Glows */}
-          <div className="absolute -top-24 -left-24 w-72 h-72 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="max-w-xl z-10">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-mono font-bold tracking-widest text-blue-400 uppercase bg-blue-950/80 px-3 py-1 rounded-full border border-blue-800/50">
-                [101_LIVE_VAULT]
-              </span>
-              <span className="text-xs font-mono text-slate-400">CURATED DROP // <span className="text-orange-500 font-bold">IN STOCK</span></span>
-            </div>
-
-            <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight mt-4 font-heading leading-none">
-              STREET CODE <span className="text-orange-500">101</span>
-            </h1>
+        {selectedCategory === 'All' && !searchQuery && (
+          <div className="relative mb-10 rounded-3xl overflow-hidden bg-slate-950 text-white p-8 md:p-12 border border-slate-800 shadow-[0_0_50px_rgba(249,115,22,0.1)] flex flex-col md:flex-row items-center justify-between gap-8">
             
-            <p className="text-slate-400 mt-4 text-sm md:text-base font-mono leading-relaxed">
-              AUTHENTICATED DROPS & PEER-TO-PEER LEDGER. LOG IN TO YOUR PROFILE TO UNLOCK VAULT DISCOUNTS.
-            </p>
+            {/* Dual Ambient Glows */}
+            <div className="absolute -top-24 -left-24 w-72 h-72 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            <div className="mt-8 flex flex-wrap gap-4 font-mono">
-              <a href="#catalog" className="bg-orange-500 hover:bg-orange-600 text-slate-950 font-black px-8 py-4 rounded-xl shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all active:scale-95 text-xs uppercase tracking-widest">
-                EXPLORE DROP
-              </a>
-              <Link to="/feed" className="bg-slate-900 hover:bg-slate-800 text-blue-400 font-bold px-8 py-4 rounded-xl border border-blue-500/30 transition-all text-xs uppercase tracking-widest">
-                SOCIAL FEED
-              </Link>
-            </div>
-          </div>
-
-          {/* Showcase Image Frame */}
-          <div className="relative z-10 w-full md:w-auto flex justify-center">
-            <div className="relative w-56 h-56 md:w-64 md:h-64 rounded-2xl bg-slate-900 border border-slate-800 p-3 flex items-center justify-center shadow-2xl group hover:border-orange-500/50 transition-all">
-              <span className="absolute top-3 left-3 z-20 px-2.5 py-1 bg-slate-950/90 backdrop-blur-md text-[10px] font-mono text-blue-400 border border-blue-500/30 rounded-md">
-                FEATURED_ITEM
-              </span>
-              <img src="/streetbook_logo.png" alt="Featured Drop" className="w-full h-full object-cover rounded-xl group-hover:scale-105 transition-transform duration-300" />
-            </div>
-          </div>
-        </div>
-
-        {/* --- CATALOG CONTROLS --- */}
-        <div id="catalog" className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-[100]">
-          
-          {/* Enhanced Category Dropdown */}
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <span className="text-xs font-black text-slate-400 uppercase tracking-widest hidden lg:block">Select Category</span>
-            <div className="relative w-full sm:w-72">
-              <button
-                onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
-                className="flex items-center justify-between w-full px-5 py-3.5 bg-slate-900 border-2 border-slate-900 text-white rounded-xl shadow-lg text-sm font-bold hover:bg-slate-800 focus:outline-none transition-all"
-              >
-                <span className="flex items-center gap-3">
-                  <div className="w-7 h-7 bg-orange-500 rounded-md flex items-center justify-center text-white">
-                    <i className="fa-solid fa-layer-group text-xs"></i>
-                  </div>
-                  {categories.find(c => c.id === selectedCategory)?.label || 'All Drops'}
+            <div className="max-w-xl z-10">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono font-bold tracking-widest text-blue-400 uppercase bg-blue-950/80 px-3 py-1 rounded-full border border-blue-800/50">
+                  [101_LIVE_VAULT]
                 </span>
-                <i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${isCategoryMenuOpen ? 'rotate-180' : ''}`}></i>
-              </button>
+                <span className="text-xs font-mono text-slate-400">CURATED DROP // <span className="text-orange-500 font-bold">IN STOCK</span></span>
+              </div>
 
-              {isCategoryMenuOpen && (
-                <>
-                  {/* Invisible backdrop to close menu when clicking outside */}
-                  <div className="fixed inset-0 z-40" onClick={() => setIsCategoryMenuOpen(false)}></div>
-                  
-                  {/* Solid Dropdown Menu */}
-                  <div className="absolute left-0 mt-2 w-full rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] bg-white border border-slate-200 overflow-hidden z-50">
-                    <div className="py-2 max-h-[60vh] overflow-y-auto relative bg-white">
-                      {categories.map(cat => (
-                        <button
-                          key={cat.id}
-                          onClick={() => {
-                            setSelectedCategory(cat.id);
-                            setIsCategoryMenuOpen(false);
-                          }}
-                          className={`block w-full text-left px-5 py-3.5 text-sm font-bold transition-colors ${
-                            selectedCategory === cat.id
-                              ? 'bg-orange-50 text-orange-600 border-l-4 border-orange-500'
-                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
-                          }`}
-                        >
-                          {cat.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
+              <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight mt-4 font-heading leading-none">
+                STREET CODE <span className="text-orange-500">101</span>
+              </h1>
+              
+              <p className="text-slate-400 mt-4 text-sm md:text-base font-mono leading-relaxed">
+                AUTHENTICATED DROPS & PEER-TO-PEER LEDGER. LOG IN TO YOUR PROFILE TO UNLOCK VAULT DISCOUNTS.
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-4 font-mono">
+                <a href="#catalog" className="bg-orange-500 hover:bg-orange-600 text-slate-950 font-black px-8 py-4 rounded-xl shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all active:scale-95 text-xs uppercase tracking-widest">
+                  EXPLORE DROP
+                </a>
+                <Link to="/feed" className="bg-slate-900 hover:bg-slate-800 text-blue-400 font-bold px-8 py-4 rounded-xl border border-blue-500/30 transition-all text-xs uppercase tracking-widest">
+                  SOCIAL FEED
+                </Link>
+              </div>
+            </div>
+
+            {/* Showcase Image Frame */}
+            <div className="relative z-10 w-full md:w-auto flex justify-center">
+              <div className="relative w-56 h-56 md:w-64 md:h-64 rounded-2xl bg-slate-900 border border-slate-800 p-3 flex items-center justify-center shadow-2xl group hover:border-orange-500/50 transition-all">
+                <span className="absolute top-3 left-3 z-20 px-2.5 py-1 bg-slate-950/90 backdrop-blur-md text-[10px] font-mono text-blue-400 border border-blue-500/30 rounded-md">
+                  FEATURED_ITEM
+                </span>
+                <img src="/streetbook_logo.png" alt="Featured Drop" className="w-full h-full object-cover rounded-xl group-hover:scale-105 transition-transform duration-300" />
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Clean Search Results Text */}
-          <div className="text-sm text-slate-500 font-medium bg-white border border-slate-200 shadow-sm px-5 py-3.5 rounded-xl flex-shrink-0">
-            Showing <span className="font-bold text-slate-800">{filteredProducts.length}</span> results
-            {searchQuery && <span> matching "<span className="font-bold text-slate-800">{searchQuery}</span>"</span>}
-          </div>
-        </div>
+        
 
         {/* --- SKELETON LOADING GRID --- */}
         {loading && (
