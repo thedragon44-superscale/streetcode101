@@ -10,6 +10,8 @@ class User(SQLModel, table=True):
     bio: Optional[str] = None
     profile_image_url: str = Field(default="/default.png")
     is_verified: bool = Field(default=False)
+    has_spun: bool = Field(default=False)
+    discount_percent: float = Field(default=0.0)
 
 class Product(SQLModel, table=True):
     sku: str = Field(primary_key=True, index=True)

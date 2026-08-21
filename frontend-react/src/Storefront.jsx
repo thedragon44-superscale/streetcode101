@@ -119,30 +119,46 @@ export default function Storefront() {
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         
-        {/* --- STREETWEAR HERO BANNER --- */}
-        <div className="relative mb-8 rounded-3xl overflow-hidden bg-slate-900 text-white p-8 md:p-12 shadow-xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="max-w-lg z-10">
-            <span className="text-xs font-black tracking-widest text-cyan-400 uppercase bg-cyan-950/80 px-3 py-1 rounded-full border border-cyan-800/50">
-              New Season Drop
-            </span>
-            <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight mt-3 leading-none">
-              Street Code <span className="text-orange-500">101</span>
+        {/* --- HIGH-FASHION FEATURED DROP BANNER --- */}
+        <div className="relative mb-10 rounded-3xl overflow-hidden bg-slate-950 text-white p-8 md:p-12 border border-slate-800 shadow-[0_0_50px_rgba(249,115,22,0.1)] flex flex-col md:flex-row items-center justify-between gap-8">
+          
+          {/* Dual Ambient Glows */}
+          <div className="absolute -top-24 -left-24 w-72 h-72 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="max-w-xl z-10">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-mono font-bold tracking-widest text-blue-400 uppercase bg-blue-950/80 px-3 py-1 rounded-full border border-blue-800/50">
+                [101_LIVE_VAULT]
+              </span>
+              <span className="text-xs font-mono text-slate-400">CURATED DROP // <span className="text-orange-500 font-bold">IN STOCK</span></span>
+            </div>
+
+            <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight mt-4 font-heading leading-none">
+              STREET CODE <span className="text-orange-500">101</span>
             </h1>
-            <p className="text-slate-400 mt-3 text-sm md:text-base font-medium leading-relaxed">
-              Exclusive streetwear, tech gear, and peer-to-peer vendor drops. Authenticated on the local ledger.
+            
+            <p className="text-slate-400 mt-4 text-sm md:text-base font-mono leading-relaxed">
+              AUTHENTICATED DROPS & PEER-TO-PEER LEDGER. LOG IN TO YOUR PROFILE TO UNLOCK VAULT DISCOUNTS.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <a href="#catalog" className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg transition-all active:scale-95 text-sm uppercase tracking-wider">
-                Explore Catalog
+
+            <div className="mt-8 flex flex-wrap gap-4 font-mono">
+              <a href="#catalog" className="bg-orange-500 hover:bg-orange-600 text-slate-950 font-black px-8 py-4 rounded-xl shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all active:scale-95 text-xs uppercase tracking-widest">
+                EXPLORE DROP
               </a>
-              <Link to="/feed" className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-6 py-3 rounded-xl border border-slate-700 transition-all text-sm uppercase tracking-wider">
-                Social Feed
+              <Link to="/feed" className="bg-slate-900 hover:bg-slate-800 text-blue-400 font-bold px-8 py-4 rounded-xl border border-blue-500/30 transition-all text-xs uppercase tracking-widest">
+                SOCIAL FEED
               </Link>
             </div>
           </div>
-          <div className="relative w-full md:w-auto flex justify-center">
-            <div className="w-48 h-48 md:w-56 md:h-56 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-orange-500/20 border border-slate-700/50 p-4 flex items-center justify-center shadow-2xl backdrop-blur-sm">
-              <img src="/streetbook_logo.png" alt="Featured" className="w-full h-full object-cover rounded-xl shadow-md mix-blend-screen" />
+
+          {/* Showcase Image Frame */}
+          <div className="relative z-10 w-full md:w-auto flex justify-center">
+            <div className="relative w-56 h-56 md:w-64 md:h-64 rounded-2xl bg-slate-900 border border-slate-800 p-3 flex items-center justify-center shadow-2xl group hover:border-orange-500/50 transition-all">
+              <span className="absolute top-3 left-3 z-20 px-2.5 py-1 bg-slate-950/90 backdrop-blur-md text-[10px] font-mono text-blue-400 border border-blue-500/30 rounded-md">
+                FEATURED_ITEM
+              </span>
+              <img src="/streetbook_logo.png" alt="Featured Drop" className="w-full h-full object-cover rounded-xl group-hover:scale-105 transition-transform duration-300" />
             </div>
           </div>
         </div>

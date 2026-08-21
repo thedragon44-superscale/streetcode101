@@ -28,13 +28,18 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
   const [checkoutZip, setCheckoutZip] = useState('');
   const [clientSecret, setClientSecret] = useState('');
 
-  // Fetch Stripe PaymentIntent automatically when the Cart is opened
+  // Dynamic Discount Calculation
+  const vaultDiscount = currentUser?.discount_percent || 0;
+  const discountMultiplier = 1 - (vaultDiscount / 100);
+  const finalTotal = cartTotal * discountMultiplier;
+
+  // Fetch Stripe PaymentIntent automatically using the DISCOUNTED total
   useEffect(() => {
-    if (isCartOpen && cartTotal > 0) {
+    if (isCartOpen && finalTotal > 0) {
       fetch(`${API_BASE}/create-payment-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: cartTotal })
+        body: JSON.stringify({ amount: finalTotal })
       })
       .then(res => res.json())
       .then(data => {
@@ -42,7 +47,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
       })
       .catch(err => console.error('Stripe error:', err));
     }
-  }, [isCartOpen, cartTotal]);
+  }, [isCartOpen, finalTotal]);
 
   // Authenticate user on load globally
   useEffect(() => {
@@ -76,7 +81,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sku: item.sku,
-            quantity: item.cart_quantity || 1,  // <-- FIXED THIS LINE
+            quantity: item.cart_quantity || 1,
             customer_email: checkoutEmail,
             shipping_address: fullShippingAddress
           })
@@ -96,218 +101,173 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-slate-900 text-white shadow-md">
+      <header className="sticky top-0 z-50 bg-slate-950 text-white shadow-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 flex-shrink-0 hover:text-orange-400 transition-colors">
-            <img src="/streetbook_logo.png" alt="Street Code 101" className="h-10 w-10 object-cover rounded-md shadow-sm" />
-            <span className="text-xl font-black tracking-tight hidden md:block uppercase">Street Code <span className="text-orange-500">101</span></span>
+          <Link to="/" className="flex items-center gap-3 flex-shrink-0 hover:text-orange-500 transition-colors">
+            <img src="/streetbook_logo.png" alt="Street Code 101" className="h-10 w-10 object-cover rounded-md shadow-sm border border-slate-800" />
+            <span className="text-xl font-black tracking-tight hidden md:block uppercase font-heading">
+              STREET CODE <span className="text-orange-500">101</span>
+            </span>
           </Link>
 
-          {/* Optional Search Bar (Only shows on Storefront) */}
+          {/* Search Bar */}
           <div className="flex-1 max-w-3xl flex justify-center px-4">
             {showSearch && (
               <div className="flex w-full max-w-xl relative">
                 <input 
                   type="text" 
-                  placeholder="Search catalog..." 
+                  placeholder="SEARCH VAULT..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-800 text-white placeholder-slate-400 border border-slate-700 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium transition-all"
+                  className="w-full px-4 py-2 bg-slate-900 text-blue-400 placeholder-slate-600 border border-slate-800 rounded-l-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-xs font-mono font-bold transition-all uppercase tracking-wider"
                 />
-                <button className="bg-orange-500 hover:bg-orange-600 px-6 py-2 rounded-r-xl text-white transition-colors flex items-center justify-center border border-orange-500">
+                <button className="bg-slate-800 hover:bg-slate-700 px-6 py-2 rounded-r-xl text-blue-400 transition-colors flex items-center justify-center border border-slate-800 border-l-0">
                   <i className="fa-solid fa-magnifying-glass"></i>
                 </button>
 
                 {/* Auto-fill Search Dropdown */}
                 {searchQuery.trim().length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-50 flex flex-col">
-                    
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 rounded-xl shadow-2xl border border-slate-800 overflow-hidden z-50 flex flex-col">
                     {searchResults.slice(0, 5).map(item => (
                       <Link 
                         key={item.sku} 
                         to={`/product/${item.sku}`}
-                        onClick={() => setSearchQuery('')} // Clears search & closes dropdown on click!
-                        className="flex items-center gap-3 p-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors text-left"
+                        onClick={() => setSearchQuery('')}
+                        className="flex items-center gap-3 p-3 hover:bg-slate-800 border-b border-slate-800/50 last:border-0 transition-colors text-left group"
                       >
-                        <img src={item.image_url} alt={item.title} className="w-10 h-10 object-contain rounded-md bg-slate-50 border border-slate-100 p-1 mix-blend-multiply" />
+                        <img src={item.image_url} alt={item.title} className="w-10 h-10 object-cover rounded-md bg-slate-950 border border-slate-800" />
                         <div className="flex-1 overflow-hidden">
-                          <h4 className="text-sm font-bold text-slate-900 truncate">{item.title}</h4>
-                          <p className="text-xs text-orange-600 font-black">${item.price.toFixed(2)}</p>
+                          <h4 className="text-sm font-bold text-slate-200 truncate group-hover:text-orange-500 transition-colors">{item.title}</h4>
+                          <p className="text-xs text-blue-400 font-mono">${item.price.toFixed(2)}</p>
                         </div>
                       </Link>
                     ))}
-
-                    {/* Zero Results State */}
-                    {searchResults.length === 0 && (
-                      <div className="p-4 text-center text-sm font-bold text-slate-500">
-                        No products found matching "{searchQuery}".
-                      </div>
-                    )}
-
-                    {/* Show remaining count if there are lots of matches */}
-                    {searchResults.length > 5 && (
-                      <a href="#catalog" className="p-2 text-center text-xs font-black text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors bg-white border-t border-slate-100 uppercase tracking-wider block">
-                        + {searchResults.length - 5} more results below
-                      </a>
-                    )}
                   </div>
                 )}
               </div>
             )}
           </div>
           
-          {/* Right Navigation (Hidden on Mobile, Replaced by Bottom Nav) */}
+          {/* Right Navigation */}
           <div className="hidden sm:flex items-center gap-6 flex-shrink-0">
-            <Link to="/feed" className="text-sm font-bold text-slate-300 hover:text-white transition-colors mt-1">
-              Social Feed
+            <Link to="/feed" className="text-xs font-mono font-bold text-slate-400 hover:text-blue-400 transition-colors uppercase tracking-widest">
+              SOCIAL FEED
             </Link>
 
             {currentUser ? (
               <>
-                {currentUser.username === 'admin' && (
-                  <Link to="/admin" className="text-sm font-black text-orange-400 hover:text-orange-300 transition-colors mt-1">
-                    Admin Console
-                  </Link>
-                )}
-                <Link to="/inbox" className="text-sm font-bold text-slate-300 hover:text-white transition-colors mt-1">
-                  Inbox
+                <Link to="/inbox" className="text-xs font-mono font-bold text-slate-400 hover:text-blue-400 transition-colors uppercase tracking-widest">
+                  SECURE INBOX
                 </Link>
-                <Link to="/profile/me" className="flex items-center gap-2 hover:text-orange-400 transition-colors">
-                  <img src={currentUser.profile_image_url} alt="Avatar" className="w-8 h-8 rounded-full border border-slate-600 object-cover" />
-                  <div className="text-sm font-bold">
-                    <span className="block text-xs font-normal text-slate-400">Hello, @{currentUser.username}</span>
-                    Your Profile
+                <Link to="/profile/me" className="flex items-center gap-2 hover:text-orange-500 transition-colors">
+                  <img src={currentUser.profile_image_url} alt="Avatar" className="w-8 h-8 rounded-full border border-slate-700 object-cover" />
+                  <div className="text-xs font-mono font-bold uppercase tracking-wider text-right">
+                    <span className="block text-[9px] text-blue-400">LOGGED IN</span>
+                    @{currentUser.username}
                   </div>
                 </Link>
               </>
             ) : (
-              <Link to="/login" className="text-sm font-bold hover:text-orange-400 transition-colors">
-                <span className="block text-xs font-normal text-slate-400">Hello, Sign in</span>
-                Account & Admin
+              <Link to="/login" className="text-xs font-mono font-bold text-orange-500 hover:text-orange-400 transition-colors uppercase tracking-widest border border-orange-500/30 px-3 py-1.5 rounded-md bg-orange-500/10">
+                ACCESS VAULT
               </Link>
             )}
             
-            <button onClick={() => setIsCartOpen(true)} className="flex items-center gap-1 hover:text-orange-400 transition-colors">
+            <button onClick={() => setIsCartOpen(true)} className="flex items-center gap-1 hover:text-orange-500 transition-colors bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-md">
               <div className="relative">
-                <i className="fa-solid fa-cart-shopping text-2xl"></i>
+                <i className="fa-solid fa-cart-shopping text-lg text-slate-300"></i>
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-orange-500 text-slate-900 rounded-full w-5 h-5 flex items-center justify-center text-xs font-black">
+                  <span className="absolute -top-2 -right-3 bg-orange-500 text-slate-950 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black font-mono">
                     {cartItemCount}
                   </span>
                 )}
               </div>
-              <span className="font-bold mt-2">Cart</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* --- MOBILE BOTTOM NAVIGATION BAR --- */}
-      <div className="sm:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 z-50 flex items-center justify-around h-16 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <Link to="/" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/') ? 'text-orange-500' : 'text-slate-400 hover:text-slate-900'}`}>
+      <div className="sm:hidden fixed bottom-0 left-0 w-full bg-slate-950 border-t border-slate-800 z-50 flex items-center justify-around h-16 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.5)]">
+        <Link to="/" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/') ? 'text-orange-500' : 'text-slate-500 hover:text-blue-400'}`}>
           <i className="fa-solid fa-house text-xl"></i>
-          <span className="text-[10px] font-bold tracking-wide">Home</span>
+          <span className="text-[10px] font-bold tracking-wide font-mono uppercase">Home</span>
         </Link>
         
-        <Link to="/feed" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/feed') ? 'text-orange-500' : 'text-slate-400 hover:text-slate-900'}`}>
+        <Link to="/feed" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/feed') ? 'text-orange-500' : 'text-slate-500 hover:text-blue-400'}`}>
           <i className="fa-solid fa-layer-group text-xl"></i>
-          <span className="text-[10px] font-bold tracking-wide">Feed</span>
+          <span className="text-[10px] font-bold tracking-wide font-mono uppercase">Feed</span>
         </Link>
         
-        <button onClick={() => setIsCartOpen(true)} className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isCartOpen ? 'text-orange-500' : 'text-slate-400 hover:text-slate-900'}`}>
+        <button onClick={() => setIsCartOpen(true)} className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isCartOpen ? 'text-orange-500' : 'text-slate-500 hover:text-blue-400'}`}>
           <div className="relative">
             <i className="fa-solid fa-cart-shopping text-xl"></i>
             {cartItemCount > 0 && (
-              <span className="absolute -top-1.5 -right-2 bg-orange-500 text-slate-900 rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-black border-2 border-white box-content">
+              <span className="absolute -top-1.5 -right-2 bg-orange-500 text-slate-950 rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-black font-mono border-2 border-slate-950 box-content">
                 {cartItemCount}
               </span>
             )}
           </div>
-          <span className="text-[10px] font-bold tracking-wide">Cart</span>
+          <span className="text-[10px] font-bold tracking-wide font-mono uppercase">Cart</span>
         </button>
 
-        <Link to={currentUser ? "/profile/me" : "/login"} className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/profile/me') ? 'text-orange-500' : 'text-slate-400 hover:text-slate-900'}`}>
+        <Link to={currentUser ? "/profile/me" : "/login"} className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/profile/me') ? 'text-orange-500' : 'text-slate-500 hover:text-blue-400'}`}>
           {currentUser ? (
              <img src={currentUser.profile_image_url} alt="Profile" className={`w-6 h-6 rounded-full object-cover border-2 ${isActive('/profile/me') ? 'border-orange-500' : 'border-transparent'}`} />
           ) : (
-            <i className="fa-regular fa-user text-xl"></i>
+            <i className="fa-solid fa-user-astronaut text-xl"></i>
           )}
-          <span className="text-[10px] font-bold tracking-wide">{currentUser ? 'Profile' : 'Sign In'}</span>
+          <span className="text-[10px] font-bold tracking-wide font-mono uppercase">{currentUser ? 'Profile' : 'Log In'}</span>
         </Link>
       </div>
 
-      {/* Mobile Spacer to prevent content from hiding behind the bottom bar */}
-      <div className="h-16 sm:hidden"></div>
+      <div className="h-16 sm:hidden bg-slate-950"></div>
 
-      {/* --- CART SLIDE-OUT MODAL (Global) --- */}
+      {/* --- CART SLIDE-OUT MODAL --- */}
       {isCartOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] transition-opacity" onClick={() => setIsCartOpen(false)} />
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] transition-opacity" onClick={() => setIsCartOpen(false)} />
       )}
-      <div className={`fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white z-[101] shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
-          <h2 className="text-xl font-black text-slate-900">Your Cart</h2>
-          <button onClick={() => setIsCartOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-xl p-2">✕</button>
+      <div className={`fixed top-0 right-0 h-full w-full sm:w-[500px] bg-slate-950 z-[101] shadow-[-10px_0_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ease-in-out flex flex-col border-l border-slate-800 ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        
+        <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+          <h2 className="text-xl font-black text-white uppercase tracking-widest font-heading">
+            YOUR <span className="text-orange-500">CART</span>
+          </h2>
+          <button onClick={() => setIsCartOpen(false)} className="text-slate-500 hover:text-orange-500 font-bold text-xl transition-colors">✕</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-900/50">
           {cart.length === 0 ? (
-            <div className="text-center text-slate-500 mt-10">
-              <span className="text-4xl mb-4 block">🛒</span>
-              Your Street Cart is empty.
+            <div className="text-center text-slate-500 mt-20 font-mono text-sm">
+              <i className="fa-solid fa-ghost text-4xl mb-4 block text-slate-700"></i>
+              NO ITEMS IN VAULT.
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-2 mt-2 px-1">
+            <div className="flex flex-col gap-3">
               {cart.map(item => (
-                <div key={item.sku} className="relative flex flex-col bg-white p-2 rounded-lg border border-slate-200 shadow-sm group hover:border-orange-300 transition-colors">
-                  
-                  {/* Floating Remove Button (Popped outside the box) */}
+                <div key={item.sku} className="relative flex gap-4 bg-slate-900 p-3 rounded-xl border border-slate-800 shadow-sm group hover:border-blue-500/50 transition-colors">
                   <button 
-                    type="button" 
                     onClick={() => removeFromCart(item.sku)} 
-                    className="absolute -top-2 -right-2 z-10 w-5 h-5 bg-white hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-full flex items-center justify-center shadow-md border border-slate-200 transition-all text-[9px] font-black"
-                    title="Remove item"
+                    className="absolute top-2 right-2 z-10 w-6 h-6 bg-slate-800 hover:bg-orange-500 text-slate-400 hover:text-slate-950 rounded-md flex items-center justify-center transition-colors text-xs"
                   >✕</button>
 
-                  {/* Micro Product Image */}
-                  <img 
-                    src={item.image_url} 
-                    alt={item.title} 
-                    className="w-full h-14 object-contain mix-blend-multiply bg-slate-50 border border-slate-100 rounded mb-1.5 p-0.5" 
-                  />
+                  <img src={item.image_url} alt={item.title} className="w-20 h-20 object-cover rounded-lg bg-slate-950 border border-slate-800" />
                   
-                  {/* Micro Product Details */}
-                  <div className="flex flex-col flex-1">
-                    <h3 className="font-bold text-[10px] text-slate-900 line-clamp-2 leading-tight mb-1 flex-1">{item.title}</h3>
+                  <div className="flex flex-col flex-1 justify-between py-1">
+                    <h3 className="font-bold text-xs text-slate-200 uppercase pr-6 leading-relaxed">{item.title}</h3>
                     
-                    <div className="flex flex-col items-center justify-between mt-auto border-t border-slate-50 pt-1">
-                      <p className="text-slate-900 font-black text-xs">${item.price.toFixed(2)}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-blue-400 font-mono font-bold text-sm">${item.price.toFixed(2)}</p>
                       
-                      {/* Micro Quantity Toggler */}
-                      <div className="flex items-center justify-between bg-slate-100 border border-slate-200 rounded shadow-sm w-full mt-1">
-                        <button 
-                          type="button" 
-                          onClick={() => updateQuantity(item.sku, (item.cart_quantity || item.quantity || 1) - 1)}
-                          className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-red-500 hover:bg-slate-200 rounded-l transition-colors font-black text-[10px]"
-                        >
-                          -
-                        </button>
-                        <span className="text-[9px] font-black text-slate-700">
-                          {item.cart_quantity || item.quantity || 1}
-                        </span>
-                        <button 
-                          type="button" 
-                          onClick={() => updateQuantity(item.sku, (item.cart_quantity || item.quantity || 1) + 1)}
-                          className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-slate-200 rounded-r transition-colors font-black text-[10px]"
-                        >
-                          +
-                        </button>
+                      <div className="flex items-center bg-slate-950 border border-slate-800 rounded-md">
+                        <button onClick={() => updateQuantity(item.sku, (item.cart_quantity || 1) - 1)} className="px-2 py-1 text-slate-400 hover:text-white">-</button>
+                        <span className="px-2 font-mono text-xs text-white">{item.cart_quantity || 1}</span>
+                        <button onClick={() => updateQuantity(item.sku, (item.cart_quantity || 1) + 1)} className="px-2 py-1 text-slate-400 hover:text-white">+</button>
                       </div>
-
                     </div>
                   </div>
-                  
                 </div>
               ))}
             </div>
@@ -315,43 +275,54 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
         </div>
 
         {cart.length > 0 && (
-          <div className="border-t border-slate-200 p-6 bg-white shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] z-10 overflow-y-auto max-h-[60vh]">
-            <div className="flex justify-between items-center mb-4">
-              <span className="text-slate-900 font-bold">Subtotal ({cartItemCount} items):</span>
-              <span className="text-2xl font-black text-slate-900">${cartTotal.toFixed(2)}</span>
+          <div className="border-t border-slate-800 p-6 bg-slate-950 shadow-2xl z-10 overflow-y-auto max-h-[60vh]">
+            
+            {/* Discount Calculation Display */}
+            <div className="flex justify-between items-center mb-2 font-mono text-sm text-slate-400">
+              <span>SUBTOTAL:</span>
+              <span>${cartTotal.toFixed(2)}</span>
+            </div>
+            
+            {vaultDiscount > 0 && (
+              <div className="flex justify-between items-center mb-2 font-mono text-xs text-emerald-400 font-bold bg-emerald-950/30 p-2 rounded-md border border-emerald-900/50">
+                <span>[101_VAULT_DISCOUNT]</span>
+                <span>-{vaultDiscount}%</span>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center mb-6 pt-2 border-t border-slate-800">
+              <span className="text-white font-black uppercase tracking-widest text-sm">TOTAL:</span>
+              <span className="text-2xl font-black text-orange-500 font-mono">${finalTotal.toFixed(2)}</span>
             </div>
 
             <div className="space-y-6">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 mb-2 uppercase tracking-wide">Shipping Info</h3>
-                <div className="space-y-2">
-                  <input type="email" placeholder="Email Address *" value={checkoutEmail} onChange={(e) => setCheckoutEmail(e.target.value)} className="w-full px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium" />
-                  <input type="text" placeholder="Full Name *" value={checkoutName} onChange={(e) => setCheckoutName(e.target.value)} className="w-full px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium" />
-                  
+                <h3 className="text-xs font-mono font-bold text-blue-400 mb-3 uppercase tracking-widest">SHIPPING MANIFEST</h3>
+                <div className="space-y-3">
+                  <input type="email" placeholder="EMAIL ADDRESS *" value={checkoutEmail} onChange={(e) => setCheckoutEmail(e.target.value)} className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg focus:outline-none focus:border-orange-500 font-mono text-xs text-white placeholder-slate-600" />
+                  <input type="text" placeholder="FULL NAME *" value={checkoutName} onChange={(e) => setCheckoutName(e.target.value)} className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg focus:outline-none focus:border-orange-500 font-mono text-xs text-white placeholder-slate-600" />
                   <div className="flex gap-2">
-                    <input type="text" placeholder="Street Address *" value={checkoutStreet} onChange={(e) => setCheckoutStreet(e.target.value)} className="flex-1 px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium" />
-                    <input type="text" placeholder="Apt/Suite (Opt)" value={checkoutApt} onChange={(e) => setCheckoutApt(e.target.value)} className="w-1/3 px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium" />
+                    <input type="text" placeholder="STREET ADDRESS *" value={checkoutStreet} onChange={(e) => setCheckoutStreet(e.target.value)} className="flex-1 px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg focus:outline-none focus:border-orange-500 font-mono text-xs text-white placeholder-slate-600" />
                   </div>
-
                   <div className="grid grid-cols-2 gap-2">
-                    <input type="text" placeholder="City *" value={checkoutCity} onChange={(e) => setCheckoutCity(e.target.value)} className="w-full px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium" />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="text" placeholder="State *" value={checkoutState} onChange={(e) => setCheckoutState(e.target.value)} className="w-full px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium uppercase" maxLength={2} />
-                      <input type="text" placeholder="ZIP *" value={checkoutZip} onChange={(e) => setCheckoutZip(e.target.value)} className="w-full px-3 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-sm font-medium" />
-                    </div>
+                    <input type="text" placeholder="CITY *" value={checkoutCity} onChange={(e) => setCheckoutCity(e.target.value)} className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg focus:outline-none focus:border-orange-500 font-mono text-xs text-white placeholder-slate-600" />
+                    <input type="text" placeholder="ZIP *" value={checkoutZip} onChange={(e) => setCheckoutZip(e.target.value)} className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg focus:outline-none focus:border-orange-500 font-mono text-xs text-white placeholder-slate-600" />
                   </div>
                 </div>
               </div>
 
               <div>
-                <h3 className="text-sm font-bold text-slate-900 mb-2 uppercase tracking-wide">Payment Details</h3>
+                <h3 className="text-xs font-mono font-bold text-blue-400 mb-3 uppercase tracking-widest">SECURE PAYMENT</h3>
                 {clientSecret ? (
-                  <Elements stripe={stripePromise} options={{ clientSecret }}>
+                  <Elements stripe={stripePromise} options={{ 
+                    clientSecret, 
+                    appearance: { theme: 'night', variables: { colorPrimary: '#f97316', colorBackground: '#0f172a' } }
+                  }}>
                     <CheckoutForm onSuccess={handleCheckout} />
                   </Elements>
                 ) : (
-                  <div className="w-full px-4 py-4 rounded-xl border border-slate-300 bg-slate-50 flex items-center justify-center text-slate-500 font-bold text-sm">
-                    <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> Initializing Secure Checkout...
+                  <div className="w-full px-4 py-6 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center text-orange-500 font-mono font-bold text-xs">
+                    <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> INITIALIZING STRIPE SECURE...
                   </div>
                 )}
               </div>

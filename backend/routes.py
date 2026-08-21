@@ -11,6 +11,7 @@ import smtplib
 import urllib.request
 import urllib.parse
 import json
+import random
 from email.message import EmailMessage
 
 # ==========================================
@@ -280,6 +281,33 @@ def delete_product(sku: str, session: Session = Depends(get_session), token: dic
     session.delete(product)
     session.commit()
     return {"message": f"Product {sku} permanently deleted."}
+
+@router.patch("/api/admin/products/{sku}")
+def edit_product_details(sku: str, payload: dict, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Allows the admin to manually edit any product's details."""
+    username = token.get("sub")
+    if username != "admin":
+        raise HTTPException(status_code=403, detail="Master Admin only.")
+        
+    product = session.get(Product, sku)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    # Dynamically update only the fields provided from the frontend
+    if "title" in payload:
+        product.title = payload["title"]
+    if "description" in payload:
+        product.description = payload["description"]
+    if "price" in payload:
+        product.price = float(payload["price"])
+    if "category" in payload:
+        product.category = payload["category"]
+    
+    session.add(product)
+    session.commit()
+    session.refresh(product)
+    
+    return {"message": f"Successfully updated {sku}!", "product": product}
 
 class PaymentIntentRequest(BaseModel):
     amount: float  # The cart total in dollars
@@ -686,6 +714,40 @@ def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_
     session.add(new_prod)
     session.commit()
     return {"message": f"Successfully imported {p.get('nameEn')}!"}
+
+@router.post("/api/profile/spin")
+def spin_vault_wheel(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Executes a one-time discount spin and locks the account state."""
+    username = token.get("sub")
+    if username == "admin":
+        raise HTTPException(status_code=400, detail="Master Admin cannot spin for discounts.")
+        
+    user = session.exec(select(User).where(User.username == username)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if user.has_spun:
+        raise HTTPException(status_code=400, detail="Vault discount already claimed.")
+        
+    rewards = [
+        {"code": "VAULT10", "percent": 10.0, "label": "10% OFF CART"},
+        {"code": "VAULT15", "percent": 15.0, "label": "15% OFF CART"},
+        {"code": "VAULT20", "percent": 20.0, "label": "20% OFF CART"},
+        {"code": "VAULT25", "percent": 25.0, "label": "RARE 25% OFF"}
+    ]
+    won = random.choice(rewards)
+    
+    user.has_spun = True
+    user.discount_percent = won["percent"]
+    session.add(user)
+    session.commit()
+    
+    return {
+        "message": f"Unlocked {won['label']}!",
+        "code": won["code"],
+        "discount_percent": won["percent"]
+    }
+
 # --- WEBSOCKET CONNECTION MANAGER ---
 class ConnectionManager:
     def __init__(self):
