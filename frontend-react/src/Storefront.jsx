@@ -126,24 +126,29 @@ export default function Storefront() {
 
             {isCategoryMenuOpen && (
               <>
+                {/* Invisible backdrop to close menu when clicking outside */}
                 <div className="fixed inset-0 z-40" onClick={() => setIsCategoryMenuOpen(false)}></div>
-                <div className="absolute left-0 mt-3 w-64 bg-white border border-slate-200 shadow-2xl z-[999] rounded-xl overflow-hidden py-2">
-                  {categories.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => {
-                        setSelectedCategory(cat.id);
-                        setIsCategoryMenuOpen(false);
-                      }}
-                      className={`block w-full text-left px-6 py-2.5 text-sm font-bold transition-colors ${
-                        selectedCategory === cat.id
-                          ? 'text-orange-600 bg-orange-50 border-l-4 border-orange-500'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-l-4 border-transparent'
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
+                
+                {/* Mega Menu Container */}
+                <div className="absolute left-0 mt-3 w-[90vw] sm:w-[500px] max-w-full bg-white border border-slate-200 shadow-2xl z-[999] rounded-2xl overflow-hidden">
+                  <div className="p-3 max-h-[50vh] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2 custom-scrollbar">
+                    {categories.map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => {
+                          setSelectedCategory(cat.id);
+                          setIsCategoryMenuOpen(false);
+                        }}
+                        className={`block w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                          selectedCategory === cat.id
+                            ? 'text-orange-600 bg-orange-50 border border-orange-200 shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent hover:border-slate-200'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </>
             )}
