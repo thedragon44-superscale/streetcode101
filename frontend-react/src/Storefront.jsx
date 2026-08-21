@@ -22,6 +22,7 @@ export default function Storefront() {
   // --- SEARCH & CATEGORY STATE ---
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const categories = [
     { id: 'All', label: 'All Drops' },
     { id: 'mens-clothing', label: "Men's Clothing" },
@@ -106,20 +107,7 @@ export default function Storefront() {
       {/* Global Navbar with Search Enabled */}
       <Navbar showSearch={true} searchQuery={searchQuery} setSearchQuery={setSearchQuery} searchResults={filteredProducts} />
 
-      {/* Storefront Category Bar */}
-      <div className="bg-slate-800 text-slate-300 text-sm overflow-x-auto shadow-md">
-        <div className="max-w-7xl mx-auto px-4 flex whitespace-nowrap">
-          {categories.map(cat => (
-            <button 
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-3 border-b-2 font-bold transition-colors ${selectedCategory === cat.id ? 'border-orange-500 text-white' : 'border-transparent hover:text-white'}`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         
@@ -167,8 +155,56 @@ export default function Storefront() {
           </div>
         </div>
 
-        <div id="catalog" className="mb-4 text-sm text-slate-600">
-          Showing results for <span className="font-bold">"{categories.find(c => c.id === selectedCategory)?.label || selectedCategory}"</span> {searchQuery && <span>matching "{searchQuery}"</span>}
+        {/* --- CATALOG CONTROLS --- */}
+        <div id="catalog" className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-20">
+          
+          {/* Category Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
+              className="flex items-center justify-between w-full sm:w-64 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-sm font-bold text-slate-700 hover:border-orange-500 focus:outline-none transition-all"
+            >
+              <span className="flex items-center gap-2">
+                <i className="fa-solid fa-layer-group text-orange-500"></i>
+                {categories.find(c => c.id === selectedCategory)?.label || 'All Drops'}
+              </span>
+              <i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${isCategoryMenuOpen ? 'rotate-180' : ''}`}></i>
+            </button>
+
+            {isCategoryMenuOpen && (
+              <>
+                {/* Invisible backdrop to close menu when clicking outside */}
+                <div className="fixed inset-0 z-10" onClick={() => setIsCategoryMenuOpen(false)}></div>
+                
+                <div className="absolute left-0 mt-2 w-full sm:w-64 rounded-xl shadow-2xl bg-white border border-slate-100 overflow-hidden z-20">
+                  <div className="py-2 max-h-[60vh] overflow-y-auto">
+                    {categories.map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => {
+                          setSelectedCategory(cat.id);
+                          setIsCategoryMenuOpen(false);
+                        }}
+                        className={`block w-full text-left px-4 py-3 text-sm font-bold transition-colors ${
+                          selectedCategory === cat.id
+                            ? 'bg-orange-50 text-orange-600 border-l-4 border-orange-500'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Clean Search Results Text */}
+          <div className="text-sm text-slate-500 font-medium bg-white border border-slate-200 shadow-sm px-4 py-2 rounded-xl">
+            Showing <span className="font-bold text-slate-800">{filteredProducts.length}</span> results
+            {searchQuery && <span> matching "<span className="font-bold text-slate-800">{searchQuery}</span>"</span>}
+          </div>
         </div>
 
         {/* --- SKELETON LOADING GRID --- */}
