@@ -101,7 +101,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
   return (
     <>
-      <header className="sticky top-0 z-[200] bg-slate-950 text-white shadow-md border-b border-slate-800">
+      <header className="sticky top-0 z-[9999] bg-slate-950 text-white shadow-2xl border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           
           {/* Logo */}
@@ -129,29 +129,26 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
                 {/* Auto-fill Search Dropdown */}
                 {searchQuery.trim().length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-3 bg-slate-950 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-slate-700 overflow-hidden z-[250] flex flex-col isolate opacity-100">
+                  <div className="absolute top-[110%] left-0 right-0 bg-slate-950 rounded-xl shadow-[0_30px_60px_rgba(0,0,0,0.9)] border border-slate-700 overflow-hidden z-[99999] flex flex-col">
                     {searchResults.slice(0, 6).map(item => (
                       <Link 
                         key={item.sku} 
                         to={`/product/${item.sku}`}
                         onClick={() => setSearchQuery('')}
-                        className="flex items-center gap-4 p-3 bg-slate-950 hover:bg-slate-800 border-b border-slate-800/50 last:border-0 transition-colors text-left group opacity-100"
+                        className="flex items-center gap-4 p-3 bg-slate-950 hover:bg-slate-800 border-b border-slate-800/50 last:border-0 transition-colors text-left group"
                       >
-                        <img src={item.image_url} alt={item.title} className="w-12 h-12 object-cover rounded-md bg-slate-900 border border-slate-800 shadow-sm" />
-                        <div className="flex-1 overflow-hidden">
+                        <img src={item.image_url} alt={item.title} className="w-12 h-12 object-cover rounded-md bg-slate-900 border border-slate-800 shadow-sm relative z-10" />
+                        <div className="flex-1 overflow-hidden relative z-10">
                           <h4 className="text-sm font-bold text-slate-100 truncate group-hover:text-orange-500 transition-colors">{item.title}</h4>
                           <p className="text-xs text-blue-400 font-mono mt-0.5">${item.price.toFixed(2)}</p>
                         </div>
                       </Link>
                     ))}
                     {searchResults.length === 0 && (
-                      <div className="p-4 bg-slate-950 text-center text-slate-500 font-mono text-xs opacity-100">NO RESULTS FOUND</div>
+                      <div className="p-4 bg-slate-950 text-center text-slate-500 font-mono text-xs">NO RESULTS FOUND</div>
                     )}
                   </div>
                 )}
-              </div>
-            )}
-          </div>
           
           {/* Right Navigation */}
           <div className="hidden sm:flex items-center gap-6 flex-shrink-0">
