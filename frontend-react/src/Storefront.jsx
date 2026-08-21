@@ -22,7 +22,16 @@ export default function Storefront() {
   // --- SEARCH & CATEGORY STATE ---
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const categories = ['All', 'Peripherals', 'Displays', 'Accessories'];
+  const categories = [
+    { id: 'All', label: 'All Drops' },
+    { id: 'mens-clothing', label: "Men's Clothing" },
+    { id: 'womens-clothing', label: "Women's Clothing" },
+    { id: 'mens-jewelry', label: "Men's Jewelry" },
+    { id: 'womens-jewelry', label: "Women's Jewelry" },
+    { id: 'accessories', label: 'Accessories' },
+    { id: 'electronics', label: 'Electronics' },
+    { id: 'uncategorized', label: 'New Arrivals' }
+  ];
 
   // --- CURRENT USER STATE (For Support Chat) ---
   const [currentUser, setCurrentUser] = useState(null);
@@ -61,17 +70,10 @@ export default function Storefront() {
       });
   }, []);
 
-  const getMockCategory = (title) => {
-    const t = title.toLowerCase();
-    if (t.includes('mouse') || t.includes('keyboard')) return 'Peripherals';
-    if (t.includes('monitor') || t.includes('display')) return 'Displays';
-    return 'Accessories';
-  };
-
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           product.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || getMockCategory(product.title) === selectedCategory;
+    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -107,11 +109,11 @@ export default function Storefront() {
         <div className="max-w-7xl mx-auto px-4 flex whitespace-nowrap">
           {categories.map(cat => (
             <button 
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-3 border-b-2 font-bold transition-colors ${selectedCategory === cat ? 'border-orange-500 text-white' : 'border-transparent hover:text-white'}`}
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`px-4 py-3 border-b-2 font-bold transition-colors ${selectedCategory === cat.id ? 'border-orange-500 text-white' : 'border-transparent hover:text-white'}`}
             >
-              {cat}
+              {cat.label}
             </button>
           ))}
         </div>
@@ -164,7 +166,7 @@ export default function Storefront() {
         </div>
 
         <div id="catalog" className="mb-4 text-sm text-slate-600">
-          Showing results for <span className="font-bold">"{selectedCategory}"</span> {searchQuery && <span>matching "{searchQuery}"</span>}
+          Showing results for <span className="font-bold">"{categories.find(c => c.id === selectedCategory)?.label || selectedCategory}"</span> {searchQuery && <span>matching "{searchQuery}"</span>}
         </div>
 
         {/* --- SKELETON LOADING GRID --- */}
