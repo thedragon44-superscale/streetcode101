@@ -108,7 +108,7 @@ export default function Storefront() {
       <Navbar showSearch={true} searchQuery={searchQuery} setSearchQuery={setSearchQuery} searchResults={filteredProducts} />
 
       {/* --- PROFESSIONAL SUB-HEADER / CATEGORY NAV --- */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 sm:top-[73px] z-[90] shadow-sm">
+      <div className="bg-white border-b border-slate-200 sticky top-0 sm:top-[73px] relative z-[100] shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           
           {/* Minimalist Dropdown */}
@@ -127,7 +127,7 @@ export default function Storefront() {
             {isCategoryMenuOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsCategoryMenuOpen(false)}></div>
-                <div className="absolute left-0 mt-3 w-64 bg-white border border-slate-200 shadow-2xl z-50 rounded-xl overflow-hidden py-2">
+                <div className="absolute left-0 mt-3 w-64 bg-white border border-slate-200 shadow-2xl z-[999] rounded-xl overflow-hidden py-2">
                   {categories.map(cat => (
                     <button
                       key={cat.id}
@@ -161,7 +161,7 @@ export default function Storefront() {
         
         {/* --- HIGH-FASHION FEATURED DROP BANNER --- */}
         {selectedCategory === 'All' && !searchQuery && (
-          <div className="relative mb-10 rounded-3xl overflow-hidden bg-slate-950 text-white p-8 md:p-12 border border-slate-800 shadow-[0_0_50px_rgba(249,115,22,0.1)] flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="relative z-0 mb-10 rounded-3xl overflow-hidden bg-slate-950 text-white p-8 md:p-12 border border-slate-800 shadow-[0_0_50px_rgba(249,115,22,0.1)] flex flex-col md:flex-row items-center justify-between gap-8">
             
             {/* Dual Ambient Glows */}
             <div className="absolute -top-24 -left-24 w-72 h-72 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
