@@ -149,6 +149,9 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
                     )}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
           
           {/* Right Navigation */}
           <div className="hidden sm:flex items-center gap-6 flex-shrink-0">
