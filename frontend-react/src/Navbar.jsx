@@ -129,15 +129,15 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
                 {/* Auto-fill Search Dropdown */}
                 {searchQuery.trim().length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-3 bg-slate-900 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] border border-slate-700 overflow-hidden z-50 flex flex-col">
+                  <div className="absolute top-full left-0 right-0 mt-3 bg-slate-950 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-slate-700 overflow-hidden z-[250] flex flex-col isolate opacity-100">
                     {searchResults.slice(0, 6).map(item => (
                       <Link 
                         key={item.sku} 
                         to={`/product/${item.sku}`}
                         onClick={() => setSearchQuery('')}
-                        className="flex items-center gap-4 p-3 hover:bg-slate-800 border-b border-slate-800/50 last:border-0 transition-colors text-left group"
+                        className="flex items-center gap-4 p-3 bg-slate-950 hover:bg-slate-800 border-b border-slate-800/50 last:border-0 transition-colors text-left group opacity-100"
                       >
-                        <img src={item.image_url} alt={item.title} className="w-12 h-12 object-cover rounded-md bg-slate-950 border border-slate-800 shadow-sm" />
+                        <img src={item.image_url} alt={item.title} className="w-12 h-12 object-cover rounded-md bg-slate-900 border border-slate-800 shadow-sm" />
                         <div className="flex-1 overflow-hidden">
                           <h4 className="text-sm font-bold text-slate-100 truncate group-hover:text-orange-500 transition-colors">{item.title}</h4>
                           <p className="text-xs text-blue-400 font-mono mt-0.5">${item.price.toFixed(2)}</p>
@@ -145,7 +145,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
                       </Link>
                     ))}
                     {searchResults.length === 0 && (
-                      <div className="p-4 text-center text-slate-500 font-mono text-xs">NO RESULTS FOUND</div>
+                      <div className="p-4 bg-slate-950 text-center text-slate-500 font-mono text-xs opacity-100">NO RESULTS FOUND</div>
                     )}
                   </div>
                 )}
