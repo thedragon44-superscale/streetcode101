@@ -152,6 +152,25 @@ export default function Admin() {
     }
   };
 
+  const handleResyncAll = async () => {
+    if (!window.confirm("Are you sure? This will reach out to CJ and update all existing products with their latest variants.")) return;
+    setIsSyncing(true);
+    try {
+      const response = await fetch(`${API_BASE}/admin/resync-all-variants`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Failed to resync');
+      toast.success(data.message);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleSyncCJ = async () => {
     if (!cjSku.trim()) return toast.error('Please enter a CJ SKU first!');
     setIsSyncing(true);
@@ -327,16 +346,19 @@ export default function Admin() {
                 <p className="text-slate-500 mt-1 font-medium">Manage your storefront products.</p>
               </div>
               <div className="flex gap-3">
+                <button onClick={handleResyncAll} disabled={isSyncing} className="bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50">
+                  {isSyncing ? '🔄 Working...' : '🔄 Resync All Variants'}
+                </button>
                 <div className="flex items-center gap-2">
                   <input 
                     type="text" 
                     value={cjSku}
                     onChange={(e) => setCjSku(e.target.value)}
                     placeholder="Enter CJ SKU..."
-                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500 font-medium"
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500 font-medium w-36"
                   />
                   <button onClick={handleSyncCJ} disabled={isSyncing} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50">
-                    {isSyncing ? '🔄 Syncing API...' : '⚡ Import SKU'}
+                    {isSyncing ? '🔄 Syncing...' : '⚡ Import SKU'}
                   </button>
                 </div>
                 <button onClick={() => setIsAddModalOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2">
