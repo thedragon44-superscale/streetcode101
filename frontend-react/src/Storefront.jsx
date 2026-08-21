@@ -126,21 +126,17 @@ export default function Storefront() {
 
             {isCategoryMenuOpen && (
               <>
-                {/* Invisible backdrop to close menu when clicking outside */}
                 <div className="fixed inset-0 z-40" onClick={() => setIsCategoryMenuOpen(false)}></div>
-                
-                {/* Compact Ultra-Wide Mega Menu */}
-                <div className="absolute left-0 mt-3 w-[95vw] sm:w-[600px] lg:w-[800px] max-w-[100vw] bg-white border border-slate-200 shadow-2xl z-[999] rounded-2xl overflow-hidden">
-                  <div className="p-4 max-h-[75vh] overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 custom-scrollbar">
+                <div className="absolute left-0 mt-3 w-max min-w-[320px] sm:min-w-[450px] bg-white border border-slate-200 shadow-2xl z-[999] rounded-xl overflow-hidden p-3">
+                  <div className="grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto">
                     {categories.map(cat => (
                       <button
                         key={cat.id}
-                        title={cat.label}
                         onClick={() => {
                           setSelectedCategory(cat.id);
                           setIsCategoryMenuOpen(false);
                         }}
-                        className={`block w-full text-left px-3 py-2.5 rounded-lg text-sm font-bold transition-all truncate ${
+                        className={`block w-full text-left px-4 py-2.5 text-sm font-bold rounded-lg transition-colors whitespace-nowrap ${
                           selectedCategory === cat.id
                             ? 'text-orange-600 bg-orange-50 border border-orange-200 shadow-sm'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent hover:border-slate-200'
