@@ -719,12 +719,24 @@ def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_
 
 @router.post("/api/admin/resync-all-variants")
 def resync_all_variants(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Loops through all products and fetches their latest variants from CJ."""
+    """Loops through all products using a single auth token to prevent timeouts."""
     username = token.get("sub")
     if username != "admin":
         raise HTTPException(status_code=403, detail="Unauthorized.")
         
     cj_api_key = os.getenv("CJ_API_KEY")
+    
+    # 1. Authenticate exactly ONCE for the entire batch
+    auth_url = "https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken"
+    base_headers = {"User-Agent": "Mozilla/5.0"}
+    auth_res = requests.post(auth_url, json={"apiKey": cj_api_key}, headers=base_headers, timeout=15)
+    if not auth_res.ok or not auth_res.json().get("data"):
+        raise HTTPException(status_code=500, detail="CJ API Auth Failed")
+        
+    access_token = auth_res.json()["data"].get("accessToken")
+    auth_headers = {**base_headers, "CJ-Access-Token": access_token}
+
+    # 2. Loop through products using the single token
     products = session.exec(select(Product)).all()
     updated = 0
     
@@ -732,11 +744,39 @@ def resync_all_variants(session: Session = Depends(get_session), token: dict = D
         if not prod.supplier_sku:
             continue
             
-        cj_data = fetch_cj_product_data(prod.supplier_sku, cj_api_key)
-        if cj_data:
-            prod.variants = cj_data["variants"]
+        products_url = "https://developers.cjdropshipping.com/api2.0/v1/product/listV2"
+        safe_params = {"page": 1, "size": 10, "keyWord": prod.supplier_sku}
+        
+        try:
+            prod_res = requests.get(products_url, headers=auth_headers, params=safe_params, timeout=10)
+            content_list = prod_res.json().get("data", {}).get("content", [])
+            
+            if not content_list or not content_list[0].get("productList"):
+                continue
+                
+            p = content_list[0].get("productList")[0]
+            base_price = float(p.get("sellPrice", 15.00))
+            cj_variants = p.get("variantList", [])
+            parsed_variants = []
+            
+            for v in cj_variants:
+                parsed_variants.append({
+                    "variant_sku": v.get("variantSku", ""),
+                    "color": v.get("variantKey", "Default").split("-")[0] if "-" in v.get("variantKey", "") else "Default",
+                    "size": v.get("variantKey", "OS").split("-")[-1] if "-" in v.get("variantKey", "") else "OS",
+                    "price": float(v.get("sellPrice", base_price)) * 2.5,
+                    "image_url": v.get("variantImage", p.get("bigImage"))
+                })
+                
+            if not parsed_variants:
+                parsed_variants = [{"variant_sku": f"101-{prod.supplier_sku[:8]}-DEF", "color": "Default", "size": "OS", "price": base_price * 2.5, "image_url": p.get("bigImage")}]
+                
+            prod.variants = parsed_variants
             session.add(prod)
             updated += 1
+        except Exception as e:
+            print(f"Skipping {prod.supplier_sku} due to error: {e}")
+            continue
             
     session.commit()
     return {"message": f"Successfully resynced variants for {updated} products!"}
