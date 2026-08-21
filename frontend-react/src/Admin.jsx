@@ -16,10 +16,14 @@ export default function Admin() {
 
   // --- MODAL STATE ---
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [cjSku, setCjSku] = useState('');
   const [newProduct, setNewProduct] = useState({
     sku: '', title: '', price: '', description: '', category: 'peripherals', in_stock: true, image: null
+  });
+  const [editingProduct, setEditingProduct] = useState({
+    sku: '', title: '', price: '', description: '', category: ''
   });
 
   // ==========================================
@@ -83,6 +87,27 @@ export default function Admin() {
     localStorage.removeItem('pidrop_token');
     setToken(null);
     navigate('/login');
+  };
+
+  const handleEditProduct = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`${API_BASE}/admin/products/${editingProduct.sku}`, {
+        method: 'PATCH',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(editingProduct)
+      });
+      
+      if (!response.ok) throw new Error('Failed to update product');
+      toast.success('Product updated successfully!');
+      fetchData(); 
+      setIsEditModalOpen(false);
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
   const handleStatusChange = async (orderId, newStatus) => {
@@ -335,7 +360,16 @@ export default function Admin() {
                           {product.in_stock ? 'In Stock' : 'Out of Stock'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-right flex justify-end gap-2">
+                        <button 
+                          onClick={() => {
+                            setEditingProduct(product);
+                            setIsEditModalOpen(true);
+                          }} 
+                          className="text-slate-500 hover:bg-slate-100 p-2 rounded-lg transition-colors font-bold text-xs"
+                        >
+                          ✏️ Edit
+                        </button>
                         <button onClick={() => handleDeleteProduct(product.sku)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors font-bold text-xs">
                           🗑️ Delete
                         </button>
@@ -407,6 +441,55 @@ export default function Admin() {
               <div className="pt-4 border-t border-slate-100">
                 <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-3 rounded-xl shadow-lg transition-all active:scale-[0.98]">
                   Save Product to Database
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- EDIT PRODUCT MODAL --- */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h2 className="text-xl font-black text-slate-900">Edit Product</h2>
+              <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-xl p-2">✕</button>
+            </div>
+            
+            <form onSubmit={handleEditProduct} className="p-6 space-y-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-2 flex items-center gap-3">
+                <span className="text-2xl">🔒</span>
+                <div>
+                  <div className="text-xs font-bold text-slate-500 uppercase">Editing SKU</div>
+                  <div className="font-mono font-black text-slate-800">{editingProduct.sku}</div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Title</label>
+                <input required type="text" value={editingProduct.title} onChange={e => setEditingProduct({...editingProduct, title: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Price ($)</label>
+                  <input required type="number" step="0.01" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                  <input required type="text" value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Description</label>
+                <textarea required value={editingProduct.description} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" rows="3"></textarea>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100">
+                <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-3 rounded-xl shadow-lg transition-all active:scale-[0.98]">
+                  Save Changes
                 </button>
               </div>
             </form>

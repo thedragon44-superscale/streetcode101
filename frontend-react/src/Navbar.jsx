@@ -158,6 +158,11 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
             {currentUser ? (
               <>
+                {currentUser.username === 'admin' && (
+                  <Link to="/admin" className="text-xs font-mono font-bold text-orange-500 hover:text-orange-400 transition-colors uppercase tracking-widest border border-orange-500/30 px-3 py-1.5 rounded-md bg-orange-500/10">
+                    ADMIN CONSOLE
+                  </Link>
+                )}
                 <Link to="/inbox" className="text-xs font-mono font-bold text-slate-400 hover:text-blue-400 transition-colors uppercase tracking-widest">
                   SECURE INBOX
                 </Link>
