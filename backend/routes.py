@@ -713,7 +713,8 @@ def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_
     )
     session.add(new_prod)
     session.commit()
-    return {"message": f"Successfully imported {p.get('nameEn')}!"}
+    session.refresh(new_prod)
+    return {"message": f"Successfully imported {p.get('nameEn')}!", "product": new_prod}
 
 @router.post("/api/profile/spin")
 def spin_vault_wheel(session: Session = Depends(get_session), token: dict = Depends(verify_token)):

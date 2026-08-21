@@ -166,6 +166,12 @@ export default function Admin() {
       toast.success(data.message);
       setCjSku(''); 
       fetchData(); 
+
+      // Instantly pop open the edit modal for the newly imported product!
+      if (data.product) {
+        setEditingProduct(data.product);
+        setIsEditModalOpen(true);
+      }
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -199,10 +205,16 @@ export default function Admin() {
       if (response.status === 401) return handleLogout();
       if (!response.ok) throw new Error('Failed to upload product to backend');
 
+      const addedProduct = await response.json();
+
       toast.success('Product successfully added to catalog!');
       fetchData(); // Refresh the table to show the real database entry!
-      setNewProduct({ sku: '', title: '', price: '', description: '', category: 'peripherals', in_stock: true, image: null });
+      setNewProduct({ sku: '', title: '', price: '', description: '', category: 'mens-clothing', in_stock: true, image: null });
       setIsAddModalOpen(false);
+
+      // Instantly pop open the edit modal!
+      setEditingProduct(addedProduct);
+      setIsEditModalOpen(true);
     } catch (err) { 
       toast.error(err.message); 
     }
