@@ -132,34 +132,35 @@ export default function ProductPage() {
           </div>
 
           {/* Variant Selectors */}
-          {hasVariants && availableColors.length > 0 && availableColors[0] !== 'Default' && (
+          {hasVariants && (product.variants.length > 1 || availableColors[0] !== 'Default') && (
             <div className="mb-6 space-y-6">
               
               {/* Color Picker */}
-              <div>
-                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-3">Color: <span className="text-orange-500">{selectedColor}</span></h3>
-                <div className="flex flex-wrap gap-2">
-                  {availableColors.map(color => (
-                    <button
-                      key={color}
-                      onClick={() => {
-                        setSelectedColor(color);
-                        // Auto-select first available size for this new color to prevent dead states
-                        const sizesForColor = product.variants.filter(v => v.color === color).map(v => v.size);
-                        if (sizesForColor.length > 0 && !sizesForColor.includes(selectedSize)) {
-                          setSelectedSize(sizesForColor[0]);
-                        }
-                      }}
-                      className={`px-4 py-2 text-sm font-bold rounded-xl border-2 transition-all ${selectedColor === color ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
-                    >
-                      {color}
-                    </button>
-                  ))}
+              {(availableColors.length > 1 || availableColors[0] !== 'Default') && (
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-3">Color: <span className="text-orange-500">{selectedColor}</span></h3>
+                  <div className="flex flex-wrap gap-2">
+                    {availableColors.map(color => (
+                      <button
+                        key={color}
+                        onClick={() => {
+                          setSelectedColor(color);
+                          const sizesForColor = product.variants.filter(v => v.color === color).map(v => v.size);
+                          if (sizesForColor.length > 0 && !sizesForColor.includes(selectedSize)) {
+                            setSelectedSize(sizesForColor[0]);
+                          }
+                        }}
+                        className={`px-4 py-2 text-sm font-bold rounded-xl border-2 transition-all ${selectedColor === color ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
+                      >
+                        {color}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Size Picker */}
-              {availableSizes.length > 0 && availableSizes[0] !== 'OS' && (
+              {(availableSizes.length > 1 || availableSizes[0] !== 'OS') && (
                 <div>
                   <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-3">Size: <span className="text-orange-500">{selectedSize}</span></h3>
                   <div className="flex flex-wrap gap-2">
