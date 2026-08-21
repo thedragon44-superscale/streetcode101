@@ -156,52 +156,58 @@ export default function Storefront() {
         </div>
 
         {/* --- CATALOG CONTROLS --- */}
-        <div id="catalog" className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-20">
+        <div id="catalog" className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-[100]">
           
-          {/* Category Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
-              className="flex items-center justify-between w-full sm:w-64 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-sm font-bold text-slate-700 hover:border-orange-500 focus:outline-none transition-all"
-            >
-              <span className="flex items-center gap-2">
-                <i className="fa-solid fa-layer-group text-orange-500"></i>
-                {categories.find(c => c.id === selectedCategory)?.label || 'All Drops'}
-              </span>
-              <i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${isCategoryMenuOpen ? 'rotate-180' : ''}`}></i>
-            </button>
-
-            {isCategoryMenuOpen && (
-              <>
-                {/* Invisible backdrop to close menu when clicking outside */}
-                <div className="fixed inset-0 z-10" onClick={() => setIsCategoryMenuOpen(false)}></div>
-                
-                <div className="absolute left-0 mt-2 w-full sm:w-64 rounded-xl shadow-2xl bg-white border border-slate-100 overflow-hidden z-20">
-                  <div className="py-2 max-h-[60vh] overflow-y-auto">
-                    {categories.map(cat => (
-                      <button
-                        key={cat.id}
-                        onClick={() => {
-                          setSelectedCategory(cat.id);
-                          setIsCategoryMenuOpen(false);
-                        }}
-                        className={`block w-full text-left px-4 py-3 text-sm font-bold transition-colors ${
-                          selectedCategory === cat.id
-                            ? 'bg-orange-50 text-orange-600 border-l-4 border-orange-500'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
-                        }`}
-                      >
-                        {cat.label}
-                      </button>
-                    ))}
+          {/* Enhanced Category Dropdown */}
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <span className="text-xs font-black text-slate-400 uppercase tracking-widest hidden lg:block">Select Category</span>
+            <div className="relative w-full sm:w-72">
+              <button
+                onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
+                className="flex items-center justify-between w-full px-5 py-3.5 bg-slate-900 border-2 border-slate-900 text-white rounded-xl shadow-lg text-sm font-bold hover:bg-slate-800 focus:outline-none transition-all"
+              >
+                <span className="flex items-center gap-3">
+                  <div className="w-7 h-7 bg-orange-500 rounded-md flex items-center justify-center text-white">
+                    <i className="fa-solid fa-layer-group text-xs"></i>
                   </div>
-                </div>
-              </>
-            )}
+                  {categories.find(c => c.id === selectedCategory)?.label || 'All Drops'}
+                </span>
+                <i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${isCategoryMenuOpen ? 'rotate-180' : ''}`}></i>
+              </button>
+
+              {isCategoryMenuOpen && (
+                <>
+                  {/* Invisible backdrop to close menu when clicking outside */}
+                  <div className="fixed inset-0 z-40" onClick={() => setIsCategoryMenuOpen(false)}></div>
+                  
+                  {/* Solid Dropdown Menu */}
+                  <div className="absolute left-0 mt-2 w-full rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] bg-white border border-slate-200 overflow-hidden z-50">
+                    <div className="py-2 max-h-[60vh] overflow-y-auto relative bg-white">
+                      {categories.map(cat => (
+                        <button
+                          key={cat.id}
+                          onClick={() => {
+                            setSelectedCategory(cat.id);
+                            setIsCategoryMenuOpen(false);
+                          }}
+                          className={`block w-full text-left px-5 py-3.5 text-sm font-bold transition-colors ${
+                            selectedCategory === cat.id
+                              ? 'bg-orange-50 text-orange-600 border-l-4 border-orange-500'
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
+                          }`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Clean Search Results Text */}
-          <div className="text-sm text-slate-500 font-medium bg-white border border-slate-200 shadow-sm px-4 py-2 rounded-xl">
+          <div className="text-sm text-slate-500 font-medium bg-white border border-slate-200 shadow-sm px-5 py-3.5 rounded-xl flex-shrink-0">
             Showing <span className="font-bold text-slate-800">{filteredProducts.length}</span> results
             {searchQuery && <span> matching "<span className="font-bold text-slate-800">{searchQuery}</span>"</span>}
           </div>
