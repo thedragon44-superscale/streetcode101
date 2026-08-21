@@ -349,7 +349,15 @@ export default function Admin() {
                     <tr key={product.sku} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4 flex items-center gap-4">
                         <img src={product.image_url} alt={product.title} className="w-12 h-12 rounded-lg object-cover border border-slate-200 bg-slate-100" />
-                        <span className="font-bold text-slate-900 text-base">{product.title}</span>
+                        <button 
+                          onClick={() => {
+                            setEditingProduct(product);
+                            setIsEditModalOpen(true);
+                          }} 
+                          className="font-bold text-slate-900 text-base hover:text-orange-500 hover:underline text-left transition-colors"
+                        >
+                          {product.title}
+                        </button>
                       </td>
                       <td className="px-6 py-4">
                         <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold border border-slate-200">{product.sku}</span>
