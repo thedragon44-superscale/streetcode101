@@ -101,7 +101,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-slate-950 text-white shadow-md border-b border-slate-800">
+      <header className="sticky top-0 z-[200] bg-slate-950 text-white shadow-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           
           {/* Logo */}
@@ -234,9 +234,9 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
       {/* --- CART SLIDE-OUT MODAL --- */}
       {isCartOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] transition-opacity" onClick={() => setIsCartOpen(false)} />
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[210] transition-opacity" onClick={() => setIsCartOpen(false)} />
       )}
-      <div className={`fixed top-0 right-0 h-full w-full sm:w-[500px] bg-slate-950 z-[101] shadow-[-10px_0_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ease-in-out flex flex-col border-l border-slate-800 ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed top-0 right-0 h-full w-full sm:w-[500px] bg-slate-950 z-[220] shadow-[-10px_0_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ease-in-out flex flex-col border-l border-slate-800 ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         
         <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between bg-slate-950">
           <h2 className="text-xl font-black text-white uppercase tracking-widest font-heading">
