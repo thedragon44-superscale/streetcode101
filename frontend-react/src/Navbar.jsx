@@ -112,38 +112,41 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
             </span>
           </Link>
 
-          {/* Search Bar */}
-          <div className="flex-1 max-w-3xl flex justify-center px-4">
+          {/* Enhanced Search Bar */}
+          <div className="flex-1 w-full flex justify-center px-6 sm:px-10">
             {showSearch && (
-              <div className="flex w-full max-w-xl relative">
+              <div className="flex w-full max-w-3xl relative group">
                 <input 
                   type="text" 
                   placeholder="SEARCH VAULT..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-900 text-blue-400 placeholder-slate-600 border border-slate-800 rounded-l-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-xs font-mono font-bold transition-all uppercase tracking-wider"
+                  className="w-full px-5 py-2.5 bg-slate-900/80 text-blue-400 placeholder-slate-500 border border-slate-700 rounded-l-xl focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm font-mono font-bold transition-all uppercase tracking-wider group-hover:bg-slate-900 shadow-inner"
                 />
-                <button className="bg-slate-800 hover:bg-slate-700 px-6 py-2 rounded-r-xl text-blue-400 transition-colors flex items-center justify-center border border-slate-800 border-l-0">
+                <button className="bg-slate-800 hover:bg-slate-700 px-6 py-2.5 rounded-r-xl text-orange-500 transition-colors flex items-center justify-center border border-slate-700 border-l-0 shadow-sm">
                   <i className="fa-solid fa-magnifying-glass"></i>
                 </button>
 
                 {/* Auto-fill Search Dropdown */}
                 {searchQuery.trim().length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 rounded-xl shadow-2xl border border-slate-800 overflow-hidden z-50 flex flex-col">
-                    {searchResults.slice(0, 5).map(item => (
+                  <div className="absolute top-full left-0 right-0 mt-3 bg-slate-900 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] border border-slate-700 overflow-hidden z-50 flex flex-col">
+                    {searchResults.slice(0, 6).map(item => (
                       <Link 
                         key={item.sku} 
                         to={`/product/${item.sku}`}
                         onClick={() => setSearchQuery('')}
-                        className="flex items-center gap-3 p-3 hover:bg-slate-800 border-b border-slate-800/50 last:border-0 transition-colors text-left group"
+                        className="flex items-center gap-4 p-3 hover:bg-slate-800 border-b border-slate-800/50 last:border-0 transition-colors text-left group"
                       >
-                        <img src={item.image_url} alt={item.title} className="w-10 h-10 object-cover rounded-md bg-slate-950 border border-slate-800" />
+                        <img src={item.image_url} alt={item.title} className="w-12 h-12 object-cover rounded-md bg-slate-950 border border-slate-800 shadow-sm" />
                         <div className="flex-1 overflow-hidden">
-                          <h4 className="text-sm font-bold text-slate-200 truncate group-hover:text-orange-500 transition-colors">{item.title}</h4>
-                          <p className="text-xs text-blue-400 font-mono">${item.price.toFixed(2)}</p>
+                          <h4 className="text-sm font-bold text-slate-100 truncate group-hover:text-orange-500 transition-colors">{item.title}</h4>
+                          <p className="text-xs text-blue-400 font-mono mt-0.5">${item.price.toFixed(2)}</p>
                         </div>
                       </Link>
                     ))}
+                    {searchResults.length === 0 && (
+                      <div className="p-4 text-center text-slate-500 font-mono text-xs">NO RESULTS FOUND</div>
+                    )}
                   </div>
                 )}
               </div>
@@ -152,39 +155,38 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
           
           {/* Right Navigation */}
           <div className="hidden sm:flex items-center gap-6 flex-shrink-0">
-            <Link to="/feed" className="text-xs font-mono font-bold text-slate-400 hover:text-blue-400 transition-colors uppercase tracking-widest">
-              SOCIAL FEED
+            <Link to="/feed" className="text-xs font-mono font-bold text-slate-400 hover:text-orange-500 transition-colors uppercase tracking-widest">
+              FEED
             </Link>
 
             {currentUser ? (
               <>
+                <Link to="/inbox" className="text-xs font-mono font-bold text-slate-400 hover:text-orange-500 transition-colors uppercase tracking-widest">
+                  INBOX
+                </Link>
                 {currentUser.username === 'admin' && (
                   <Link to="/admin" className="text-xs font-mono font-bold text-orange-500 hover:text-orange-400 transition-colors uppercase tracking-widest border border-orange-500/30 px-3 py-1.5 rounded-md bg-orange-500/10">
-                    ADMIN CONSOLE
+                    ADMIN
                   </Link>
                 )}
-                <Link to="/inbox" className="text-xs font-mono font-bold text-slate-400 hover:text-blue-400 transition-colors uppercase tracking-widest">
-                  SECURE INBOX
-                </Link>
-                <Link to="/profile/me" className="flex items-center gap-2 hover:text-orange-500 transition-colors">
+                <Link to="/profile/me" className="flex items-center gap-2 hover:text-orange-500 transition-colors ml-2 pl-2 border-l border-slate-800">
                   <img src={currentUser.profile_image_url} alt="Avatar" className="w-8 h-8 rounded-full border border-slate-700 object-cover" />
-                  <div className="text-xs font-mono font-bold uppercase tracking-wider text-right">
-                    <span className="block text-[9px] text-blue-400">LOGGED IN</span>
+                  <div className="text-xs font-mono font-bold uppercase tracking-wider text-left">
                     @{currentUser.username}
                   </div>
                 </Link>
               </>
             ) : (
-              <Link to="/login" className="text-xs font-mono font-bold text-orange-500 hover:text-orange-400 transition-colors uppercase tracking-widest border border-orange-500/30 px-3 py-1.5 rounded-md bg-orange-500/10">
-                ACCESS VAULT
+              <Link to="/login" className="text-xs font-mono font-bold text-slate-950 bg-orange-500 hover:bg-orange-400 transition-colors uppercase tracking-widest px-4 py-2 rounded-md shadow-sm ml-2">
+                LOG IN
               </Link>
             )}
             
-            <button onClick={() => setIsCartOpen(true)} className="flex items-center gap-1 hover:text-orange-500 transition-colors bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-md">
+            <button onClick={() => setIsCartOpen(true)} className="flex items-center gap-1 hover:text-orange-500 transition-colors px-2">
               <div className="relative">
-                <i className="fa-solid fa-cart-shopping text-lg text-slate-300"></i>
+                <i className="fa-solid fa-cart-shopping text-xl text-slate-300 transition-colors hover:text-orange-500"></i>
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-2 -right-3 bg-orange-500 text-slate-950 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black font-mono">
+                  <span className="absolute -top-2 -right-3 bg-orange-500 text-slate-950 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black font-mono shadow-md">
                     {cartItemCount}
                   </span>
                 )}
