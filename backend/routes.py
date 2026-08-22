@@ -302,6 +302,8 @@ def edit_product_details(sku: str, payload: dict, session: Session = Depends(get
         product.price = float(payload["price"])
     if "category" in payload:
         product.category = payload["category"]
+    if "image_url" in payload:
+        product.image_url = payload["image_url"]
     
     session.add(product)
     session.commit()
@@ -694,7 +696,13 @@ def fetch_cj_product_data(target_sku: str, cj_api_key: str):
         parsed_variants = [{"variant_sku": f"101-{target_sku[:8]}-DEF", "color": "Default", "size": "OS", "price": base_price * 2.5, "image_url": p.get("productImage", p.get("bigImage", "/sb.png"))}]
         
     p["nameEn"] = p.get("productNameEn", p.get("nameEn", "Premium CJ Drop"))
-    p["bigImage"] = p.get("productImage", p.get("bigImage", "/sb.png"))
+    
+    # Safely extract an image: try main image, fallback to first variant, fallback to default
+    main_img = p.get("productImage") or p.get("bigImage")
+    if not main_img and parsed_variants:
+        main_img = parsed_variants[0].get("image_url")
+    p["bigImage"] = main_img or "/sb.png"
+    
     p["sku"] = p.get("productSku", target_sku)
         
     return {"base_data": p, "variants": parsed_variants}
