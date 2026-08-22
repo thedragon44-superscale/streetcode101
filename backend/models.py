@@ -24,6 +24,7 @@ class Product(SQLModel, table=True):
     in_stock: bool
     supplier_sku: Optional[str] = None 
     variants: list = Field(default=[], sa_column=Column(JSON)) 
+    is_featured: bool = Field(default=False) 
 
 class Order(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

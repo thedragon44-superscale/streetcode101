@@ -6,22 +6,19 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
 export default function Admin() {
   const navigate = useNavigate();
-  // --- AUTHENTICATION STATE ---
   const [token, setToken] = useState(localStorage.getItem('pidrop_token'));
 
   // --- DASHBOARD STATE ---
-  const [activeTab, setActiveTab] = useState('orders');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
+  const [socialFeed, setSocialFeed] = useState([]);
+  const [orderFilter, setOrderFilter] = useState('all');
 
   // --- MODAL STATE ---
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [cjSku, setCjSku] = useState('');
-  const [newProduct, setNewProduct] = useState({
-    sku: '', title: '', price: '', description: '', category: 'mens-clothing', in_stock: true, image: null
-  });
   const [editingProduct, setEditingProduct] = useState({
     sku: '', title: '', price: '', description: '', category: ''
   });
@@ -31,34 +28,32 @@ export default function Admin() {
   // ==========================================
   const fetchData = async () => {
     try {
-      const [ordersRes, productsRes] = await Promise.all([
+      const [ordersRes, productsRes, feedRes] = await Promise.all([
         fetch(`${API_BASE}/orders`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE}/products`)
+        fetch(`${API_BASE}/products`),
+        fetch(`${API_BASE}/listings/feed`)
       ]);
 
       if (ordersRes.status === 401) {
-        handleLogout(); // Token expired or invalid!
+        handleLogout(); 
         return;
       }
 
       const ordersData = await ordersRes.json();
       const productsData = await productsRes.json();
+      const feedData = await feedRes.json();
 
       setOrders(ordersData);
       setProducts(productsData);
+      setSocialFeed(feedData);
     } catch (err) {
       console.error("Error fetching data:", err);
     }
   };
 
-  // Auth verification & Fetch real data from PostgreSQL
   useEffect(() => {
     const currentToken = localStorage.getItem('pidrop_token');
-    
-    if (!currentToken) {
-      navigate('/login');
-      return;
-    }
+    if (!currentToken) return navigate('/login');
 
     fetch(`${API_BASE}/profile/me`, {
       headers: { 'Authorization': `Bearer ${currentToken}` }
@@ -68,17 +63,25 @@ export default function Admin() {
         return res.json();
       })
       .then(data => {
-        if (data.username !== 'admin') {
-          navigate('/');
-        } else {
-          fetchData();
-        }
+        if (data.username !== 'admin') navigate('/');
+        else fetchData();
       })
       .catch(() => {
         localStorage.removeItem('pidrop_token');
         navigate('/login');
       });
   }, [navigate]);
+
+  // ==========================================
+  // METRICS CALCULATIONS
+  // ==========================================
+  const totalRevenue = orders.reduce((sum, order) => {
+    const prod = products.find(p => p.sku === order.sku);
+    return sum + (prod ? prod.price * order.quantity : 0);
+  }, 0);
+
+  const pendingOrdersCount = orders.filter(o => o.status === 'processing').length;
+  const filteredOrders = orderFilter === 'all' ? orders : orders.filter(o => o.status === orderFilter);
 
   // ==========================================
   // EVENT HANDLERS
@@ -94,46 +97,29 @@ export default function Admin() {
     try {
       const response = await fetch(`${API_BASE}/admin/products/${editingProduct.sku}`, {
         method: 'PATCH',
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json' 
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(editingProduct)
       });
-      
       if (!response.ok) throw new Error('Failed to update product');
       toast.success('Product updated successfully!');
       fetchData(); 
       setIsEditModalOpen(false);
-    } catch (err) {
-      toast.error(err.message);
-    }
+    } catch (err) { toast.error(err.message); }
   };
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       const response = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
         method: 'PATCH',
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json' 
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
       });
-
       if (response.status === 401) return handleLogout();
       if (!response.ok) throw new Error('Failed to update status');
-
       toast.success(`Order #${orderId} status updated!`);
-      fetchData(); // Refresh UI immediately
-      
-      // If shipped, Celery takes ~3s. Poll DB again after 4s to grab tracking!
-      if (newStatus === 'shipped') {
-        setTimeout(fetchData, 4000);
-      }
-    } catch (err) {
-      toast.error(err.message);
-    }
+      fetchData(); 
+      if (newStatus === 'shipped') setTimeout(fetchData, 4000);
+    } catch (err) { toast.error(err.message); }
   };
 
   const handleDeleteProduct = async (sku) => {
@@ -145,15 +131,39 @@ export default function Admin() {
         });
         if (!response.ok) throw new Error('Failed to delete product');
         toast.success(`Product ${sku} deleted.`);
-        fetchData(); // Refresh the table!
-      } catch (err) {
-        toast.error(err.message);
-      }
+        fetchData(); 
+      } catch (err) { toast.error(err.message); }
+    }
+  };
+
+  const handleToggleFeatured = async (sku) => {
+    try {
+      const response = await fetch(`${API_BASE}/admin/products/${sku}/featured`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Failed to set featured product');
+      toast.success(`Featured drop updated!`);
+      fetchData();
+    } catch (err) { toast.error(err.message); }
+  };
+
+  const handleDeleteListing = async (id) => {
+    if (window.confirm(`Delete this user listing?`)) {
+      try {
+        const response = await fetch(`${API_BASE}/admin/listings/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to delete listing');
+        toast.success(`Listing removed from feed.`);
+        fetchData(); 
+      } catch (err) { toast.error(err.message); }
     }
   };
 
   const handleResyncAll = async () => {
-    if (!window.confirm("Are you sure? This will reach out to CJ and update all existing products with their latest variants.")) return;
+    if (!window.confirm("Are you sure? This will update all products.")) return;
     setIsSyncing(true);
     try {
       const response = await fetch(`${API_BASE}/admin/resync-all-variants`, {
@@ -164,11 +174,7 @@ export default function Admin() {
       if (!response.ok) throw new Error(data.detail || 'Failed to resync');
       toast.success(data.message);
       fetchData();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setIsSyncing(false);
-    }
+    } catch (err) { toast.error(err.message); } finally { setIsSyncing(false); }
   };
 
   const handleSyncCJ = async () => {
@@ -185,64 +191,13 @@ export default function Admin() {
       toast.success(data.message);
       setCjSku(''); 
       fetchData(); 
-
-      // Instantly pop open the edit modal for the newly imported product!
       if (data.product) {
         setEditingProduct(data.product);
         setIsEditModalOpen(true);
       }
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setIsSyncing(false);
-    }
+    } catch (err) { toast.error(err.message); } finally { setIsSyncing(false); }
   };
 
-  const handleAddProduct = async (e) => {
-    e.preventDefault();
-    
-    // Prepare data for FastAPI & MinIO (Requires FormData!)
-    const formData = new FormData();
-    formData.append('sku', newProduct.sku);
-    formData.append('title', newProduct.title);
-    formData.append('price', newProduct.price);
-    formData.append('description', newProduct.description);
-    formData.append('category', newProduct.category);
-    formData.append('in_stock', newProduct.in_stock);
-    if (newProduct.image) {
-      formData.append('file', newProduct.image); 
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}/products`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        // Note: Do NOT set Content-Type manually when using FormData! The browser sets it automatically with the file boundary.
-        body: formData
-      });
-      
-      if (response.status === 401) return handleLogout();
-      if (!response.ok) throw new Error('Failed to upload product to backend');
-
-      const addedProduct = await response.json();
-
-      toast.success('Product successfully added to catalog!');
-      fetchData(); // Refresh the table to show the real database entry!
-      setNewProduct({ sku: '', title: '', price: '', description: '', category: 'mens-clothing', in_stock: true, image: null });
-      setIsAddModalOpen(false);
-
-      // Instantly pop open the edit modal!
-      setEditingProduct(addedProduct);
-      setIsEditModalOpen(true);
-    } catch (err) { 
-      toast.error(err.message); 
-    }
-  };
-
-
-  // ==========================================
-  // RENDER: SECURE ADMIN DASHBOARD
-  // ==========================================
   if (!token) return null;
 
   return (
@@ -258,11 +213,18 @@ export default function Admin() {
           <button onClick={() => navigate('/')} className="w-full text-left px-4 py-3 rounded-xl font-bold transition-all text-cyan-400 hover:bg-slate-800 hover:text-cyan-300 mb-4 border border-slate-700/50 bg-slate-800/50">
             🏪 Back to Storefront
           </button>
-          <button onClick={() => setActiveTab('orders')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'orders' ? 'bg-orange-500/10 text-orange-500' : 'hover:bg-slate-800 hover:text-white'}`}>
-            📦 Orders
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'dashboard' ? 'bg-cyan-500/10 text-cyan-400' : 'hover:bg-slate-800 hover:text-white'}`}>
+            📊 Dashboard
+          </button>
+          <button onClick={() => setActiveTab('orders')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'orders' ? 'bg-orange-500/10 text-orange-500' : 'hover:bg-slate-800 hover:text-white'} flex justify-between items-center`}>
+            <span>📦 Orders</span>
+            {pendingOrdersCount > 0 && <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">{pendingOrdersCount}</span>}
           </button>
           <button onClick={() => setActiveTab('products')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'products' ? 'bg-orange-500/10 text-orange-500' : 'hover:bg-slate-800 hover:text-white'}`}>
             🏷️ Products
+          </button>
+          <button onClick={() => setActiveTab('social')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'social' ? 'bg-purple-500/10 text-purple-400' : 'hover:bg-slate-800 hover:text-white'}`}>
+            👥 Social Feed
           </button>
         </nav>
         <div className="p-4 border-t border-slate-800">
@@ -275,16 +237,49 @@ export default function Admin() {
       {/* Main Content Area */}
       <main className="flex-1 p-8 overflow-y-auto relative">
         
+        {/* --- DASHBOARD VIEW --- */}
+        {activeTab === 'dashboard' && (
+          <div className="animate-fade-in">
+            <header className="mb-8">
+              <h1 className="text-3xl font-black text-slate-900">Command Center</h1>
+              <p className="text-slate-500 mt-1 font-medium">High-level storefront metrics.</p>
+            </header>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                <div className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">Total Revenue</div>
+                <div className="text-4xl font-black text-slate-900">${totalRevenue.toFixed(2)}</div>
+              </div>
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                <div className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">Pending Orders</div>
+                <div className="text-4xl font-black text-orange-500">{pendingOrdersCount}</div>
+              </div>
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                <div className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">Total Products</div>
+                <div className="text-4xl font-black text-cyan-600">{products.length}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* --- ORDERS VIEW --- */}
         {activeTab === 'orders' && (
-          <>
-            <header className="mb-8 flex justify-between items-end">
+          <div className="animate-fade-in">
+            <header className="mb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
               <div>
                 <h1 className="text-3xl font-black text-slate-900">Order Ledger</h1>
                 <p className="text-slate-500 mt-1 font-medium">Manage and fulfill customer orders.</p>
               </div>
-              <div className="bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 font-bold text-slate-700">
-                Total Orders: <span className="text-orange-500">{orders.length}</span>
+              <div className="flex bg-slate-200 p-1 rounded-xl">
+                {['all', 'processing', 'shipped', 'cancelled'].map(status => (
+                  <button 
+                    key={status} 
+                    onClick={() => setOrderFilter(status)}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wider transition-all ${orderFilter === status ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    {status}
+                  </button>
+                ))}
               </div>
             </header>
 
@@ -299,7 +294,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {orders.map((order) => (
+                  {filteredOrders.map((order) => (
                     <tr key={order.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4 font-black text-slate-900 text-base">#{order.id}</td>
                       <td className="px-6 py-4">
@@ -312,7 +307,7 @@ export default function Admin() {
                       </td>
                       <td className="px-6 py-4">
                         <select 
-                          className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block w-full p-2.5 font-bold cursor-pointer shadow-sm" 
+                          className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-orange-500 block w-full p-2.5 font-bold cursor-pointer shadow-sm" 
                           defaultValue={order.status}
                           onChange={(e) => handleStatusChange(order.id, e.target.value)}
                         >
@@ -320,26 +315,21 @@ export default function Admin() {
                           <option value="shipped">📦 Shipped</option>
                           <option value="cancelled">🚫 Cancelled</option>
                         </select>
-                        {order.tracking_number && (
-                          <div className="mt-2 text-xs font-black text-emerald-600 flex items-center gap-1 bg-emerald-50 w-fit px-2 py-1 rounded-md border border-emerald-100">
-                            <span>↳</span> {order.tracking_number}
-                          </div>
-                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {orders.length === 0 && (
-                <div className="text-center py-20 text-slate-400 font-medium">No orders found in the database.</div>
+              {filteredOrders.length === 0 && (
+                <div className="text-center py-20 text-slate-400 font-medium">No orders found for this filter.</div>
               )}
             </div>
-          </>
+          </div>
         )}
 
         {/* --- PRODUCTS VIEW --- */}
         {activeTab === 'products' && (
-          <>
+          <div className="animate-fade-in">
             <header className="mb-8 flex justify-between items-end">
               <div>
                 <h1 className="text-3xl font-black text-slate-900">Inventory</h1>
@@ -354,11 +344,7 @@ export default function Admin() {
                     placeholder="Enter CJ SKU..."
                     className="px-3 py-2 border-none text-sm focus:ring-0 font-medium w-48 bg-transparent text-slate-700 placeholder-slate-400 uppercase tracking-wider"
                   />
-                  <button 
-                    onClick={handleSyncCJ} 
-                    disabled={isSyncing} 
-                    className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-6 py-2 rounded-lg shadow-sm transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 text-xs tracking-widest uppercase"
-                  >
+                  <button onClick={handleSyncCJ} disabled={isSyncing} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-6 py-2 rounded-lg shadow-sm transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 text-xs tracking-widest uppercase">
                     {isSyncing ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-cloud-arrow-down"></i>}
                     Import SKU
                   </button>
@@ -372,51 +358,59 @@ export default function Admin() {
                   <tr>
                     <th className="px-6 py-5">Product Info</th>
                     <th className="px-6 py-5">SKU</th>
-                    <th className="px-6 py-5">Price</th>
+                    <th className="px-6 py-5">Price (Margin)</th>
                     <th className="px-6 py-5">Status</th>
                     <th className="px-6 py-5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {products.map((product) => (
-                    <tr key={product.sku} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 flex items-center gap-4">
-                        <img src={product.image_url} alt={product.title} className="w-12 h-12 rounded-lg object-cover border border-slate-200 bg-slate-100" />
-                        <button 
-                          onClick={() => {
-                            setEditingProduct(product);
-                            setIsEditModalOpen(true);
-                          }} 
-                          className="font-bold text-slate-900 text-base hover:text-orange-500 hover:underline text-left transition-colors"
-                        >
-                          {product.title}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold border border-slate-200">{product.sku}</span>
-                      </td>
-                      <td className="px-6 py-4 font-black text-slate-900 text-base">${product.price.toFixed(2)}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${product.in_stock ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-red-500'}`}></span>
-                          <span className={`text-xs font-black uppercase tracking-widest ${product.in_stock ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {product.in_stock ? 'Active' : 'Empty'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end">
+                  {products.map((product) => {
+                    // Calculate Profit Margin based on your 2.5x markup model
+                    const baseCost = product.price / 2.5;
+                    const profit = product.price - baseCost;
+
+                    return (
+                      <tr key={product.sku} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4 flex items-center gap-4">
                           <button 
-                            onClick={() => handleDeleteProduct(product.sku)} 
-                            className="text-slate-300 hover:text-red-500 hover:bg-red-50 w-8 h-8 rounded-lg transition-all flex items-center justify-center active:scale-90"
-                            title="Delete Product"
+                            onClick={() => handleToggleFeatured(product.sku)}
+                            className={`text-xl transition-all hover:scale-125 ${product.is_featured ? 'text-yellow-400 drop-shadow-md' : 'text-slate-300 hover:text-yellow-200'}`}
+                            title="Set as Featured Drop"
                           >
-                            <i className="fa-solid fa-xmark text-lg"></i>
+                            <i className="fa-solid fa-crown"></i>
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                          <img src={product.image_url} alt={product.title} className="w-12 h-12 rounded-lg object-cover border border-slate-200 bg-slate-100" />
+                          <button onClick={() => { setEditingProduct(product); setIsEditModalOpen(true); }} className="font-bold text-slate-900 text-base hover:text-orange-500 hover:underline text-left transition-colors">
+                            {product.title}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold border border-slate-200">{product.sku}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-black text-slate-900 text-base">${product.price.toFixed(2)}</div>
+                          <div className="text-xs font-bold text-emerald-600 mt-0.5">
+                            +${profit.toFixed(2)} Profit
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${product.in_stock ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-red-500'}`}></span>
+                            <span className={`text-xs font-black uppercase tracking-widest ${product.in_stock ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {product.in_stock ? 'Active' : 'Empty'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end">
+                            <button onClick={() => handleDeleteProduct(product.sku)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 w-8 h-8 rounded-lg transition-all flex items-center justify-center active:scale-90" title="Delete Product">
+                              <i className="fa-solid fa-xmark text-lg"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               {products.length === 0 && (
@@ -424,88 +418,70 @@ export default function Admin() {
               )}
             </div>
 
-            {/* Bottom Admin Actions */}
             {products.length > 0 && (
               <div className="mt-8 flex justify-end">
-                <button 
-                  onClick={handleResyncAll} 
-                  disabled={isSyncing} 
-                  className="bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-mono text-xs font-bold uppercase tracking-widest px-6 py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 border border-slate-800"
-                >
+                <button onClick={handleResyncAll} disabled={isSyncing} className="bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-mono text-xs font-bold uppercase tracking-widest px-6 py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 border border-slate-800">
                   {isSyncing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-rotate-right"></i>}
                   {isSyncing ? 'SYNCING...' : 'RESYNC ALL VARIANTS'}
                 </button>
               </div>
             )}
-          </>
+          </div>
+        )}
+
+        {/* --- SOCIAL FEED MODERATION VIEW --- */}
+        {activeTab === 'social' && (
+          <div className="animate-fade-in">
+            <header className="mb-8">
+              <h1 className="text-3xl font-black text-slate-900">Feed Moderation</h1>
+              <p className="text-slate-500 mt-1 font-medium">Monitor and remove peer-to-peer vendor listings.</p>
+            </header>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full text-left text-sm text-slate-600">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
+                  <tr>
+                    <th className="px-6 py-5">User</th>
+                    <th className="px-6 py-5">Listing Details</th>
+                    <th className="px-6 py-5">Price</th>
+                    <th className="px-6 py-5 text-right">Kill Switch</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {socialFeed.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <img src={item.user_avatar} alt={item.username} className="w-8 h-8 rounded-full border border-slate-200" />
+                          <span className="font-bold text-slate-900">@{item.username}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 flex items-center gap-4">
+                        <img src={item.image_url} alt={item.title} className="w-12 h-12 rounded-lg object-cover border border-slate-200 bg-slate-100" />
+                        <div>
+                          <div className="font-bold text-slate-900 text-base">{item.title}</div>
+                          <div className="text-xs text-slate-500 truncate w-48">{item.description}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-black text-slate-900 text-base">${item.price.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end">
+                          <button onClick={() => handleDeleteListing(item.id)} className="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white px-4 py-2 rounded-lg transition-all font-bold text-xs uppercase tracking-wider flex items-center gap-2">
+                            <i className="fa-solid fa-trash"></i> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {socialFeed.length === 0 && (
+                <div className="text-center py-20 text-slate-400 font-medium">No user listings currently active.</div>
+              )}
+            </div>
+          </div>
         )}
       </main>
-
-      {/* --- ADD PRODUCT MODAL --- */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <h2 className="text-xl font-black text-slate-900">Add New Product</h2>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-xl p-2">✕</button>
-            </div>
-            
-            <form onSubmit={handleAddProduct} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Title</label>
-                  <input required type="text" value={newProduct.title} onChange={e => setNewProduct({...newProduct, title: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" placeholder="E.g. Gaming Mouse" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">SKU</label>
-                  <input required type="text" value={newProduct.sku} onChange={e => setNewProduct({...newProduct, sku: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" placeholder="MOU-001" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Price ($)</label>
-                  <input required type="number" step="0.01" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" placeholder="49.99" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
-                  <select required value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium bg-white">
-                    <option value="mens-clothing">Men's Clothing</option>
-                    <option value="womens-clothing">Women's Clothing</option>
-                    <option value="mens-shoes">Men's Shoes</option>
-                    <option value="womens-shoes">Women's Shoes</option>
-                    <option value="mens-jewelry">Men's Jewelry</option>
-                    <option value="womens-jewelry">Women's Jewelry</option>
-                    <option value="accessories">Accessories</option>
-                    <option value="electronics">Electronics</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Product Description</label>
-                <textarea required value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" rows="2" placeholder="Describe the item..."></textarea>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Product Image</label>
-                <input required type="file" accept="image/*" onChange={e => setNewProduct({...newProduct, image: e.target.files[0]})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-orange-50 file:text-orange-600 hover:file:bg-orange-100 cursor-pointer" />
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <input type="checkbox" id="in_stock" checked={newProduct.in_stock} onChange={e => setNewProduct({...newProduct, in_stock: e.target.checked})} className="w-5 h-5 rounded border-slate-300 text-orange-500 focus:ring-orange-500 cursor-pointer" />
-                <label htmlFor="in_stock" className="text-sm font-bold text-slate-700 cursor-pointer">Item is currently in stock</label>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100">
-                <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-3 rounded-xl shadow-lg transition-all active:scale-[0.98]">
-                  Save Product to Database
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* --- EDIT PRODUCT MODAL --- */}
       {isEditModalOpen && (
@@ -524,12 +500,10 @@ export default function Admin() {
                   <div className="font-mono font-black text-slate-800">{editingProduct.sku}</div>
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Title</label>
                 <input required type="text" value={editingProduct.title} onChange={e => setEditingProduct({...editingProduct, title: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Price ($)</label>
@@ -550,12 +524,10 @@ export default function Admin() {
                   </select>
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Description</label>
                 <textarea required value={editingProduct.description} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" rows="3"></textarea>
               </div>
-
               <div className="pt-4 border-t border-slate-100">
                 <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-3 rounded-xl shadow-lg transition-all active:scale-[0.98]">
                   Save Changes

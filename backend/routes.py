@@ -700,6 +700,45 @@ def fetch_cj_product_data(target_sku: str, cj_api_key: str):
     return {"base_data": p, "variants": parsed_variants}
 
 
+@router.patch("/api/admin/products/{sku}/featured")
+def toggle_featured_product(sku: str, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Sets a product as the Featured Drop and un-features all others."""
+    username = token.get("sub")
+    if username != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    product = session.get(Product, sku)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    # Un-feature all other products to ensure only ONE crown exists
+    existing_featured = session.exec(select(Product).where(Product.is_featured == True)).all()
+    for p in existing_featured:
+        p.is_featured = False
+        session.add(p)
+        
+    # Feature the selected product
+    product.is_featured = True
+    session.add(product)
+    session.commit()
+    
+    return {"message": f"{product.title} is now the Featured Drop!"}
+
+@router.delete("/api/admin/listings/{id}")
+def delete_social_listing(id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Allows the Admin to delete a user's peer-to-peer listing."""
+    username = token.get("sub")
+    if username != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    listing = session.get(VendorListing, id)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+        
+    session.delete(listing)
+    session.commit()
+    return {"message": "Listing removed from social feed."}
+
 # --- WEBSOCKET CONNECTION MANAGER ---
 class ConnectionManager:
     def __init__(self):
