@@ -357,9 +357,7 @@ export default function Storefront() {
           </>
         )}
       </main>
-      <Footer 
-        onSupportClick={(!currentUser || currentUser.username !== 'admin') ? () => setIsSupportOpen(true) : null} 
-      />
+      <Footer />
     </div>
   );
 }

@@ -12,12 +12,11 @@ export default function Footer() {
           <p className="text-xs font-mono">Authenticated Drops & Peer-to-Peer Ledger</p>
         </div>
         
-        {/* These links are exactly what Stripe's bots look for */}
-        <div className="flex flex-wrap justify-center gap-4 text-xs font-bold uppercase tracking-wider">
+        <div className="flex flex-wrap justify-center items-center gap-4 text-xs font-bold uppercase tracking-wider">
           <Link to="/legal/refunds" className="hover:text-orange-500 transition-colors">Refund Policy</Link>
           <Link to="/legal/privacy" className="hover:text-orange-500 transition-colors">Privacy Policy</Link>
           <Link to="/legal/terms" className="hover:text-orange-500 transition-colors">Terms of Service</Link>
-          <a href="mailto:support@streetcode101.com" className="hover:text-orange-500 transition-colors">Contact Support</a>
+          <span className="text-slate-500 font-mono lowercase tracking-normal">admin@streetcode101.com</span>
         </div>
         
         <div className="text-xs font-mono text-slate-600">
