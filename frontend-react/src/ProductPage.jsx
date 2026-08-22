@@ -123,10 +123,10 @@ export default function ProductPage() {
           <Link to="/" className="text-cyan-700 font-bold hover:underline text-sm mb-4">Visit the Street Code 101 Store</Link>
           
           <div className="flex items-center gap-2 mb-6 border-b border-slate-200 pb-6">
-            <div className="text-yellow-400 text-sm">
-              <i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star-half-stroke"></i>
+            <div className="text-slate-900 text-sm">
+              <i className="fa-solid fa-shield-halved"></i>
             </div>
-            <span className="text-cyan-700 hover:underline cursor-pointer text-sm font-bold">Verified Local Reviews</span>
+            <span className="text-slate-600 text-sm font-bold uppercase tracking-wider">Street Code 101 Authenticated Drop</span>
           </div>
 
           <div className="flex items-start mb-6 text-slate-900">
@@ -199,13 +199,15 @@ export default function ProductPage() {
           <div className="border border-slate-200 rounded-3xl p-6 shadow-xl shadow-slate-200/50 sticky top-24">
             <div className="text-3xl font-black text-slate-900 mb-4">${displayPrice.toFixed(2)}</div>
             
-            <div className="text-sm text-slate-600 mb-4">
-              <span className="font-bold text-cyan-700 hover:underline cursor-pointer">FREE Returns</span>
-            </div>
-            
-            <div className="text-sm mb-6">
-              <span className="font-bold text-cyan-700 hover:underline cursor-pointer">FREE delivery</span> 
-              <span className="font-bold text-slate-900"> {new Date(Date.now() + 172800000).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+            <div className="text-sm text-slate-600 mb-6 space-y-2">
+              <div className="flex items-start gap-2">
+                <i className="fa-solid fa-truck-fast mt-1 text-slate-400"></i>
+                <span><span className="font-bold text-slate-900">Standard Global Shipping</span><br/>Estimated 7-14 business days.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <i className="fa-solid fa-box-open mt-1 text-slate-400"></i>
+                <span><span className="font-bold text-slate-900">Order Tracking</span><br/>Tracking ID provided via email after dispatch.</span>
+              </div>
             </div>
 
             {product.in_stock ? (
@@ -234,9 +236,9 @@ export default function ProductPage() {
             </button>
 
             <div className="mt-6 text-xs text-slate-500 space-y-3 font-medium bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <div className="flex justify-between"><span>Ships from</span> <span className="font-bold text-slate-900">Street Code 101</span></div>
+              <div className="flex justify-between"><span>Ships from</span> <span className="font-bold text-slate-900">Global Partner Network</span></div>
               <div className="flex justify-between"><span>Sold by</span> <span className="font-bold text-slate-900">Street Code 101</span></div>
-              <div className="flex justify-between"><span>Returns</span> <span className="font-bold text-cyan-700 hover:underline cursor-pointer">30-day refund policy</span></div>
+              <div className="flex justify-between"><span>Support</span> <span className="font-bold text-cyan-700">Contact us for order issues</span></div>
             </div>
           </div>
         </div>

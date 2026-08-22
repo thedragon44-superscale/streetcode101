@@ -238,16 +238,13 @@ export default function Storefront() {
                   <Link to={`/product/${product.sku}`}>
                     <h2 className="text-slate-900 font-medium line-clamp-2 leading-snug hover:text-orange-600 cursor-pointer">{product.title}</h2>
                   </Link>
-                  <div className="flex items-center gap-1 mt-1 mb-2 text-yellow-400 text-xs">
-                    <i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star-half-stroke"></i>
-                  </div>
-                  <div className="flex items-start">
+                  <div className="flex items-start mt-2">
                     <span className="text-xs font-medium text-slate-900 mt-1">$</span>
                     <span className="text-2xl font-black text-slate-900">{Math.floor(product.price)}</span>
                     <span className="text-xs font-medium text-slate-900 mt-1">{(product.price % 1).toFixed(2).substring(2)}</span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-1">
-                    <span className="font-bold text-cyan-600">✓ Free Delivery</span> {new Date(Date.now() + 172800000).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  <div className="text-xs text-slate-400 mt-2 font-mono uppercase tracking-wider">
+                    {product.in_stock ? '🟢 Authentic Drop' : '🔴 Sold Out'}
                   </div>
                   {!product.in_stock && <span className="text-red-600 text-xs font-bold mt-1">Currently unavailable.</span>}
                   <div className="mt-auto pt-4">
