@@ -1,3 +1,4 @@
+import Footer from './Footer';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from './CartContext';
@@ -326,6 +327,7 @@ export default function Storefront() {
           </>
         )}
       </main>
+      <Footer />
     </div>
   );
 }

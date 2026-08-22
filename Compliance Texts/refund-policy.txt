@@ -1,0 +1,12 @@
+📄 1. Refund Policy
+
+Returns & Refunds
+Street Code 101 offers a 30-day return policy. If 30 days have passed since your purchase was delivered, unfortunately, we cannot offer you a refund or exchange.
+
+To be eligible for a return, your item must be unused, in the same condition that you received it, and in its original packaging.
+
+Initiating a Return
+Do not send your purchase back to the manufacturer or the return address on the package. To initiate a return, please contact our support team via the chat widget on our storefront or email us at [Insert Your Support Email] with your Order ID. We will provide you with the correct return shipping address.
+
+Refunds
+Once your return is received and inspected, we will notify you of the approval or rejection of your refund. If approved, your refund will be processed, and a credit will automatically be applied to your original method of payment (via Stripe) within 5-10 business days.

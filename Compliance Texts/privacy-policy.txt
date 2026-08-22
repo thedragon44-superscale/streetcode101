@@ -1,0 +1,13 @@
+📄 2. Privacy Policy
+
+Data Collection
+When you purchase something from our store, we collect the personal information you give us such as your name, address, and email address to fulfill your order.
+
+Secure Payments
+All payments are processed securely through Stripe. Street Code 101 does not store, process, or have access to your full credit card information. Your payment data is encrypted and handled directly by Stripe's secure infrastructure.
+
+Social Feed & Profiles
+If you utilize our peer-to-peer social feed, your chosen username, profile image, and listing details will be publicly visible to other users.
+
+Third-Party Services
+We share your shipping information solely with our verified global fulfillment partners (CJ Dropshipping) strictly for the purpose of shipping your order. We do not sell your personal information to third parties.

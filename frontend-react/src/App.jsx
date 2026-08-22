@@ -1,3 +1,4 @@
+import Legal from './Legal';
 import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -27,6 +28,7 @@ function App() {
         }} 
       />
       <Routes>
+        <Route path="/legal/:section" element={<Legal />} />
         <Route path="/" element={<Storefront />} />
         <Route path="/product/:sku" element={<ProductPage />} />
         <Route path="/profile/:username" element={<Profile />} />
