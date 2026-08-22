@@ -312,7 +312,7 @@ export default function Storefront() {
             </button>
 
             {/* Support Widget Modal */}
-            <div className={`fixed bottom-24 right-4 sm:right-6 w-[90vw] max-w-[320px] max-h-[60vh] bg-white rounded-2xl shadow-2xl border border-slate-200 z-[9999] overflow-hidden flex flex-col transform transition-all duration-300 origin-bottom-right ${isSupportOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}>
+            <div className={`fixed bottom-24 right-4 sm:right-6 w-11/12 sm:w-80 max-h-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[9999] overflow-hidden flex flex-col transform transition-all duration-300 origin-bottom-right ${isSupportOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}>
               <div className="bg-slate-900 text-white p-4 flex gap-3 items-center shrink-0">
                 <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-sm"><i className="fa-solid fa-robot"></i></div>
                 <div>
