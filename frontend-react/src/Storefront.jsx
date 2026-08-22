@@ -162,7 +162,9 @@ export default function Storefront() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         
         {/* --- HIGH-FASHION FEATURED DROP BANNER --- */}
-        {selectedCategory === 'All' && !searchQuery && (
+        {selectedCategory === 'All' && !searchQuery && (() => {
+          const featuredProduct = products.find(p => p.is_featured);
+          return (
           <div className="relative z-0 mb-10 rounded-3xl overflow-hidden bg-slate-950 text-white p-8 md:p-12 border border-slate-800 shadow-[0_0_50px_rgba(249,115,22,0.1)] flex flex-col md:flex-row items-center justify-between gap-8">
             
             {/* Dual Ambient Glows */}
@@ -174,21 +176,29 @@ export default function Storefront() {
                 <span className="text-xs font-mono font-bold tracking-widest text-blue-400 uppercase bg-blue-950/80 px-3 py-1 rounded-full border border-blue-800/50">
                   [101_LIVE_VAULT]
                 </span>
-                <span className="text-xs font-mono text-slate-400">CURATED DROP // <span className="text-orange-500 font-bold">IN STOCK</span></span>
+                <span className="text-xs font-mono text-slate-400">
+                  CURATED DROP // <span className="text-orange-500 font-bold">{featuredProduct && featuredProduct.in_stock ? 'IN STOCK' : 'LIVE'}</span>
+                </span>
               </div>
 
               <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight mt-4 font-heading leading-none">
-                STREET CODE <span className="text-orange-500">101</span>
+                {featuredProduct ? (
+                  <span className="line-clamp-2">{featuredProduct.title}</span>
+                ) : (
+                  <>STREET CODE <span className="text-orange-500">101</span></>
+                )}
               </h1>
               
-              <p className="text-slate-400 mt-4 text-sm md:text-base font-mono leading-relaxed">
-                AUTHENTICATED DROPS & PEER-TO-PEER LEDGER. LOG IN TO YOUR PROFILE TO UNLOCK VAULT DISCOUNTS.
+              <p className="text-slate-400 mt-4 text-sm md:text-base font-mono leading-relaxed line-clamp-3">
+                {featuredProduct 
+                  ? featuredProduct.description || "EXCLUSIVE VAULT DROP. LIMITED QUANTITIES AVAILABLE."
+                  : "AUTHENTICATED DROPS & PEER-TO-PEER LEDGER. LOG IN TO YOUR PROFILE TO UNLOCK VAULT DISCOUNTS."}
               </p>
 
               <div className="mt-8 flex flex-wrap gap-4 font-mono">
-                <a href="#catalog" className="bg-orange-500 hover:bg-orange-600 text-slate-950 font-black px-8 py-4 rounded-xl shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all active:scale-95 text-xs uppercase tracking-widest">
+                <Link to={featuredProduct ? `/product/${featuredProduct.sku}` : "#catalog"} className="bg-orange-500 hover:bg-orange-600 text-slate-950 font-black px-8 py-4 rounded-xl shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all active:scale-95 text-xs uppercase tracking-widest">
                   EXPLORE DROP
-                </a>
+                </Link>
                 <Link to="/feed" className="bg-slate-900 hover:bg-slate-800 text-blue-400 font-bold px-8 py-4 rounded-xl border border-blue-500/30 transition-all text-xs uppercase tracking-widest">
                   SOCIAL FEED
                 </Link>
@@ -197,15 +207,19 @@ export default function Storefront() {
 
             {/* Showcase Image Frame */}
             <div className="relative z-10 w-full md:w-auto flex justify-center">
-              <div className="relative w-56 h-56 md:w-64 md:h-64 rounded-2xl bg-slate-900 border border-slate-800 p-3 flex items-center justify-center shadow-2xl group hover:border-orange-500/50 transition-all">
+              <div className="relative w-56 h-56 md:w-64 md:h-64 rounded-2xl bg-slate-900 border border-slate-800 p-3 flex items-center justify-center shadow-2xl group hover:border-orange-500/50 transition-all bg-white/5">
                 <span className="absolute top-3 left-3 z-20 px-2.5 py-1 bg-slate-950/90 backdrop-blur-md text-[10px] font-mono text-blue-400 border border-blue-500/30 rounded-md">
                   FEATURED_ITEM
                 </span>
-                <img src="/streetbook_logo.png" alt="Featured Drop" className="w-full h-full object-cover rounded-xl group-hover:scale-105 transition-transform duration-300" />
+                <img 
+                  src={featuredProduct ? featuredProduct.image_url : '/streetbook_logo.png'} 
+                  alt="Featured Drop" 
+                  className={`w-full h-full rounded-xl group-hover:scale-105 transition-transform duration-300 ${featuredProduct ? 'object-contain mix-blend-screen' : 'object-cover'}`} 
+                />
               </div>
             </div>
           </div>
-        )}
+        )})()}
 
         
 
