@@ -312,7 +312,7 @@ export default function Storefront() {
             </button>
 
             {/* Support Widget Modal */}
-            <div className={`fixed bottom-40 right-6 w-[90vw] sm:w-80 max-h-[60vh] bg-white rounded-2xl shadow-2xl border border-slate-200 z-[9999] overflow-hidden flex flex-col transform transition-all duration-300 origin-bottom-right ${isSupportOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}>
+            <div className={`fixed bottom-24 right-4 sm:right-6 w-[90vw] max-w-[320px] max-h-[60vh] bg-white rounded-2xl shadow-2xl border border-slate-200 z-[9999] overflow-hidden flex flex-col transform transition-all duration-300 origin-bottom-right ${isSupportOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}>
               <div className="bg-slate-900 text-white p-4 flex gap-3 items-center shrink-0">
                 <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-sm"><i className="fa-solid fa-robot"></i></div>
                 <div>
@@ -324,7 +324,7 @@ export default function Storefront() {
               <div className="p-4 bg-slate-50 flex-1 overflow-y-auto flex flex-col gap-3 min-h-[120px]">
                 <div className="bg-slate-200 p-3 rounded-xl rounded-tl-sm self-start max-w-[85%] text-slate-800 text-xs font-medium leading-relaxed">
                   {currentUser ? `Yo @${currentUser.username}! ` : 'Welcome to the Vault! '} 
-                  Need help with tracking an order or sourcing a specific drop? Leave a message and our team will get right back to you.
+                  How can we help you today?
                 </div>
               </div>
               
