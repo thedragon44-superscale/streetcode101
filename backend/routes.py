@@ -700,6 +700,69 @@ def fetch_cj_product_data(target_sku: str, cj_api_key: str):
     return {"base_data": p, "variants": parsed_variants}
 
 
+@router.post("/api/admin/sync-cj")
+def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Fetches a specific product from CJ Dropshipping API by SKU, including variants."""
+    username = token.get("sub")
+    if username != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized.")
+        
+    cj_api_key = os.getenv("CJ_API_KEY")
+    target_sku = payload.sku.strip()
+    
+    existing = session.exec(select(Product).where(Product.supplier_sku == target_sku)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Product already exists. Use Resync.")
+
+    cj_data = fetch_cj_product_data(target_sku, cj_api_key)
+    if not cj_data:
+        raise HTTPException(status_code=404, detail=f"CJ returned 0 results for: {target_sku}")
+        
+    p = cj_data["base_data"]
+    actual_sku = p.get("sku", target_sku)
+    markup_price = float(p.get("sellPrice", 15.00)) * 2.5
+    
+    new_prod = Product(
+        sku=f"101-{actual_sku[:8]}", 
+        title=p.get("nameEn", "Premium CJ Drop"),
+        description=f"Authentic dropshipped item. Supplier Ref: {actual_sku}",
+        price=markup_price,
+        image_url=p.get("bigImage", "/sb.png"), 
+        in_stock=True,
+        supplier_sku=actual_sku,
+        variants=cj_data["variants"]
+    )
+    session.add(new_prod)
+    session.commit()
+    session.refresh(new_prod)
+    return {"message": f"Successfully imported {new_prod.title} with variants!", "product": new_prod}
+
+
+@router.post("/api/admin/resync-all-variants")
+def resync_all_variants(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """API endpoint for UI resyncing using the optimized logic."""
+    username = token.get("sub")
+    if username != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized.")
+        
+    cj_api_key = os.getenv("CJ_API_KEY")
+    products = session.exec(select(Product)).all()
+    updated = 0
+    
+    for prod in products:
+        if not prod.supplier_sku:
+            continue
+            
+        cj_data = fetch_cj_product_data(prod.supplier_sku, cj_api_key)
+        if cj_data:
+            prod.variants = cj_data["variants"]
+            session.add(prod)
+            updated += 1
+            
+    session.commit()
+    return {"message": f"Successfully resynced variants for {updated} products!"}
+
+
 @router.patch("/api/admin/products/{sku}/featured")
 def toggle_featured_product(sku: str, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Sets a product as the Featured Drop and un-features all others."""
