@@ -928,6 +928,10 @@ def get_inbox(session: Session = Depends(get_session), token: dict = Depends(ver
 class SupportMessageRequest(BaseModel):
     text: str
 
+class GuestSupportRequest(BaseModel):
+    email: str
+    text: str
+
 # --- PERSISTENT CART ENDPOINTS ---
 
 class CartItemSync(BaseModel):
@@ -1010,5 +1014,39 @@ def send_support_message(payload: SupportMessageRequest, session: Session = Depe
             print(f"❌ SMTP ERROR: {str(e)}")
             # We don't raise an HTTPException here so the user still sees a "success" 
             # message even if your email server briefly hiccups.
+
+    return {"message": "Support request transmitted."}
+
+@router.post("/api/support/guest-message")
+def send_guest_support_message(payload: GuestSupportRequest, session: Session = Depends(get_session)):
+    """Saves a guest support message and emails the Admin via SMTP."""
+    # Prefix the email so you know it's a guest in your DB
+    sender_id = f"guest:{payload.email}"
+    
+    new_msg = Message(sender=sender_id, receiver="admin", text=payload.text)
+    session.add(new_msg)
+    session.commit()
+
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", 587))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    admin_email = os.getenv("ADMIN_EMAIL", smtp_user)
+    
+    if smtp_user and smtp_pass:
+        try:
+            msg = EmailMessage()
+            msg.set_content(f"Guest ({payload.email}) sent a support request from the storefront:\n\n{payload.text}\n\nYou must reply to them via their email address directly.")
+            msg["Subject"] = f"🚨 New Guest Ticket: {payload.email}"
+            msg["From"] = smtp_user
+            msg["To"] = admin_email
+            
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+            server.quit()
+        except Exception as e:
+            print(f"❌ SMTP ERROR: {str(e)}")
 
     return {"message": "Support request transmitted."}

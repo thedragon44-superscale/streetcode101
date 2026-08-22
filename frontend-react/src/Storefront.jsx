@@ -19,6 +19,8 @@ export default function Storefront() {
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [supportMsg, setSupportMsg] = useState('');
   const [isSendingSupport, setIsSendingSupport] = useState(false);
+  const [guestEmail, setGuestEmail] = useState('');
+
 
   // --- SEARCH & CATEGORY STATE ---
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,14 +88,29 @@ export default function Storefront() {
     setIsSendingSupport(true);
     try {
       const token = localStorage.getItem('pidrop_token');
-      const response = await fetch(`${API_BASE}/support/message`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: supportMsg })
-      });
+      let response;
+
+      if (token && currentUser) {
+        // Authenticated User Route
+        response = await fetch(`${API_BASE}/support/message`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: supportMsg })
+        });
+      } else {
+        // Guest User Route
+        if (!guestEmail) throw new Error("Email is required so we can reply!");
+        response = await fetch(`${API_BASE}/support/guest-message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: guestEmail, text: supportMsg })
+        });
+      }
+
       if (!response.ok) throw new Error('Failed to send message');
       toast.success('Message sent! An operator will email you shortly.');
       setSupportMsg('');
+      setGuestEmail('');
       setIsSupportOpen(false);
     } catch (err) {
       toast.error(err.message);
@@ -284,7 +301,7 @@ export default function Storefront() {
         )}
 
         {/* Floating Admin Support Button & Modal */}
-        {currentUser && currentUser.username !== 'admin' && (
+        {(!currentUser || currentUser.username !== 'admin') && (
           <>
             <button 
               onClick={() => setIsSupportOpen(!isSupportOpen)}
@@ -306,28 +323,43 @@ export default function Storefront() {
               
               <div className="p-4 bg-slate-50 h-48 overflow-y-auto flex flex-col gap-3">
                 <div className="bg-slate-200 p-3 rounded-xl rounded-tl-sm self-start max-w-[85%] text-slate-800 text-xs font-medium leading-relaxed">
-                  Yo @{currentUser.username}! Need help with tracking an order or sourcing a specific drop? Leave a message and our team will get right back to you.
+                  {currentUser ? `Yo @${currentUser.username}! ` : 'Welcome to the Vault! '} 
+                  Need help with tracking an order or sourcing a specific drop? Leave a message and our team will get right back to you.
                 </div>
               </div>
               
-              <form onSubmit={handleSendSupport} className="p-3 border-t border-slate-100 bg-white flex gap-2">
-                <input 
-                  type="text" 
-                  value={supportMsg} 
-                  onChange={(e) => setSupportMsg(e.target.value)}
-                  placeholder="Type your message..." 
-                  className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 font-medium"
-                  required
-                />
-                <button disabled={isSendingSupport} type="submit" className="bg-cyan-600 text-white w-10 rounded-xl hover:bg-cyan-700 disabled:opacity-50 flex items-center justify-center shadow-sm">
-                  {isSendingSupport ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
-                </button>
+              <form onSubmit={handleSendSupport} className="p-3 border-t border-slate-100 bg-white flex flex-col gap-2">
+                {!currentUser && (
+                  <input 
+                    type="email" 
+                    value={guestEmail} 
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    placeholder="Your Email Address..." 
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 font-medium"
+                    required
+                  />
+                )}
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={supportMsg} 
+                    onChange={(e) => setSupportMsg(e.target.value)}
+                    placeholder="Type your message..." 
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 font-medium"
+                    required
+                  />
+                  <button disabled={isSendingSupport} type="submit" className="bg-cyan-600 text-white w-10 rounded-xl hover:bg-cyan-700 disabled:opacity-50 flex items-center justify-center shadow-sm">
+                    {isSendingSupport ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
+                  </button>
+                </div>
               </form>
             </div>
           </>
         )}
       </main>
-      <Footer />
+      <Footer 
+        onSupportClick={(!currentUser || currentUser.username !== 'admin') ? () => setIsSupportOpen(true) : null} 
+      />
     </div>
   );
 }
