@@ -305,15 +305,15 @@ export default function Storefront() {
           <>
             <button 
               onClick={() => setIsSupportOpen(!isSupportOpen)}
-              className="fixed bottom-20 right-6 bg-cyan-600 text-white w-14 h-14 rounded-full shadow-2xl hover:bg-cyan-500 hover:scale-110 transition-transform z-50 flex items-center justify-center border-2 border-white"
+              className="fixed bottom-20 right-4 sm:right-6 bg-cyan-600 text-white w-14 h-14 rounded-full shadow-2xl hover:bg-cyan-500 hover:scale-110 transition-transform z-[100] flex items-center justify-center border-2 border-white"
               title="Chat with Operator"
             >
               <i className={`fa-solid ${isSupportOpen ? 'fa-xmark' : 'fa-headset'} text-2xl`}></i>
             </button>
 
             {/* Support Widget Modal */}
-            <div className={`fixed bottom-40 right-6 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden flex flex-col transform transition-all duration-300 origin-bottom-right ${isSupportOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}>
-              <div className="bg-slate-900 text-white p-4 flex gap-3 items-center">
+            <div className={`fixed bottom-36 sm:bottom-40 right-4 sm:right-6 w-[calc(100vw-32px)] sm:w-80 max-h-[65dvh] bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] overflow-hidden flex flex-col transform transition-all duration-300 origin-bottom-right ${isSupportOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}>
+              <div className="bg-slate-900 text-white p-4 flex gap-3 items-center shrink-0">
                 <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-sm"><i className="fa-solid fa-robot"></i></div>
                 <div>
                   <h3 className="font-black text-sm leading-tight">Operator Support</h3>
@@ -321,14 +321,14 @@ export default function Storefront() {
                 </div>
               </div>
               
-              <div className="p-4 bg-slate-50 h-48 overflow-y-auto flex flex-col gap-3">
+              <div className="p-4 bg-slate-50 flex-1 overflow-y-auto flex flex-col gap-3 min-h-[120px]">
                 <div className="bg-slate-200 p-3 rounded-xl rounded-tl-sm self-start max-w-[85%] text-slate-800 text-xs font-medium leading-relaxed">
                   {currentUser ? `Yo @${currentUser.username}! ` : 'Welcome to the Vault! '} 
                   Need help with tracking an order or sourcing a specific drop? Leave a message and our team will get right back to you.
                 </div>
               </div>
               
-              <form onSubmit={handleSendSupport} className="p-3 border-t border-slate-100 bg-white flex flex-col gap-2">
+              <form onSubmit={handleSendSupport} className="p-3 border-t border-slate-100 bg-white flex flex-col gap-2 shrink-0">
                 {!currentUser && (
                   <input 
                     type="email" 
