@@ -641,7 +641,7 @@ class CJSyncRequest(BaseModel):
     sku: str
 
 def fetch_cj_product_data(target_sku: str, cj_api_key: str):
-    """Helper function to ping CJ and extract base data + variants using the Deep Query API."""
+    """Hits listV2 to extract the hidden PID, then hits Deep Query to extract variants."""
     auth_url = "https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken"
     base_headers = {"User-Agent": "Mozilla/5.0"}
     
@@ -652,16 +652,28 @@ def fetch_cj_product_data(target_sku: str, cj_api_key: str):
     access_token = auth_res.json()["data"].get("accessToken")
     auth_headers = {**base_headers, "CJ-Access-Token": access_token}
 
-    # USE DEEP QUERY API INSTEAD OF SEARCH API
-    products_url = "https://developers.cjdropshipping.com/api2.0/v1/product/query"
-    safe_params = {"productSku": target_sku}
-    prod_res = requests.get(products_url, headers=auth_headers, params=safe_params, timeout=15)
+    # STEP 1: Search listV2 to get the hidden PID UUID
+    search_url = "https://developers.cjdropshipping.com/api2.0/v1/product/listV2"
+    search_res = requests.get(search_url, headers=auth_headers, params={"page": 1, "size": 10, "keyWord": target_sku}, timeout=15)
     
-    p = prod_res.json().get("data")
+    content_list = search_res.json().get("data", {}).get("content", [])
+    if not content_list or not content_list[0].get("productList"):
+        return None
+        
+    summary_product = content_list[0].get("productList")[0]
+    actual_pid = summary_product.get("pid")
+    
+    if not actual_pid:
+        return None
+
+    # STEP 2: Hit Deep Query API using the true PID
+    query_url = "https://developers.cjdropshipping.com/api2.0/v1/product/query"
+    query_res = requests.get(query_url, headers=auth_headers, params={"pid": actual_pid}, timeout=15)
+    
+    p = query_res.json().get("data")
     if not p:
         return None
         
-    # Extract Variants dynamically
     base_price = float(p.get("sellPrice", 15.00))
     cj_variants = p.get("variantList", [])
     parsed_variants = []
@@ -678,7 +690,6 @@ def fetch_cj_product_data(target_sku: str, cj_api_key: str):
     if not parsed_variants:
         parsed_variants = [{"variant_sku": f"101-{target_sku[:8]}-DEF", "color": "Default", "size": "OS", "price": base_price * 2.5, "image_url": p.get("productImage", p.get("bigImage", "/sb.png"))}]
         
-    # Normalize keys since /query uses slightly different names than /listV2
     p["nameEn"] = p.get("productNameEn", p.get("nameEn", "Premium CJ Drop"))
     p["bigImage"] = p.get("productImage", p.get("bigImage", "/sb.png"))
     p["sku"] = p.get("productSku", target_sku)
@@ -723,14 +734,13 @@ def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_
 
 @router.post("/api/admin/resync-all-variants")
 def resync_all_variants(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Loops through all products using a single auth token to prevent timeouts."""
+    """Loops through all products using the two-step PID bypass."""
     username = token.get("sub")
     if username != "admin":
         raise HTTPException(status_code=403, detail="Unauthorized.")
         
     cj_api_key = os.getenv("CJ_API_KEY")
     
-    # 1. Authenticate exactly ONCE for the entire batch
     auth_url = "https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken"
     base_headers = {"User-Agent": "Mozilla/5.0"}
     auth_res = requests.post(auth_url, json={"apiKey": cj_api_key}, headers=base_headers, timeout=15)
@@ -740,7 +750,6 @@ def resync_all_variants(session: Session = Depends(get_session), token: dict = D
     access_token = auth_res.json()["data"].get("accessToken")
     auth_headers = {**base_headers, "CJ-Access-Token": access_token}
 
-    # 2. Loop through products using the single token
     products = session.exec(select(Product)).all()
     updated = 0
     
@@ -748,13 +757,23 @@ def resync_all_variants(session: Session = Depends(get_session), token: dict = D
         if not prod.supplier_sku:
             continue
             
-        # USE DEEP QUERY API
-        products_url = "https://developers.cjdropshipping.com/api2.0/v1/product/query"
-        safe_params = {"productSku": prod.supplier_sku}
-        
         try:
-            prod_res = requests.get(products_url, headers=auth_headers, params=safe_params, timeout=10)
-            p = prod_res.json().get("data")
+            # STEP 1: Steal the PID
+            search_url = "https://developers.cjdropshipping.com/api2.0/v1/product/listV2"
+            search_res = requests.get(search_url, headers=auth_headers, params={"page": 1, "size": 10, "keyWord": prod.supplier_sku}, timeout=10)
+            content_list = search_res.json().get("data", {}).get("content", [])
+            
+            if not content_list or not content_list[0].get("productList"):
+                continue
+                
+            actual_pid = content_list[0].get("productList")[0].get("pid")
+            if not actual_pid:
+                continue
+
+            # STEP 2: Force Deep Query with PID
+            query_url = "https://developers.cjdropshipping.com/api2.0/v1/product/query"
+            query_res = requests.get(query_url, headers=auth_headers, params={"pid": actual_pid}, timeout=10)
+            p = query_res.json().get("data")
             
             if not p:
                 continue
