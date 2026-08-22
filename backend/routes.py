@@ -641,7 +641,7 @@ class CJSyncRequest(BaseModel):
     sku: str
 
 def fetch_cj_product_data(target_sku: str, cj_api_key: str):
-    """Hits listV2 to extract the hidden PID, then hits Deep Query to extract variants."""
+    """Hits listV2 to extract the hidden 'id', then hits Deep Query to extract variants."""
     auth_url = "https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken"
     base_headers = {"User-Agent": "Mozilla/5.0"}
     
@@ -652,38 +652,41 @@ def fetch_cj_product_data(target_sku: str, cj_api_key: str):
     access_token = auth_res.json()["data"].get("accessToken")
     auth_headers = {**base_headers, "CJ-Access-Token": access_token}
 
-    # STEP 1: Search listV2 to get the hidden PID UUID
+    # STEP 1: Search listV2 to grab the 'id'
     search_url = "https://developers.cjdropshipping.com/api2.0/v1/product/listV2"
-    search_res = requests.get(search_url, headers=auth_headers, params={"page": 1, "size": 10, "keyWord": target_sku}, timeout=15)
+    search_res = requests.get(search_url, headers=auth_headers, params={"page": 1, "size": 1, "keyWord": target_sku}, timeout=15)
     
     content_list = search_res.json().get("data", {}).get("content", [])
     if not content_list or not content_list[0].get("productList"):
         return None
         
-    summary_product = content_list[0].get("productList")[0]
-    actual_pid = summary_product.get("pid")
-    
+    actual_pid = content_list[0].get("productList")[0].get("id")
     if not actual_pid:
         return None
 
-    # STEP 2: Hit Deep Query API using the true PID
+    # STEP 2: Use 'id' for Deep Query
     query_url = "https://developers.cjdropshipping.com/api2.0/v1/product/query"
     query_res = requests.get(query_url, headers=auth_headers, params={"pid": actual_pid}, timeout=15)
-    
     p = query_res.json().get("data")
+    
     if not p:
         return None
         
     base_price = float(p.get("sellPrice", 15.00))
-    cj_variants = p.get("variantList", [])
+    cj_variants = p.get("variants", [])
     parsed_variants = []
     
     for v in cj_variants:
+        v_key = v.get("variantKey", "Default")
+        parts = v_key.split("-")
+        color = parts[0] if len(parts) > 0 else "Default"
+        size = parts[-1] if len(parts) > 1 else "OS"
+        
         parsed_variants.append({
             "variant_sku": v.get("variantSku", ""),
-            "color": v.get("variantKey", "Default").split("-")[0] if "-" in v.get("variantKey", "") else v.get("variantKey", "Default"),
-            "size": v.get("variantKey", "OS").split("-")[-1] if "-" in v.get("variantKey", "") else "OS",
-            "price": float(v.get("sellPrice", base_price)) * 2.5,
+            "color": color,
+            "size": size,
+            "price": float(v.get("variantSellPrice", base_price)) * 2.5,
             "image_url": v.get("variantImage", p.get("productImage", p.get("bigImage", "/sb.png")))
         })
         
@@ -696,146 +699,6 @@ def fetch_cj_product_data(target_sku: str, cj_api_key: str):
         
     return {"base_data": p, "variants": parsed_variants}
 
-@router.post("/api/admin/sync-cj")
-def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Fetches a specific product from CJ Dropshipping API by SKU, including variants."""
-    username = token.get("sub")
-    if username != "admin":
-        raise HTTPException(status_code=403, detail="Unauthorized.")
-        
-    cj_api_key = os.getenv("CJ_API_KEY")
-    target_sku = payload.sku.strip()
-    
-    existing = session.exec(select(Product).where(Product.supplier_sku == target_sku)).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Product already exists. Use Resync.")
-
-    cj_data = fetch_cj_product_data(target_sku, cj_api_key)
-    if not cj_data:
-        raise HTTPException(status_code=404, detail=f"CJ returned 0 results for: {target_sku}")
-        
-    p = cj_data["base_data"]
-    actual_sku = p.get("sku", target_sku)
-    markup_price = float(p.get("sellPrice", 15.00)) * 2.5
-    
-    new_prod = Product(
-        sku=f"101-{actual_sku[:8]}", 
-        title=p.get("nameEn", "Premium CJ Drop"),
-        description=f"Authentic dropshipped item. Supplier Ref: {actual_sku}",
-        price=markup_price,
-        image_url=p.get("bigImage", "/sb.png"), 
-        in_stock=True,
-        supplier_sku=actual_sku,
-        variants=cj_data["variants"]
-    )
-    session.add(new_prod)
-    session.commit()
-    return {"message": f"Successfully imported {new_prod.title} with variants!"}
-
-@router.post("/api/admin/resync-all-variants")
-def resync_all_variants(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Loops through all products using the two-step PID bypass."""
-    username = token.get("sub")
-    if username != "admin":
-        raise HTTPException(status_code=403, detail="Unauthorized.")
-        
-    cj_api_key = os.getenv("CJ_API_KEY")
-    
-    auth_url = "https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken"
-    base_headers = {"User-Agent": "Mozilla/5.0"}
-    auth_res = requests.post(auth_url, json={"apiKey": cj_api_key}, headers=base_headers, timeout=15)
-    if not auth_res.ok or not auth_res.json().get("data"):
-        raise HTTPException(status_code=500, detail="CJ API Auth Failed")
-        
-    access_token = auth_res.json()["data"].get("accessToken")
-    auth_headers = {**base_headers, "CJ-Access-Token": access_token}
-
-    products = session.exec(select(Product)).all()
-    updated = 0
-    
-    for prod in products:
-        if not prod.supplier_sku:
-            continue
-            
-        try:
-            # STEP 1: Steal the PID
-            search_url = "https://developers.cjdropshipping.com/api2.0/v1/product/listV2"
-            search_res = requests.get(search_url, headers=auth_headers, params={"page": 1, "size": 10, "keyWord": prod.supplier_sku}, timeout=10)
-            content_list = search_res.json().get("data", {}).get("content", [])
-            
-            if not content_list or not content_list[0].get("productList"):
-                continue
-                
-            actual_pid = content_list[0].get("productList")[0].get("pid")
-            if not actual_pid:
-                continue
-
-            # STEP 2: Force Deep Query with PID
-            query_url = "https://developers.cjdropshipping.com/api2.0/v1/product/query"
-            query_res = requests.get(query_url, headers=auth_headers, params={"pid": actual_pid}, timeout=10)
-            p = query_res.json().get("data")
-            
-            if not p:
-                continue
-                
-            base_price = float(p.get("sellPrice", 15.00))
-            cj_variants = p.get("variantList", [])
-            parsed_variants = []
-            
-            for v in cj_variants:
-                parsed_variants.append({
-                    "variant_sku": v.get("variantSku", ""),
-                    "color": v.get("variantKey", "Default").split("-")[0] if "-" in v.get("variantKey", "") else v.get("variantKey", "Default"),
-                    "size": v.get("variantKey", "OS").split("-")[-1] if "-" in v.get("variantKey", "") else "OS",
-                    "price": float(v.get("sellPrice", base_price)) * 2.5,
-                    "image_url": v.get("variantImage", p.get("productImage", p.get("bigImage", "/sb.png")))
-                })
-                
-            if not parsed_variants:
-                parsed_variants = [{"variant_sku": f"101-{prod.supplier_sku[:8]}-DEF", "color": "Default", "size": "OS", "price": base_price * 2.5, "image_url": p.get("productImage", p.get("bigImage", "/sb.png"))}]
-                
-            prod.variants = parsed_variants
-            session.add(prod)
-            updated += 1
-        except Exception as e:
-            print(f"Skipping {prod.supplier_sku} due to error: {e}")
-            continue
-            
-    session.commit()
-    return {"message": f"Successfully resynced variants for {updated} products!"}
-
-@router.post("/api/profile/spin")
-def spin_vault_wheel(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Executes a one-time discount spin and locks the account state."""
-    username = token.get("sub")
-    if username == "admin":
-        raise HTTPException(status_code=400, detail="Master Admin cannot spin for discounts.")
-        
-    user = session.exec(select(User).where(User.username == username)).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-        
-    if user.has_spun:
-        raise HTTPException(status_code=400, detail="Vault discount already claimed.")
-        
-    rewards = [
-        {"code": "VAULT10", "percent": 10.0, "label": "10% OFF CART"},
-        {"code": "VAULT15", "percent": 15.0, "label": "15% OFF CART"},
-        {"code": "VAULT20", "percent": 20.0, "label": "20% OFF CART"},
-        {"code": "VAULT25", "percent": 25.0, "label": "RARE 25% OFF"}
-    ]
-    won = random.choice(rewards)
-    
-    user.has_spun = True
-    user.discount_percent = won["percent"]
-    session.add(user)
-    session.commit()
-    
-    return {
-        "message": f"Unlocked {won['label']}!",
-        "code": won["code"],
-        "discount_percent": won["percent"]
-    }
 
 # --- WEBSOCKET CONNECTION MANAGER ---
 class ConnectionManager:
