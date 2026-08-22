@@ -345,25 +345,50 @@ export default function Admin() {
                 <h1 className="text-3xl font-black text-slate-900">Inventory</h1>
                 <p className="text-slate-500 mt-1 font-medium">Manage your storefront products.</p>
               </div>
-              <div className="flex gap-3">
-                <button onClick={handleResyncAll} disabled={isSyncing} className="bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50">
-                  {isSyncing ? '🔄 Working...' : '🔄 Resync All Variants'}
+              <div className="flex flex-wrap items-center gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                
+                {/* Resync Button (Hacker Console Vibe) */}
+                <button 
+                  onClick={handleResyncAll} 
+                  disabled={isSyncing} 
+                  className="group relative px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-blue-400 font-mono text-xs font-bold uppercase tracking-widest rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2 overflow-hidden disabled:opacity-50 border border-slate-700"
+                >
+                  <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-blue-600/20 to-cyan-600/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  {isSyncing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-rotate text-blue-500"></i>}
+                  <span className="relative z-10">{isSyncing ? 'SYNCING DB...' : 'RESYNC VAULT'}</span>
                 </button>
-                <div className="flex items-center gap-2">
+
+                {/* Import SKU Input Group (Glassmorphic Glow) */}
+                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-500/20 transition-all shadow-inner overflow-hidden">
+                  <div className="pl-4 text-slate-400">
+                    <i className="fa-solid fa-satellite-dish"></i>
+                  </div>
                   <input 
                     type="text" 
                     value={cjSku}
                     onChange={(e) => setCjSku(e.target.value)}
-                    placeholder="Enter CJ SKU..."
-                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500 font-medium w-36"
+                    placeholder="ENTER CJ SKU..."
+                    className="bg-transparent border-none text-slate-700 placeholder-slate-400 px-3 py-2.5 text-xs font-mono font-bold focus:outline-none focus:ring-0 w-36 uppercase tracking-wider"
                   />
-                  <button onClick={handleSyncCJ} disabled={isSyncing} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50">
-                    {isSyncing ? '🔄 Syncing...' : '⚡ Import SKU'}
+                  <button 
+                    onClick={handleSyncCJ} 
+                    disabled={isSyncing} 
+                    className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-mono text-xs font-black px-6 py-2.5 transition-all flex items-center gap-2 disabled:opacity-50 uppercase tracking-widest border-l border-cyan-600/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.3)]"
+                  >
+                    {isSyncing ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-bolt text-yellow-300"></i>}
+                    IMPORT
                   </button>
                 </div>
-                <button onClick={() => setIsAddModalOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2">
-                  <span>➕</span> Add Product
+
+                {/* Add Product Button (High-End Retail Vibe) */}
+                <button 
+                  onClick={() => setIsAddModalOpen(true)} 
+                  className="relative px-6 py-2.5 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-400 hover:to-rose-400 text-white font-mono text-xs font-black uppercase tracking-widest rounded-xl shadow-[0_8px_20px_-6px_rgba(249,115,22,0.6)] transition-all active:scale-95 flex items-center gap-2 border border-orange-400/50"
+                >
+                  <i className="fa-solid fa-plus drop-shadow-md"></i>
+                  <span>MANUAL ADD</span>
                 </button>
+
               </div>
             </header>
 
