@@ -109,8 +109,12 @@ export default function ProductPage() {
       <main className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 md:grid-cols-12 gap-8">
         
         {/* Left Column: Image */}
-        <div className="md:col-span-5 flex justify-center p-8 bg-slate-50 rounded-3xl border border-slate-100 shadow-inner">
-          <img src={displayImage} alt={product.title} className="max-w-full h-auto object-contain mix-blend-multiply hover:scale-105 transition-transform duration-500" />
+        <div className="md:col-span-5 relative w-full aspect-square bg-slate-50 rounded-3xl border border-slate-100 shadow-inner flex items-center justify-center p-6 sm:p-10 overflow-hidden">
+          <img 
+            src={displayImage} 
+            alt={product.title} 
+            className="absolute inset-0 w-full h-full p-8 object-contain mix-blend-multiply hover:scale-110 transition-transform duration-500" 
+          />
         </div>
 
         {/* Center Column: Details */}
