@@ -697,8 +697,22 @@ def fetch_cj_product_data(target_sku: str, cj_api_key: str):
         
     p["nameEn"] = p.get("productNameEn", p.get("nameEn", "Premium CJ Drop"))
     
-    # Safely extract an image: try main image, fallback to first variant, fallback to default
+    # Safely extract an image
     main_img = p.get("productImage") or p.get("bigImage")
+    
+    # SANITIZER: If CJ sends a list of images, extract just the first one
+    if isinstance(main_img, list) and len(main_img) > 0:
+        main_img = main_img[0]
+    elif isinstance(main_img, str) and main_img.strip().startswith("["):
+        try:
+            import json
+            parsed_imgs = json.loads(main_img)
+            if isinstance(parsed_imgs, list) and len(parsed_imgs) > 0:
+                main_img = parsed_imgs[0]
+        except:
+            pass # Fall back to the raw string if parsing fails
+            
+    # Fallback to variant image or default
     if not main_img and parsed_variants:
         main_img = parsed_variants[0].get("image_url")
     p["bigImage"] = main_img or "/sb.png"
