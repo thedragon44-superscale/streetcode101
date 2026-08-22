@@ -108,7 +108,7 @@ export default function Storefront() {
       <Navbar showSearch={true} searchQuery={searchQuery} setSearchQuery={setSearchQuery} searchResults={filteredProducts} />
 
       {/* --- PROFESSIONAL SUB-HEADER / CATEGORY NAV --- */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 sm:top-[65px] z-[100] shadow-sm">
+      <div className="bg-white border-b border-slate-200 sticky top-[65px] z-[90] shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           
           {/* Minimalist Dropdown */}

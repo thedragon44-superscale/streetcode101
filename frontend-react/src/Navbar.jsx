@@ -234,15 +234,15 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
       {/* --- CART SLIDE-OUT MODAL --- */}
       {isCartOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[210] transition-opacity" onClick={() => setIsCartOpen(false)} />
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[10000] transition-opacity" onClick={() => setIsCartOpen(false)} />
       )}
-      <div className={`fixed top-0 right-0 h-full w-full sm:w-[500px] bg-slate-950 z-[220] shadow-[-10px_0_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ease-in-out flex flex-col border-l border-slate-800 ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed top-0 right-0 h-[100dvh] w-full sm:w-[500px] bg-slate-950 z-[10001] shadow-[-10px_0_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ease-in-out flex flex-col border-l border-slate-800 ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         
-        <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+        <div className="px-6 pt-14 pb-5 sm:py-5 border-b border-slate-800 flex items-center justify-between bg-slate-950">
           <h2 className="text-xl font-black text-white uppercase tracking-widest font-heading">
             YOUR <span className="text-orange-500">CART</span>
           </h2>
-          <button onClick={() => setIsCartOpen(false)} className="text-slate-500 hover:text-orange-500 font-bold text-xl transition-colors">✕</button>
+          <button onClick={() => setIsCartOpen(false)} className="text-slate-500 hover:text-orange-500 font-bold text-2xl p-2 transition-colors">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 bg-slate-900/50">
