@@ -641,7 +641,7 @@ class CJSyncRequest(BaseModel):
     sku: str
 
 def fetch_cj_product_data(target_sku: str, cj_api_key: str):
-    """Helper function to ping CJ and extract base data + variants."""
+    """Helper function to ping CJ and extract base data + variants using the Deep Query API."""
     auth_url = "https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken"
     base_headers = {"User-Agent": "Mozilla/5.0"}
     
@@ -652,16 +652,15 @@ def fetch_cj_product_data(target_sku: str, cj_api_key: str):
     access_token = auth_res.json()["data"].get("accessToken")
     auth_headers = {**base_headers, "CJ-Access-Token": access_token}
 
-    products_url = "https://developers.cjdropshipping.com/api2.0/v1/product/listV2"
-    safe_params = {"page": 1, "size": 10, "keyWord": target_sku}
+    # USE DEEP QUERY API INSTEAD OF SEARCH API
+    products_url = "https://developers.cjdropshipping.com/api2.0/v1/product/query"
+    safe_params = {"productSku": target_sku}
     prod_res = requests.get(products_url, headers=auth_headers, params=safe_params, timeout=15)
     
-    content_list = prod_res.json().get("data", {}).get("content", [])
-    if not content_list or not content_list[0].get("productList"):
+    p = prod_res.json().get("data")
+    if not p:
         return None
         
-    p = content_list[0].get("productList")[0]
-    
     # Extract Variants dynamically
     base_price = float(p.get("sellPrice", 15.00))
     cj_variants = p.get("variantList", [])
@@ -670,14 +669,19 @@ def fetch_cj_product_data(target_sku: str, cj_api_key: str):
     for v in cj_variants:
         parsed_variants.append({
             "variant_sku": v.get("variantSku", ""),
-            "color": v.get("variantKey", "Default").split("-")[0] if "-" in v.get("variantKey", "") else "Default",
+            "color": v.get("variantKey", "Default").split("-")[0] if "-" in v.get("variantKey", "") else v.get("variantKey", "Default"),
             "size": v.get("variantKey", "OS").split("-")[-1] if "-" in v.get("variantKey", "") else "OS",
             "price": float(v.get("sellPrice", base_price)) * 2.5,
-            "image_url": v.get("variantImage", p.get("bigImage"))
+            "image_url": v.get("variantImage", p.get("productImage", p.get("bigImage", "/sb.png")))
         })
         
     if not parsed_variants:
-        parsed_variants = [{"variant_sku": f"101-{target_sku[:8]}-DEF", "color": "Default", "size": "OS", "price": base_price * 2.5, "image_url": p.get("bigImage")}]
+        parsed_variants = [{"variant_sku": f"101-{target_sku[:8]}-DEF", "color": "Default", "size": "OS", "price": base_price * 2.5, "image_url": p.get("productImage", p.get("bigImage", "/sb.png"))}]
+        
+    # Normalize keys since /query uses slightly different names than /listV2
+    p["nameEn"] = p.get("productNameEn", p.get("nameEn", "Premium CJ Drop"))
+    p["bigImage"] = p.get("productImage", p.get("bigImage", "/sb.png"))
+    p["sku"] = p.get("productSku", target_sku)
         
     return {"base_data": p, "variants": parsed_variants}
 
@@ -744,17 +748,17 @@ def resync_all_variants(session: Session = Depends(get_session), token: dict = D
         if not prod.supplier_sku:
             continue
             
-        products_url = "https://developers.cjdropshipping.com/api2.0/v1/product/listV2"
-        safe_params = {"page": 1, "size": 10, "keyWord": prod.supplier_sku}
+        # USE DEEP QUERY API
+        products_url = "https://developers.cjdropshipping.com/api2.0/v1/product/query"
+        safe_params = {"productSku": prod.supplier_sku}
         
         try:
             prod_res = requests.get(products_url, headers=auth_headers, params=safe_params, timeout=10)
-            content_list = prod_res.json().get("data", {}).get("content", [])
+            p = prod_res.json().get("data")
             
-            if not content_list or not content_list[0].get("productList"):
+            if not p:
                 continue
                 
-            p = content_list[0].get("productList")[0]
             base_price = float(p.get("sellPrice", 15.00))
             cj_variants = p.get("variantList", [])
             parsed_variants = []
@@ -762,14 +766,14 @@ def resync_all_variants(session: Session = Depends(get_session), token: dict = D
             for v in cj_variants:
                 parsed_variants.append({
                     "variant_sku": v.get("variantSku", ""),
-                    "color": v.get("variantKey", "Default").split("-")[0] if "-" in v.get("variantKey", "") else "Default",
+                    "color": v.get("variantKey", "Default").split("-")[0] if "-" in v.get("variantKey", "") else v.get("variantKey", "Default"),
                     "size": v.get("variantKey", "OS").split("-")[-1] if "-" in v.get("variantKey", "") else "OS",
                     "price": float(v.get("sellPrice", base_price)) * 2.5,
-                    "image_url": v.get("variantImage", p.get("bigImage"))
+                    "image_url": v.get("variantImage", p.get("productImage", p.get("bigImage", "/sb.png")))
                 })
                 
             if not parsed_variants:
-                parsed_variants = [{"variant_sku": f"101-{prod.supplier_sku[:8]}-DEF", "color": "Default", "size": "OS", "price": base_price * 2.5, "image_url": p.get("bigImage")}]
+                parsed_variants = [{"variant_sku": f"101-{prod.supplier_sku[:8]}-DEF", "color": "Default", "size": "OS", "price": base_price * 2.5, "image_url": p.get("productImage", p.get("bigImage", "/sb.png"))}]
                 
             prod.variants = parsed_variants
             session.add(prod)
