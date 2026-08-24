@@ -7,10 +7,10 @@ print("Connecting to PostgreSQL to patch User table...")
 def fix_user_table():
     with Session(engine) as session:
         try:
-            # Inject the missing column with a default value of false
-            session.exec(text('ALTER TABLE "user" ADD COLUMN has_spun BOOLEAN DEFAULT FALSE;'))
+            # Inject the missing discount_percent column with a default value of 0.0
+            session.exec(text('ALTER TABLE "user" ADD COLUMN discount_percent FLOAT DEFAULT 0.0;'))
             session.commit()
-            print("✅ SUCCESS: Added 'has_spun' column to the User table!")
+            print("✅ SUCCESS: Added 'discount_percent' column to the User table!")
         except Exception as e:
             print(f"❌ Error (Column might already exist): {e}")
 
