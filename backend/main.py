@@ -10,6 +10,7 @@ def getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
 socket.getaddrinfo = getaddrinfo_ipv4
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, Session, select
 from database import engine
@@ -17,6 +18,9 @@ from models import Product, Order, User, VendorListing, Message
 from routes import router
 
 app = FastAPI(title="Dropshipping API with Postgres", version="0.3.0")
+
+# Mount the .well-known directory for Apple Pay domain verification
+app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
 
 app.add_middleware(
     CORSMiddleware,

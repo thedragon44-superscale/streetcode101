@@ -27,27 +27,77 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
   const [checkoutState, setCheckoutState] = useState('');
   const [checkoutZip, setCheckoutZip] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [serverCalculatedTotal, setServerCalculatedTotal] = useState(0);
 
-  // Dynamic Discount Calculation
+  // Promo Code State
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+
+  // Dynamic Discount Calculation (Frontend fallback for fast UI rendering)
   const vaultDiscount = currentUser?.discount_percent || 0;
-  const discountMultiplier = 1 - (vaultDiscount / 100);
-  const finalTotal = cartTotal * discountMultiplier;
+  const activePromoDiscount = appliedPromo ? appliedPromo.discount_percent : 0;
+  const totalDiscountPercent = vaultDiscount + activePromoDiscount;
+  const discountMultiplier = 1 - (totalDiscountPercent / 100);
+  const frontendEstimatedTotal = cartTotal * discountMultiplier;
+  const displayTotal = serverCalculatedTotal > 0 ? serverCalculatedTotal : frontendEstimatedTotal;
 
-  // Fetch Stripe PaymentIntent automatically using the DISCOUNTED total
+  // Fetch Stripe PaymentIntent securely from the backend
   useEffect(() => {
-    if (isCartOpen && finalTotal > 0) {
+    if (isCartOpen && cart.length > 0) {
+      const token = localStorage.getItem('pidrop_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const payload = {
+        items: cart.map(item => ({ sku: item.sku, quantity: item.cart_quantity || 1 })),
+        promo_code: appliedPromo ? appliedPromo.code : null
+      };
+
       fetch(`${API_BASE}/create-payment-intent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: finalTotal })
+        headers,
+        body: JSON.stringify(payload)
       })
-      .then(res => res.json())
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to create payment intent');
+        return data;
+      })
       .then(data => {
-        if (data.clientSecret) setClientSecret(data.clientSecret);
+        if (data.clientSecret) {
+          setClientSecret(data.clientSecret);
+          setServerCalculatedTotal(data.finalTotal);
+        }
       })
-      .catch(err => console.error('Stripe error:', err));
+      .catch(err => console.error('Stripe error:', err.message));
+    } else {
+      setClientSecret('');
+      setServerCalculatedTotal(0);
     }
-  }, [isCartOpen, finalTotal]);
+  }, [isCartOpen, cart, appliedPromo]);
+
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) return;
+    setIsApplyingPromo(true);
+    try {
+      const res = await fetch(`${API_BASE}/validate-promo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoInput })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Invalid code');
+      
+      setAppliedPromo(data);
+      toast.success('Promo code applied!');
+      setPromoInput('');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  };
 
   // Authenticate user on load globally
   useEffect(() => {
@@ -297,9 +347,35 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
               </div>
             )}
 
+            {/* Promo Code Input UI */}
+            {!appliedPromo ? (
+              <div className="flex gap-2 mb-3 mt-3">
+                <input 
+                  type="text" 
+                  placeholder="PROMO CODE" 
+                  value={promoInput} 
+                  onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                  className="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:outline-none focus:border-orange-500 font-mono text-xs text-white uppercase" 
+                />
+                <button 
+                  onClick={handleApplyPromo}
+                  disabled={isApplyingPromo || !promoInput}
+                  className="bg-slate-800 hover:bg-orange-500 text-slate-300 hover:text-slate-950 px-4 py-2 rounded-lg font-bold text-xs transition-colors disabled:opacity-50"
+                >
+                  {isApplyingPromo ? '...' : 'APPLY'}
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center mb-3 mt-3 font-mono text-xs text-orange-400 font-bold bg-orange-950/30 p-2 rounded-md border border-orange-900/50">
+                <span>[{appliedPromo.code}]</span>
+                <span>-{appliedPromo.discount_percent}%</span>
+                <button onClick={() => setAppliedPromo(null)} className="text-slate-400 hover:text-white ml-2 transition-colors">✕</button>
+              </div>
+            )}
+
             <div className="flex justify-between items-center mb-6 pt-2 border-t border-slate-800">
               <span className="text-white font-black uppercase tracking-widest text-sm">TOTAL:</span>
-              <span className="text-2xl font-black text-orange-500 font-mono">${finalTotal.toFixed(2)}</span>
+              <span className="text-2xl font-black text-orange-500 font-mono">${displayTotal.toFixed(2)}</span>
             </div>
 
             <div className="space-y-6">

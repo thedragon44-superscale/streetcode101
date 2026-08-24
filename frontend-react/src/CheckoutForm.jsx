@@ -41,7 +41,7 @@ export default function CheckoutForm({ onSuccess }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
-        <PaymentElement />
+        <PaymentElement options={{ wallets: { applePay: 'auto', googlePay: 'auto' } }} />
       </div>
       
       <button 

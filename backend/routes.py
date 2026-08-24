@@ -42,7 +42,7 @@ from sqlmodel import Session, select
 from typing import List
 
 from database import get_session, engine
-from models import Product, Order, User, VendorListing, Message, CartItem
+from models import Product, Order, User, VendorListing, Message, CartItem, PromoCode
 
 router = APIRouter()
 security = HTTPBearer()
@@ -311,23 +311,79 @@ def edit_product_details(sku: str, payload: dict, session: Session = Depends(get
     
     return {"message": f"Successfully updated {sku}!", "product": product}
 
+class CartItemMinimal(BaseModel):
+    sku: str
+    quantity: int
+
 class PaymentIntentRequest(BaseModel):
-    amount: float  # The cart total in dollars
+    items: List[CartItemMinimal]
+    promo_code: str | None = None
+
+class PromoValidateRequest(BaseModel):
+    code: str
+
+optional_security = HTTPBearer(auto_error=False)
+
+@router.post("/api/validate-promo")
+def validate_promo(req: PromoValidateRequest, session: Session = Depends(get_session)):
+    """Allows the frontend to visually validate a code before checkout."""
+    promo = session.exec(select(PromoCode).where(PromoCode.code == req.code.upper(), PromoCode.is_active == True)).first()
+    if not promo:
+        raise HTTPException(status_code=400, detail="Invalid or expired promo code.")
+    return {"code": promo.code, "discount_percent": promo.discount_percent}
 
 @router.post("/api/create-payment-intent")
-def create_payment_intent(req: PaymentIntentRequest):
-    """Securely requests a PaymentIntent session from Stripe."""
+def create_payment_intent(
+    req: PaymentIntentRequest, 
+    session: Session = Depends(get_session),
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security)
+):
+    """Securely calculates price on the backend and requests a PaymentIntent."""
+    
+    # 1. Calculate Base Total from verified DB prices
+    base_total = 0.0
+    for item in req.items:
+        product = session.get(Product, item.sku)
+        if not product or not product.in_stock:
+            raise HTTPException(status_code=400, detail=f"Product {item.sku} unavailable")
+        base_total += product.price * item.quantity
+
+    # 2. Calculate Total Discount
+    total_discount_percent = 0.0
+    
+    # Apply User Vault Discount if logged in
+    if credentials:
+        try:
+            payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
+            user = session.exec(select(User).where(User.username == payload.get("sub"))).first()
+            if user:
+                total_discount_percent += user.discount_percent
+        except:
+            pass # Ignore invalid tokens for guest checkouts
+
+    # Apply Promo Code if provided
+    if req.promo_code:
+        promo = session.exec(select(PromoCode).where(PromoCode.code == req.promo_code.upper(), PromoCode.is_active == True)).first()
+        if promo:
+            total_discount_percent += promo.discount_percent
+        else:
+            raise HTTPException(status_code=400, detail="Invalid or inactive promo code")
+
+    # 3. Final Math
+    discount_multiplier = 1 - (total_discount_percent / 100)
+    final_total = base_total * discount_multiplier
+    amount_in_cents = int(final_total * 100)
+    
+    if amount_in_cents < 50:
+        raise HTTPException(status_code=400, detail="Minimum charge is $0.50")
+
     try:
-        # Stripe processes amounts in cents (e.g., $10.00 = 1000)
-        amount_in_cents = int(req.amount * 100)
-        
         intent = stripe.PaymentIntent.create(
             amount=amount_in_cents,
             currency="usd",
             automatic_payment_methods={"enabled": True},
         )
-        
-        return {"clientSecret": intent.client_secret}
+        return {"clientSecret": intent.client_secret, "finalTotal": final_total}
     except Exception as e:
         print(f"❌ STRIPE ERROR: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
