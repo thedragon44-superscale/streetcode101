@@ -544,8 +544,8 @@ export default function Admin() {
             </header>
 
             {/* Generator Form */}
-            <form onSubmit={handleGeneratePromo} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-              <div className="md:col-span-7">
+            <form onSubmit={handleGeneratePromo} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row gap-4 items-end">
+              <div className="flex-1 w-full min-w-[200px]">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Base Word (Max 10 Chars)</label>
                 <input 
                   type="text" 
@@ -557,7 +557,7 @@ export default function Admin() {
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-mono text-sm uppercase" 
                 />
               </div>
-              <div className="md:col-span-2">
+              <div className="w-full md:w-32 shrink-0">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Discount %</label>
                 <input 
                   type="number" 
@@ -570,11 +570,11 @@ export default function Admin() {
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-mono text-sm" 
                 />
               </div>
-              <div className="md:col-span-3">
+              <div className="w-full md:w-auto shrink-0">
                 <button 
                   type="submit" 
                   disabled={isGeneratingPromo || !baseWord || !discountPercent}
-                  className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white font-black py-3 px-4 rounded-xl shadow-md transition-all active:scale-[0.98] uppercase tracking-wider h-[46px]"
+                  className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white font-black py-3 px-8 rounded-xl shadow-md transition-all active:scale-[0.98] uppercase tracking-wider h-[46px]"
                 >
                   {isGeneratingPromo ? 'Generating...' : 'Generate Key'}
                 </button>
