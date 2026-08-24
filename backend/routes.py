@@ -43,7 +43,7 @@ from sqlmodel import Session, select
 from typing import List
 
 from database import get_session, engine
-from models import Product, Order, User, VendorListing, Message, CartItem, PromoCode
+from models import Product, Order, User, VendorListing, Message, CartItem, PromoCode, LedgerSubscriber
 
 router = APIRouter()
 security = HTTPBearer()
@@ -1157,3 +1157,83 @@ def send_guest_support_message(payload: GuestSupportRequest, session: Session = 
             print(f"❌ SMTP ERROR: {str(e)}")
 
     return {"message": "Support request transmitted."}
+
+# --- LEDGER SUBSCRIPTION & COMMUNITY ENDPOINTS ---
+
+class SubscribeRequest(BaseModel):
+    email: str
+
+class UserDiscountUpdate(BaseModel):
+    discount_percent: float
+
+class AdminEmailRequest(BaseModel):
+    subject: str
+    body: str
+
+@router.post("/api/subscribe")
+def subscribe_newsletter(req: SubscribeRequest, session: Session = Depends(get_session)):
+    """Saves marketing leads to the database and issues the vault code."""
+    existing = session.exec(select(LedgerSubscriber).where(LedgerSubscriber.email == req.email)).first()
+    
+    if not existing:
+        new_sub = LedgerSubscriber(email=req.email)
+        session.add(new_sub)
+        session.commit()
+        
+        # Fire a quick automated welcome email
+        send_automated_email(
+            to_email=req.email,
+            subject="Welcome to the 101 Ledger",
+            body="You're officially on the list. Use code 101_VAULT_10 at checkout for 10% off your first drop. Create an account to permanently secure your vault access."
+        )
+
+    # We return the code even if they already exist, so the UI can proceed cleanly
+    return {"message": "Access Granted", "code": "101_VAULT_10"}
+
+@router.get("/api/admin/users")
+def get_all_users(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Fetches the community roster for the Admin Dashboard."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    users = session.exec(select(User).order_by(User.id.desc())).all()
+    # Strip out password hashes before returning to the frontend
+    return [
+        {
+            "id": u.id, 
+            "username": u.username, 
+            "email": u.email, 
+            "profile_image_url": u.profile_image_url, 
+            "discount_percent": u.discount_percent, 
+            "is_verified": u.is_verified
+        } for u in users
+    ]
+
+@router.patch("/api/admin/users/{username}/discount")
+def update_user_discount(username: str, payload: UserDiscountUpdate, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Allows Admin to permanently adjust a user's base Vault discount."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    user = session.exec(select(User).where(User.username == username)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    user.discount_percent = payload.discount_percent
+    session.add(user)
+    session.commit()
+    
+    return {"message": f"Updated @{username}'s base discount to {payload.discount_percent}%"}
+
+@router.post("/api/admin/users/{username}/email")
+def email_user_directly(username: str, payload: AdminEmailRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Utilizes the SMTP dispatcher to email a user directly from the Admin console."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    user = session.exec(select(User).where(User.username == username)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    send_automated_email(to_email=user.email, subject=payload.subject, body=payload.body)
+    return {"message": f"Secure email dispatched to @{username}"}

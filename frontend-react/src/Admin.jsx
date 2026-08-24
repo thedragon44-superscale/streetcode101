@@ -14,12 +14,20 @@ export default function Admin() {
   const [products, setProducts] = useState([]);
   const [socialFeed, setSocialFeed] = useState([]);
   const [promos, setPromos] = useState([]);
+  const [users, setUsers] = useState([]);
   const [orderFilter, setOrderFilter] = useState('all');
 
   // --- PROMO GENERATION STATE ---
   const [baseWord, setBaseWord] = useState('');
   const [discountPercent, setDiscountPercent] = useState('');
   const [isGeneratingPromo, setIsGeneratingPromo] = useState(false);
+
+  // --- ADMIN EMAIL MODAL STATE ---
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailTarget, setEmailTarget] = useState(null);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   // --- MODAL STATE ---
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -34,27 +42,21 @@ export default function Admin() {
   // ==========================================
   const fetchData = async () => {
     try {
-      const [ordersRes, productsRes, feedRes, promosRes] = await Promise.all([
+      const [ordersRes, productsRes, feedRes, promosRes, usersRes] = await Promise.all([
         fetch(`${API_BASE}/orders`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${API_BASE}/products`),
         fetch(`${API_BASE}/listings/feed`),
-        fetch(`${API_BASE}/admin/promos`, { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(`${API_BASE}/admin/promos`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
 
-      if (ordersRes.status === 401) {
-        handleLogout(); 
-        return;
-      }
+      if (ordersRes.status === 401) return handleLogout();
 
-      const ordersData = await ordersRes.json();
-      const productsData = await productsRes.json();
-      const feedData = await feedRes.json();
-      const promosData = await promosRes.ok ? await promosRes.json() : [];
-
-      setOrders(ordersData);
-      setProducts(productsData);
-      setSocialFeed(feedData);
-      setPromos(promosData);
+      setOrders(await ordersRes.json());
+      setProducts(await productsRes.json());
+      setSocialFeed(await feedRes.json());
+      setPromos(promosRes.ok ? await promosRes.json() : []);
+      setUsers(usersRes.ok ? await usersRes.json() : []);
     } catch (err) {
       console.error("Error fetching data:", err);
     }
@@ -136,6 +138,37 @@ export default function Admin() {
   // ==========================================
   // EVENT HANDLERS
   // ==========================================
+  const handleUpdateUserDiscount = async (username, newDiscount) => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/users/${username}/discount`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discount_percent: parseFloat(newDiscount) })
+      });
+      if (!res.ok) throw new Error('Failed to update discount');
+      toast.success(`Updated discount for @${username}`);
+      fetchData();
+    } catch (err) { toast.error(err.message); }
+  };
+
+  const handleSendAdminEmail = async (e) => {
+    e.preventDefault();
+    if (!emailSubject || !emailBody) return;
+    setIsSendingEmail(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/users/${emailTarget.username}/email`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: emailSubject, body: emailBody })
+      });
+      if (!res.ok) throw new Error('Failed to dispatch email');
+      toast.success('Email dispatched successfully.');
+      setIsEmailModalOpen(false);
+      setEmailSubject('');
+      setEmailBody('');
+    } catch (err) { toast.error(err.message); } finally { setIsSendingEmail(false); }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('pidrop_token');
     setToken(null);
@@ -278,6 +311,9 @@ export default function Admin() {
           </button>
           <button onClick={() => setActiveTab('promos')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'promos' ? 'bg-emerald-500/10 text-emerald-400' : 'hover:bg-slate-800 hover:text-white'}`}>
             🎟️ Promos
+          </button>
+          <button onClick={() => setActiveTab('community')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'community' ? 'bg-blue-500/10 text-blue-400' : 'hover:bg-slate-800 hover:text-white'}`}>
+            🌍 Community
           </button>
         </nav>
         <div className="p-4 border-t border-slate-800">
@@ -630,6 +666,67 @@ export default function Admin() {
             </div>
           </div>
         )}
+
+        {/* --- COMMUNITY VIEW --- */}
+        {activeTab === 'community' && (
+          <div className="animate-fade-in">
+            <header className="mb-8">
+              <h1 className="text-3xl font-black text-slate-900">Community Roster</h1>
+              <p className="text-slate-500 mt-1 font-medium">Manage registered accounts and VIP discounts.</p>
+            </header>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full text-left text-sm text-slate-600">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
+                  <tr>
+                    <th className="px-6 py-5">User</th>
+                    <th className="px-6 py-5">Email</th>
+                    <th className="px-6 py-5">Base Vault Discount</th>
+                    <th className="px-6 py-5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {users.map((user) => (
+                    <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 flex items-center gap-3">
+                        <img src={user.profile_image_url} alt={user.username} className="w-8 h-8 rounded-full border border-slate-200 object-cover" />
+                        <span className="font-bold text-slate-900">@{user.username}</span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-500 font-mono text-xs">{user.email}</td>
+                      <td className="px-6 py-4">
+                        <input 
+                          type="number" 
+                          min="0" max="100" 
+                          defaultValue={user.discount_percent}
+                          onBlur={(e) => {
+                            if (e.target.value != user.discount_percent) handleUpdateUserDiscount(user.username, e.target.value);
+                          }}
+                          className="w-20 px-2 py-1 border border-slate-200 rounded text-slate-900 font-bold focus:border-orange-500 focus:outline-none"
+                        /> <span className="text-xs font-bold text-slate-500">%</span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => navigate(`/chat/${user.username}`)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-bold text-xs transition-colors">
+                            Message
+                          </button>
+                          <button 
+                            onClick={() => { setEmailTarget(user); setIsEmailModalOpen(true); }} 
+                            className="bg-orange-50 hover:bg-orange-500 text-orange-600 hover:text-white px-3 py-1.5 rounded-lg font-bold text-xs transition-colors"
+                          >
+                            Email
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {users.length === 0 && (
+                <div className="text-center py-20 text-slate-400 font-medium">No community members registered yet.</div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* --- EDIT PRODUCT MODAL --- */}
@@ -686,6 +783,31 @@ export default function Admin() {
                   Save Changes
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- DIRECT EMAIL MODAL --- */}
+      {isEmailModalOpen && emailTarget && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h2 className="text-xl font-black text-slate-900">Email @{emailTarget.username}</h2>
+              <button onClick={() => setIsEmailModalOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-xl p-2">✕</button>
+            </div>
+            <form onSubmit={handleSendAdminEmail} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Subject</label>
+                <input required type="text" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Message Body</label>
+                <textarea required value={emailBody} onChange={e => setEmailBody(e.target.value)} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500" rows="5"></textarea>
+              </div>
+              <button type="submit" disabled={isSendingEmail} className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-black py-3 rounded-xl shadow-lg transition-all">
+                {isSendingEmail ? 'Dispatching...' : 'Send Secure Email'}
+              </button>
             </form>
           </div>
         </div>

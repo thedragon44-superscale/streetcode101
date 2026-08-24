@@ -1,3 +1,4 @@
+import EmailCaptureModal from './EmailCaptureModal';
 import Legal from './Legal';
 import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
@@ -11,7 +12,7 @@ import ProductPage from './ProductPage';
 import Profile from './Profile';
 import Feed from './Feed';
 import Chat from './Chat';
-import Inbox from './Inbox'; // Import the new Inbox page!
+import Inbox from './Inbox';
 
 function App() {
   return (
@@ -19,27 +20,31 @@ function App() {
       <Router>
         {/* Global Toast Container styled to match your dark theme */}
         <Toaster 
-        position="top-right" 
-        toastOptions={{ 
-          duration: 4000, 
-          style: { background: '#1e293b', color: '#fff', fontWeight: 'bold', borderRadius: '12px' },
-          success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
-          error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } }
-        }} 
-      />
-      <Routes>
-        <Route path="/legal/:section" element={<Legal />} />
-        <Route path="/" element={<Storefront />} />
-        <Route path="/product/:sku" element={<ProductPage />} />
-        <Route path="/profile/:username" element={<Profile />} />
-        <Route path="/chat/:targetUsername" element={<Chat />} />
-        <Route path="/inbox" element={<Inbox />} /> {/* The Secure Inbox route */}
-        <Route path="/feed" element={<Feed />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-      </Routes>
+          position="top-right" 
+          toastOptions={{ 
+            duration: 4000, 
+            style: { background: '#1e293b', color: '#fff', fontWeight: 'bold', borderRadius: '12px' },
+            success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+            error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } }
+          }} 
+        />
+        
+        {/* Global Email Capture Modal */}
+        <EmailCaptureModal />
+
+        <Routes>
+          <Route path="/" element={<Storefront />} />
+          <Route path="/legal/:section" element={<Legal />} />
+          <Route path="/product/:sku" element={<ProductPage />} />
+          <Route path="/profile/:username" element={<Profile />} />
+          <Route path="/chat/:targetUsername" element={<Chat />} />
+          <Route path="/inbox" element={<Inbox />} />
+          <Route path="/feed" element={<Feed />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+        </Routes>
       </Router>
     </CartProvider>
   );

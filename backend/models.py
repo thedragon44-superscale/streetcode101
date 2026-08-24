@@ -64,3 +64,8 @@ class PromoCode(SQLModel, table=True):
     discount_percent: float
     is_active: bool = Field(default=True)
     usage_count: int = Field(default=0)
+
+class LedgerSubscriber(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(unique=True, index=True)
+    subscribed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
