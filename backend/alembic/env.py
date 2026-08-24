@@ -33,8 +33,8 @@ from sqlmodel import SQLModel
 import models  # Imports your tables
 from database import engine  # Imports your live database URL
 
-# Force Alembic to use your exact database URL from database.py
-config.set_main_option("sqlalchemy.url", str(engine.url).replace('%', '%%'))
+# Force Alembic to use your exact database URL from database.py (unmasking the password)
+config.set_main_option("sqlalchemy.url", engine.url.render_as_string(hide_password=False).replace('%', '%%'))
 
 target_metadata = SQLModel.metadata
 # ----------------------------
