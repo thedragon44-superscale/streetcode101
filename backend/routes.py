@@ -12,6 +12,7 @@ import urllib.request
 import urllib.parse
 import json
 import random
+import string
 from email.message import EmailMessage
 
 # ==========================================
@@ -980,6 +981,56 @@ def get_inbox(session: Session = Depends(get_session), token: dict = Depends(ver
             
     # Return as a list
     return list(conversations.values())
+
+class PromoGenerateRequest(BaseModel):
+    base_word: str
+    discount_percent: float
+
+@router.get("/api/admin/promos")
+def get_all_promos(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Fetches all promo codes for the admin dashboard."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    return session.exec(select(PromoCode).order_by(PromoCode.id.desc())).all()
+
+@router.post("/api/admin/promos")
+def generate_promo(req: PromoGenerateRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Generates a secure 16-character promo code."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    clean_word = req.base_word.strip().upper()[:10] # Max 10 chars to leave room for randomness
+    prefix = f"{clean_word}-" if clean_word else ""
+    remaining_length = 16 - len(prefix)
+    
+    # Generate the random suffix
+    chars = string.ascii_uppercase + string.digits
+    suffix = ''.join(random.choices(chars, k=max(0, remaining_length)))
+    
+    final_code = prefix + suffix
+    
+    new_promo = PromoCode(code=final_code, discount_percent=req.discount_percent)
+    session.add(new_promo)
+    session.commit()
+    session.refresh(new_promo)
+    return new_promo
+
+@router.patch("/api/admin/promos/{id}/toggle")
+def toggle_promo_status(id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Kill switch to instantly activate or deactivate a promo code."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    promo = session.get(PromoCode, id)
+    if not promo:
+        raise HTTPException(status_code=404, detail="Promo not found")
+        
+    promo.is_active = not promo.is_active
+    session.add(promo)
+    session.commit()
+    session.refresh(promo)
+    return {"message": f"Promo {promo.code} is now {'Active' if promo.is_active else 'Inactive'}", "promo": promo}
+
 
 class SupportMessageRequest(BaseModel):
     text: str

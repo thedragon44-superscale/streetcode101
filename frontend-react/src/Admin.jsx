@@ -13,7 +13,13 @@ export default function Admin() {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [socialFeed, setSocialFeed] = useState([]);
+  const [promos, setPromos] = useState([]);
   const [orderFilter, setOrderFilter] = useState('all');
+
+  // --- PROMO GENERATION STATE ---
+  const [baseWord, setBaseWord] = useState('');
+  const [discountPercent, setDiscountPercent] = useState('');
+  const [isGeneratingPromo, setIsGeneratingPromo] = useState(false);
 
   // --- MODAL STATE ---
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -28,10 +34,11 @@ export default function Admin() {
   // ==========================================
   const fetchData = async () => {
     try {
-      const [ordersRes, productsRes, feedRes] = await Promise.all([
+      const [ordersRes, productsRes, feedRes, promosRes] = await Promise.all([
         fetch(`${API_BASE}/orders`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${API_BASE}/products`),
-        fetch(`${API_BASE}/listings/feed`)
+        fetch(`${API_BASE}/listings/feed`),
+        fetch(`${API_BASE}/admin/promos`, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
 
       if (ordersRes.status === 401) {
@@ -42,12 +49,55 @@ export default function Admin() {
       const ordersData = await ordersRes.json();
       const productsData = await productsRes.json();
       const feedData = await feedRes.json();
+      const promosData = await promosRes.ok ? await promosRes.json() : [];
 
       setOrders(ordersData);
       setProducts(productsData);
       setSocialFeed(feedData);
+      setPromos(promosData);
     } catch (err) {
       console.error("Error fetching data:", err);
+    }
+  };
+
+  // ==========================================
+  // PROMO HANDLERS
+  // ==========================================
+  const handleGeneratePromo = async (e) => {
+    e.preventDefault();
+    if (!baseWord || !discountPercent) return;
+    setIsGeneratingPromo(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/promos`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base_word: baseWord, discount_percent: parseFloat(discountPercent) })
+      });
+      if (!res.ok) throw new Error('Failed to generate promo');
+      const data = await res.json();
+      setPromos([data, ...promos]);
+      setBaseWord('');
+      setDiscountPercent('');
+      toast.success(`Generated: ${data.code}`);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsGeneratingPromo(false);
+    }
+  };
+
+  const handleTogglePromo = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/promos/${id}/toggle`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to toggle promo');
+      const data = await res.json();
+      setPromos(promos.map(p => p.id === id ? data.promo : p));
+      toast.success(data.message);
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
@@ -225,6 +275,9 @@ export default function Admin() {
           </button>
           <button onClick={() => setActiveTab('social')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'social' ? 'bg-purple-500/10 text-purple-400' : 'hover:bg-slate-800 hover:text-white'}`}>
             👥 Social Feed
+          </button>
+          <button onClick={() => setActiveTab('promos')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'promos' ? 'bg-emerald-500/10 text-emerald-400' : 'hover:bg-slate-800 hover:text-white'}`}>
+            🎟️ Promos
           </button>
         </nav>
         <div className="p-4 border-t border-slate-800">
@@ -477,6 +530,100 @@ export default function Admin() {
               </table>
               {socialFeed.length === 0 && (
                 <div className="text-center py-20 text-slate-400 font-medium">No user listings currently active.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- PROMOS VIEW --- */}
+        {activeTab === 'promos' && (
+          <div className="animate-fade-in">
+            <header className="mb-8">
+              <h1 className="text-3xl font-black text-slate-900">Promo Engine</h1>
+              <p className="text-slate-500 mt-1 font-medium">Generate and manage secure 16-digit discount codes.</p>
+            </header>
+
+            {/* Generator Form */}
+            <form onSubmit={handleGeneratePromo} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row gap-4 items-end">
+              <div className="flex-1 w-full">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Base Word (Max 10 Chars)</label>
+                <input 
+                  type="text" 
+                  maxLength="10"
+                  required 
+                  value={baseWord}
+                  onChange={(e) => setBaseWord(e.target.value.toUpperCase())}
+                  placeholder="e.g. WINTER" 
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-mono text-sm uppercase" 
+                />
+              </div>
+              <div className="w-full md:w-48">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Discount %</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  max="100"
+                  required 
+                  value={discountPercent}
+                  onChange={(e) => setDiscountPercent(e.target.value)}
+                  placeholder="15" 
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-mono text-sm" 
+                />
+              </div>
+              <button 
+                type="submit" 
+                disabled={isGeneratingPromo || !baseWord || !discountPercent}
+                className="w-full md:w-auto bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white font-black py-3 px-8 rounded-xl shadow-md transition-all active:scale-[0.98] uppercase tracking-wider h-[46px]"
+              >
+                {isGeneratingPromo ? 'Generating...' : 'Generate Key'}
+              </button>
+            </form>
+
+            {/* Promos Ledger */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full text-left text-sm text-slate-600">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
+                  <tr>
+                    <th className="px-6 py-5">Access Code</th>
+                    <th className="px-6 py-5">Discount</th>
+                    <th className="px-6 py-5">Usages</th>
+                    <th className="px-6 py-5">Status</th>
+                    <th className="px-6 py-5 text-right">Kill Switch</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {promos.map((promo) => (
+                    <tr key={promo.id} className={`transition-colors ${promo.is_active ? 'hover:bg-slate-50' : 'bg-slate-50/50 opacity-75'}`}>
+                      <td className="px-6 py-4">
+                        <span className="font-mono text-sm bg-slate-100 text-slate-900 px-3 py-1.5 rounded-lg font-bold border border-slate-200">
+                          {promo.code}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 font-black text-emerald-600 text-base">
+                        {promo.discount_percent}% OFF
+                      </td>
+                      <td className="px-6 py-4 font-bold text-slate-700">
+                        {promo.usage_count}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-xs font-black uppercase tracking-widest px-2 py-1 rounded-full ${promo.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          {promo.is_active ? 'Active' : 'Disabled'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => handleTogglePromo(promo.id)} 
+                          className={`w-12 h-6 rounded-full relative transition-colors ${promo.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                        >
+                          <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${promo.is_active ? 'left-7' : 'left-1'}`}></div>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {promos.length === 0 && (
+                <div className="text-center py-20 text-slate-400 font-medium">No promo codes generated yet.</div>
               )}
             </div>
           </div>
