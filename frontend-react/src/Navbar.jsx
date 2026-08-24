@@ -27,20 +27,18 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
   const [checkoutState, setCheckoutState] = useState('');
   const [checkoutZip, setCheckoutZip] = useState('');
   const [clientSecret, setClientSecret] = useState('');
-  const [serverCalculatedTotal, setServerCalculatedTotal] = useState(0);
 
   // Promo Code State
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
 
-  // Dynamic Discount Calculation (Frontend fallback for fast UI rendering)
+  // Dynamic Discount Calculation (Forces UI to reflect math instantly)
   const vaultDiscount = currentUser?.discount_percent || 0;
   const activePromoDiscount = appliedPromo ? appliedPromo.discount_percent : 0;
   const totalDiscountPercent = vaultDiscount + activePromoDiscount;
   const discountMultiplier = 1 - (totalDiscountPercent / 100);
-  const frontendEstimatedTotal = cartTotal * discountMultiplier;
-  const displayTotal = serverCalculatedTotal > 0 ? serverCalculatedTotal : frontendEstimatedTotal;
+  const finalTotal = cartTotal * discountMultiplier;
 
   // Fetch Stripe PaymentIntent securely from the backend
   useEffect(() => {
@@ -67,13 +65,11 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
       .then(data => {
         if (data.clientSecret) {
           setClientSecret(data.clientSecret);
-          setServerCalculatedTotal(data.finalTotal);
         }
       })
       .catch(err => console.error('Stripe error:', err.message));
     } else {
       setClientSecret('');
-      setServerCalculatedTotal(0);
     }
   }, [isCartOpen, cart, appliedPromo]);
 
@@ -375,7 +371,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
             <div className="flex justify-between items-center mb-6 pt-2 border-t border-slate-800">
               <span className="text-white font-black uppercase tracking-widest text-sm">TOTAL:</span>
-              <span className="text-2xl font-black text-orange-500 font-mono">${displayTotal.toFixed(2)}</span>
+              <span className="text-2xl font-black text-orange-500 font-mono">${finalTotal.toFixed(2)}</span>
             </div>
 
             <div className="space-y-6">

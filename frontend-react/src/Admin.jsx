@@ -557,7 +557,7 @@ export default function Admin() {
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-mono text-sm uppercase" 
                 />
               </div>
-              <div className="w-full md:w-48">
+              <div className="w-full md:w-28">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Discount %</label>
                 <input 
                   type="number" 
@@ -613,9 +613,9 @@ export default function Admin() {
                       <td className="px-6 py-4 text-right">
                         <button 
                           onClick={() => handleTogglePromo(promo.id)} 
-                          className={`w-12 h-6 rounded-full relative transition-colors ${promo.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                          className={`w-12 h-6 rounded-full flex items-center p-1 transition-colors shadow-inner ${promo.is_active ? 'bg-emerald-500 justify-end' : 'bg-slate-300 justify-start'}`}
                         >
-                          <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${promo.is_active ? 'left-7' : 'left-1'}`}></div>
+                          <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>
                         </button>
                       </td>
                     </tr>
