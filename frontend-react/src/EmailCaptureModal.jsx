@@ -12,17 +12,23 @@ export default function EmailCaptureModal() {
   const [discountCode, setDiscountCode] = useState('');
 
   useEffect(() => {
-    const isDismissed = localStorage.getItem('101_ledger_dismissed');
-    if (!isDismissed) {
-      const timer = setTimeout(() => {
-        setIsOpen(true);
-      }, 7000);
-      return () => clearTimeout(timer);
-    }
+    const token = localStorage.getItem('pidrop_token');
+    const isDismissed = sessionStorage.getItem('101_ledger_dismissed');
+    
+    // Abort timer if the user is currently logged in OR has dismissed it this session
+    if (token || isDismissed) return;
+
+    const timer = setTimeout(() => {
+      setIsOpen(true);
+    }, 7000);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const handleDismiss = () => {
-    localStorage.setItem('101_ledger_dismissed', 'true');
+    // sessionStorage ensures the modal stays hidden for the rest of their visit,
+    // but will reset if they completely close the browser and return another day.
+    sessionStorage.setItem('101_ledger_dismissed', 'true');
     setIsOpen(false);
   };
 
@@ -43,7 +49,7 @@ export default function EmailCaptureModal() {
       const data = await res.json();
       setDiscountCode(data.code);
       setIsSuccess(true);
-      localStorage.setItem('101_ledger_dismissed', 'true');
+      sessionStorage.setItem('101_ledger_dismissed', 'true');
     } catch (err) {
       toast.error(err.message);
     } finally {
