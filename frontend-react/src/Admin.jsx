@@ -545,8 +545,8 @@ export default function Admin() {
 
             {/* Generator Form */}
             <form onSubmit={handleGeneratePromo} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row gap-4 items-end">
-              <div className="flex-1 w-full min-w-[200px]">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Base Word (Max 10 Chars)</label>
+              <div className="w-full md:w-1/2">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate">Base Word (Max 10)</label>
                 <input 
                   type="text" 
                   maxLength="10"
@@ -557,8 +557,8 @@ export default function Admin() {
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-mono text-sm uppercase" 
                 />
               </div>
-              <div className="w-full md:w-32 shrink-0">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Discount %</label>
+              <div className="w-full md:w-1/4">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate">Discount %</label>
                 <input 
                   type="number" 
                   min="1" 
@@ -570,11 +570,11 @@ export default function Admin() {
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-mono text-sm" 
                 />
               </div>
-              <div className="w-full md:w-auto shrink-0">
+              <div className="w-full md:w-1/4">
                 <button 
                   type="submit" 
                   disabled={isGeneratingPromo || !baseWord || !discountPercent}
-                  className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white font-black py-3 px-8 rounded-xl shadow-md transition-all active:scale-[0.98] uppercase tracking-wider h-[46px]"
+                  className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white font-black py-3 px-4 rounded-xl shadow-md transition-all active:scale-[0.98] uppercase tracking-wider h-[46px] whitespace-nowrap"
                 >
                   {isGeneratingPromo ? 'Generating...' : 'Generate Key'}
                 </button>
@@ -615,9 +615,9 @@ export default function Admin() {
                       <td className="px-6 py-4 text-right">
                         <button 
                           onClick={() => handleTogglePromo(promo.id)} 
-                          className={`w-12 h-6 rounded-full flex items-center p-1 transition-colors shadow-inner ${promo.is_active ? 'bg-emerald-500 justify-end' : 'bg-slate-300 justify-start'}`}
+                          className={`w-12 h-6 rounded-full flex items-center p-1 transition-colors shadow-inner ${promo.is_active ? 'bg-emerald-500 justify-end' : 'bg-slate-400 justify-start'}`}
                         >
-                          <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                          <div className="w-4 h-4 bg-white rounded-full shadow-md"></div>
                         </button>
                       </td>
                     </tr>
