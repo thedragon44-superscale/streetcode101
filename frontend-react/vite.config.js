@@ -18,4 +18,8 @@ export default defineConfig({
       }
     }
   ],
+  // Whitelist your live domain so Vite doesn't block it
+  preview: {
+    allowedHosts: ['streetcode101.com']
+  }
 })
