@@ -43,7 +43,7 @@ from sqlmodel import Session, select
 from typing import List
 
 from database import get_session, engine
-from models import Product, Order, User, VendorListing, Message, CartItem, PromoCode, LedgerSubscriber
+from models import Product, Order, User, Post, Like, Comment, Message, CartItem, PromoCode, LedgerSubscriber
 
 router = APIRouter()
 security = HTTPBearer()
@@ -645,27 +645,24 @@ def upload_profile_image(file: UploadFile = File(...), session: Session = Depend
     except Exception as e:
         print(f"\n❌ AVATAR UPLOAD CRASHED: {str(e)}\n")
         raise HTTPException(status_code=500, detail=f"Failed to upload avatar: {str(e)}")
-
-@router.post("/api/profile/me/listings")
-def create_vendor_listing(
-    title: str = Form(...),
+@router.post("/api/posts")
+def create_social_post(
+    post_type: str = Form(...),
     description: str = Form(...),
-    price: float = Form(...),
+    title: str = Form(None),
+    price: float = Form(None),
     file: UploadFile = File(None),
     session: Session = Depends(get_session),
     token: dict = Depends(verify_token)
 ):
-    """Allows a public user to post an item for sale to their wall and the social feed."""
+    """Creates a text, image, or vendor drop post."""
     username = token.get("sub")
-    if username == "admin":
-        raise HTTPException(status_code=400, detail="Master Admin should use the official product catalog, not user walls.")
-
-    image_url = "/default.png"
+    image_url = None
     
     if file:
         try:
             file_extension = file.filename.split(".")[-1]
-            unique_filename = f"listings/{uuid.uuid4().hex}.{file_extension}"
+            unique_filename = f"posts/{uuid.uuid4().hex}.{file_extension}"
             
             s3_client.upload_fileobj(
                 file.file,
@@ -675,60 +672,72 @@ def create_vendor_listing(
             )
             image_url = f"https://streetcode101.com/{BUCKET_NAME}/{unique_filename}"
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to upload listing image: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
 
-    new_listing = VendorListing(
+    new_post = Post(
         username=username,
-        title=title,
+        post_type=post_type,
         description=description,
+        title=title,
         price=price,
         image_url=image_url
     )
     
-    session.add(new_listing)
+    session.add(new_post)
     session.commit()
-    session.refresh(new_listing)
-    
-    return new_listing
+    session.refresh(new_post)
+    return new_post
 
-@router.get("/api/profile/{username}/listings")
-def get_user_listings(username: str, session: Session = Depends(get_session)):
-    """Fetches all items listed by a specific user for their Profile Wall."""
-    listings = session.exec(
-        select(VendorListing).where(VendorListing.username == username).order_by(VendorListing.id.desc())
+@router.get("/api/posts/user/{target_username}")
+def get_user_posts(target_username: str, session: Session = Depends(get_session)):
+    """Fetches a specific user's wall."""
+    return session.exec(
+        select(Post).where(Post.username == target_username).order_by(Post.id.desc())
     ).all()
-    return listings
 
-@router.get("/api/listings/feed")
-def get_global_social_feed(session: Session = Depends(get_session)):
-    """Fetches the global social feed of all peer-to-peer vendor items."""
-    listings = session.exec(select(VendorListing).order_by(VendorListing.id.desc())).all()
+@router.get("/api/posts/feed")
+def get_global_feed(session: Session = Depends(get_session)):
+    """Fetches the global timeline with user avatars."""
+    posts = session.exec(select(Post).order_by(Post.id.desc())).all()
     feed = []
     
-    for item in listings:
-        # Look up the user who posted this item
-        user = session.exec(select(User).where(User.username == item.username)).first()
-        
-        # Determine the correct avatar
+    for p in posts:
+        user = session.exec(select(User).where(User.username == p.username)).first()
         avatar = "/default.png"
-        if item.username == "admin":
+        if p.username == "admin":
             avatar = "/dragon_logo.png"
         elif user:
             avatar = user.profile_image_url
             
-        # Bundle it all together
         feed.append({
-            "id": item.id,
-            "username": item.username,
-            "title": item.title,
-            "description": item.description,
-            "price": item.price,
-            "image_url": item.image_url,
-            "created_at": item.created_at.isoformat() if item.created_at else None,
+            "id": p.id,
+            "username": p.username,
+            "post_type": p.post_type,
+            "title": p.title,
+            "description": p.description,
+            "price": p.price,
+            "image_url": p.image_url,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
             "user_avatar": avatar
         })
         
     return feed
+
+@router.delete("/api/posts/{id}")
+def delete_post(id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Allows Admin (or the author) to delete a post."""
+    username = token.get("sub")
+    post = session.get(Post, id)
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+        
+    if username != "admin" and username != post.username:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    session.delete(post)
+    session.commit()
+    return {"message": "Post permanently removed."}
 
 class CJSyncRequest(BaseModel):
     sku: str
@@ -900,20 +909,6 @@ def toggle_featured_product(sku: str, session: Session = Depends(get_session), t
     
     return {"message": f"{product.title} is now the Featured Drop!"}
 
-@router.delete("/api/admin/listings/{id}")
-def delete_social_listing(id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Allows the Admin to delete a user's peer-to-peer listing."""
-    username = token.get("sub")
-    if username != "admin":
-        raise HTTPException(status_code=403, detail="Unauthorized")
-        
-    listing = session.get(VendorListing, id)
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-        
-    session.delete(listing)
-    session.commit()
-    return {"message": "Listing removed from social feed."}
 
 # --- WEBSOCKET CONNECTION MANAGER ---
 class ConnectionManager:

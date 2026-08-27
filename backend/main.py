@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, Session, select
 from database import engine
-from models import Product, Order, User, VendorListing, Message
+from models import Product, Order, User, Post, Message
 from routes import router
 
 app = FastAPI(title="Dropshipping API with Postgres", version="0.3.0")

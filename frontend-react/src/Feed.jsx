@@ -11,7 +11,7 @@ export default function Feed() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/listings/feed`)
+    fetch(`${API_BASE}/posts/feed`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to load feed');
         return res.json();
@@ -87,29 +87,37 @@ export default function Feed() {
                   <img src={post.user_avatar} alt={post.username} className="w-10 h-10 rounded-full object-cover border border-slate-200 bg-slate-100" />
                   <div>
                     <div className="font-bold text-slate-900 leading-none">@{post.username}</div>
-                    <div className="text-xs text-slate-400 mt-1 font-medium">
+                    <div className="text-xs text-slate-400 mt-1 font-medium flex items-center gap-2">
                       {post.created_at ? new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                      {post.post_type === 'vendor_drop' && <span className="text-[9px] font-black bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded uppercase">Drop</span>}
                     </div>
                   </div>
                 </Link>
-                <div className="text-2xl font-black text-slate-900">
-                  ${post.price.toFixed(2)}
-                </div>
+                {post.post_type === 'vendor_drop' && post.price && (
+                  <div className="text-2xl font-black text-emerald-600">
+                    ${post.price.toFixed(2)}
+                  </div>
+                )}
               </div>
 
-              {/* Post Image */}
-              <div className="w-full bg-slate-50 flex items-center justify-center p-6 border-b border-slate-100">
-                <img src={post.image_url} alt={post.title} className="max-h-96 w-full object-contain rounded-xl mix-blend-multiply" />
-              </div>
+              {/* Conditional Image */}
+              {post.post_type !== 'text' && post.image_url && (
+                <div className="w-full bg-slate-50 flex items-center justify-center p-6 border-b border-slate-100">
+                  <img src={post.image_url} alt="Post media" className="max-h-96 w-full object-contain rounded-xl mix-blend-multiply" />
+                </div>
+              )}
 
               {/* Post Body */}
               <div className="p-5">
-                <h2 className="text-lg font-bold text-slate-900 mb-2">{post.title}</h2>
-                <p className="text-slate-600 text-sm leading-relaxed mb-4">{post.description}</p>
+                {post.post_type === 'vendor_drop' && post.title && (
+                  <h2 className="text-lg font-black text-slate-900 mb-2 uppercase tracking-wide">{post.title}</h2>
+                )}
                 
-                <div className="flex gap-3 mt-4">
-                  <Link to="/inbox" className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 rounded-xl shadow-sm transition-all border border-slate-300 flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
-                    <i className="fa-solid fa-envelope"></i> Message Vendor
+                <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap">{post.description}</p>
+                
+                <div className="flex gap-3 mt-4 pt-4 border-t border-slate-100">
+                  <Link to="/inbox" className="flex-1 bg-slate-50 hover:bg-slate-100 text-cyan-700 font-bold py-2 rounded-xl transition-all border border-slate-200 flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
+                    <i className="fa-solid fa-envelope"></i> Message @{post.username}
                   </Link>
                 </div>
               </div>

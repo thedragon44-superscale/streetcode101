@@ -21,8 +21,9 @@ export default function Profile() {
   const [newBio, setNewBio] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
-  // New Listing State
+  // New Post State
   const [showListingForm, setShowListingForm] = useState(false);
+  const [postType, setPostType] = useState('text'); // 'text', 'image', 'vendor_drop'
   const [listingTitle, setListingTitle] = useState('');
   const [listingDesc, setListingDesc] = useState('');
   const [listingPrice, setListingPrice] = useState('');
@@ -51,7 +52,7 @@ export default function Profile() {
         setNewBio(data.bio || '');
         
         // Once we know the actual username, fetch their wall listings!
-        return fetch(`${API_BASE}/profile/${data.username}/listings`);
+        return fetch(`${API_BASE}/posts/user/${data.username}`);
       })
       .then((res) => res.json())
       .then((listingsData) => {
@@ -115,13 +116,20 @@ export default function Profile() {
     setIsSubmittingListing(true);
     
     const formData = new FormData();
-    formData.append('title', listingTitle);
+    formData.append('post_type', postType);
     formData.append('description', listingDesc);
-    formData.append('price', listingPrice);
-    if (listingFile) formData.append('file', listingFile);
+    
+    if (postType === 'vendor_drop') {
+      formData.append('title', listingTitle);
+      formData.append('price', listingPrice);
+    }
+    
+    if (listingFile && postType !== 'text') {
+      formData.append('file', listingFile);
+    }
 
     try {
-      const response = await fetch(`${API_BASE}/profile/me/listings`, {
+      const response = await fetch(`${API_BASE}/posts`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -240,63 +248,88 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Vendor Listings Wall */}
+        {/* User Timeline */}
         <div>
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-black text-slate-900 uppercase tracking-wide">Vendor Listings</h2>
+            <h2 className="text-xl font-black text-slate-900 uppercase tracking-wide">Timeline</h2>
             {isMyProfile && profile.username !== 'admin' && (
               <button 
                 onClick={() => setShowListingForm(!showListingForm)}
                 className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition active:scale-95"
               >
-                {showListingForm ? 'Cancel' : '+ New Listing'}
+                {showListingForm ? 'Cancel' : '+ New Post'}
               </button>
             )}
           </div>
 
-          {/* New Listing Form */}
+          {/* New Post Form */}
           {showListingForm && (
             <form onSubmit={handleCreateListing} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 mb-8 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Item Title</label>
-                <input required type="text" value={listingTitle} onChange={(e)=>setListingTitle(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium" placeholder="e.g. Mechanical Keyboard" />
+              
+              <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-xl">
+                <button type="button" onClick={() => setPostType('text')} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${postType === 'text' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Text</button>
+                <button type="button" onClick={() => setPostType('image')} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${postType === 'image' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Image</button>
+                <button type="button" onClick={() => setPostType('vendor_drop')} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${postType === 'vendor_drop' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Vendor Drop</button>
               </div>
+
+              {postType === 'vendor_drop' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Item Title</label>
+                    <input required type="text" value={listingTitle} onChange={(e)=>setListingTitle(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium" placeholder="e.g. Mechanical Keyboard" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Price ($)</label>
+                    <input required type="number" min="1" step="0.01" value={listingPrice} onChange={(e)=>setListingPrice(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium" placeholder="45.00" />
+                  </div>
+                </>
+              )}
+
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Price ($)</label>
-                <input required type="number" min="1" step="0.01" value={listingPrice} onChange={(e)=>setListingPrice(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium" placeholder="45.00" />
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{postType === 'text' ? 'What\'s on your mind?' : 'Description'}</label>
+                <textarea required value={listingDesc} onChange={(e)=>setListingDesc(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium" rows="3" placeholder="..." />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
-                <textarea required value={listingDesc} onChange={(e)=>setListingDesc(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium" rows="3" placeholder="Condition, specs, etc." />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Product Photo</label>
-                <input type="file" accept="image/*" onChange={(e)=>setListingFile(e.target.files[0])} className="w-full p-2 border border-slate-300 rounded-xl text-sm font-medium bg-slate-50" />
-              </div>
+
+              {postType !== 'text' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Photo Upload</label>
+                  <input required={postType === 'image'} type="file" accept="image/*" onChange={(e)=>setListingFile(e.target.files[0])} className="w-full p-2 border border-slate-300 rounded-xl text-sm font-medium bg-slate-50" />
+                </div>
+              )}
+
               <button disabled={isSubmittingListing} type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl shadow-md transition disabled:opacity-50 active:scale-95">
-                {isSubmittingListing ? 'Uploading...' : 'Post to Wall'}
+                {isSubmittingListing ? 'Posting...' : 'Post to Timeline'}
               </button>
             </form>
           )}
 
-          {/* Feed of Listings */}
+          {/* User's Timeline */}
           <div className="space-y-4">
             {listings.length === 0 ? (
               <div className="text-center p-10 bg-white rounded-3xl border border-slate-200 border-dashed text-slate-500 font-medium shadow-sm">
-                No items listed yet.
+                No posts yet.
               </div>
             ) : (
               listings.map(item => (
-                <div key={item.id} className="bg-white rounded-3xl p-4 shadow-sm border border-slate-200 flex flex-col sm:flex-row gap-4 hover:shadow-md transition">
-                  <img src={item.image_url} alt={item.title} className="w-full sm:w-32 h-32 object-cover rounded-2xl bg-slate-50 border border-slate-100 flex-shrink-0" />
-                  <div className="flex flex-col flex-1 min-w-0">
-                    <div className="flex justify-between items-start mb-1">
-                      <h3 className="font-bold text-slate-900 truncate pr-4">{item.title}</h3>
-                      <span className="text-xl font-black text-emerald-600">${item.price.toFixed(2)}</span>
-                    </div>
-                    <p className="text-sm text-slate-500 line-clamp-2 mb-3 leading-relaxed font-medium">{item.description}</p>
-                    <div className="mt-auto text-xs text-slate-400 font-bold uppercase tracking-wider">
-                      Posted on {new Date(item.created_at).toLocaleDateString()}
+                <div key={item.id} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 hover:shadow-md transition">
+                  <div className="flex flex-col sm:flex-row gap-5">
+                    {item.post_type !== 'text' && item.image_url && (
+                      <img src={item.image_url} alt="Post media" className="w-full sm:w-32 h-32 object-cover rounded-2xl bg-slate-50 border border-slate-100 flex-shrink-0" />
+                    )}
+                    <div className="flex flex-col flex-1 min-w-0">
+                      {item.post_type === 'vendor_drop' && item.title && (
+                        <div className="flex justify-between items-start mb-1">
+                          <h3 className="font-bold text-slate-900 truncate pr-4 uppercase tracking-wide">{item.title}</h3>
+                          {item.price && <span className="text-lg font-black text-emerald-600">${item.price.toFixed(2)}</span>}
+                        </div>
+                      )}
+                      <p className={`text-slate-800 line-clamp-3 mb-3 whitespace-pre-wrap ${item.post_type === 'text' ? 'text-base font-medium' : 'text-sm font-medium'}`}>
+                        {item.description}
+                      </p>
+                      <div className="mt-auto flex items-center justify-between text-xs text-slate-400 font-bold uppercase tracking-wider">
+                        <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                        {item.post_type === 'vendor_drop' && <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded">Drop</span>}
+                      </div>
                     </div>
                   </div>
                 </div>
