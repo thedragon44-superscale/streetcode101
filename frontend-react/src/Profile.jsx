@@ -30,8 +30,60 @@ export default function Profile() {
   const [listingFile, setListingFile] = useState(null);
   const [isSubmittingListing, setIsSubmittingListing] = useState(false);
 
+  // Comment Section State
+  const [activeCommentPostId, setActiveCommentPostId] = useState(null);
+  const [postComments, setPostComments] = useState([]);
+  const [commentInput, setCommentInput] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
   const token = localStorage.getItem('pidrop_token');
   const isMyProfile = username === 'me';
+
+  const handleToggleComments = async (postId) => {
+    if (activeCommentPostId === postId) {
+      setActiveCommentPostId(null);
+      return;
+    }
+    setActiveCommentPostId(postId);
+    setPostComments([]); 
+    try {
+      const res = await fetch(`${API_BASE}/posts/${postId}/comments`);
+      if (res.ok) {
+        const data = await res.json();
+        setPostComments(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePostComment = async (e, postId) => {
+    e.preventDefault();
+    if (!token) return toast.error('You must be logged in to comment!');
+    if (!commentInput.trim()) return;
+
+    setIsSubmittingComment(true);
+    try {
+      const res = await fetch(`${API_BASE}/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: commentInput })
+      });
+      if (!res.ok) throw new Error('Failed to post comment');
+      const newComment = await res.json();
+      
+      setPostComments([...postComments, newComment]);
+      setCommentInput('');
+      
+      setListings(prev => prev.map(p => 
+        p.id === postId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p
+      ));
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
 
   useEffect(() => {
     if (isMyProfile && !token) {
@@ -156,6 +208,27 @@ export default function Profile() {
     localStorage.removeItem('pidrop_token');
     clearCart();
     navigate('/login');
+  };
+
+  const handleLike = async (postId) => {
+    if (!token) return toast.error('You must be logged in to like drops!');
+    try {
+      const res = await fetch(`${API_BASE}/posts/${postId}/like`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to like post');
+      const data = await res.json();
+      
+      setListings(prev => prev.map(p => {
+        if (p.id === postId) {
+          return { ...p, likes_count: data.liked ? (p.likes_count || 0) + 1 : (p.likes_count || 1) - 1 };
+        }
+        return p;
+      }));
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
   // --- SKELETON LOADER ---
@@ -326,10 +399,55 @@ export default function Profile() {
                       <p className={`text-slate-800 line-clamp-3 mb-3 whitespace-pre-wrap ${item.post_type === 'text' ? 'text-base font-medium' : 'text-sm font-medium'}`}>
                         {item.description}
                       </p>
-                      <div className="mt-auto flex items-center justify-between text-xs text-slate-400 font-bold uppercase tracking-wider">
-                        <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                        {item.post_type === 'vendor_drop' && <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded">Drop</span>}
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <div className="flex gap-4">
+                          <button onClick={() => handleLike(item.id)} className="flex items-center gap-1.5 text-slate-500 hover:text-orange-500 transition-colors text-sm font-bold active:scale-90">
+                            <i className="fa-solid fa-heart"></i> {item.likes_count || 0}
+                          </button>
+                          <button onClick={() => handleToggleComments(item.id)} className={`flex items-center gap-1.5 transition-colors text-sm font-bold ${activeCommentPostId === item.id ? 'text-cyan-600' : 'text-slate-500 hover:text-cyan-600'}`}>
+                            <i className="fa-solid fa-comment"></i> {item.comments_count || 0}
+                          </button>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-2">
+                          <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                          {item.post_type === 'vendor_drop' && <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">Drop</span>}
+                        </div>
                       </div>
+                      
+                      {/* Expandable Comment Section */}
+                      {activeCommentPostId === item.id && (
+                        <div className="mt-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                          <div className="max-h-40 overflow-y-auto space-y-2 mb-3 pr-2">
+                            {postComments.length === 0 ? (
+                              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center py-2">No comments yet.</div>
+                            ) : (
+                              postComments.map((c) => (
+                                <div key={c.id} className="bg-white p-2.5 rounded-xl shadow-sm border border-slate-100">
+                                  <div className="flex justify-between items-center mb-0.5">
+                                    <span className="text-[10px] font-black text-slate-900">@{c.username}</span>
+                                    <span className="text-[9px] text-slate-400 font-bold">{new Date(c.created_at).toLocaleDateString()}</span>
+                                  </div>
+                                  <p className="text-xs text-slate-700 font-medium">{c.text}</p>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                          <form onSubmit={(e) => handlePostComment(e, item.id)} className="flex gap-2">
+                            <input 
+                              type="text" 
+                              placeholder="Reply..." 
+                              value={commentInput} 
+                              onChange={(e) => setCommentInput(e.target.value)}
+                              className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 font-medium"
+                              required
+                            />
+                            <button disabled={isSubmittingComment} type="submit" className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-800 disabled:opacity-50 transition-all shadow-sm">
+                              Post
+                            </button>
+                          </form>
+                        </div>
+                      )}
+
                     </div>
                   </div>
                 </div>

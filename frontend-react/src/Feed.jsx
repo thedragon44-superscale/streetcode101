@@ -10,6 +10,59 @@ export default function Feed() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Comment Section State
+  const [activeCommentPostId, setActiveCommentPostId] = useState(null);
+  const [postComments, setPostComments] = useState([]);
+  const [commentInput, setCommentInput] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
+  const handleToggleComments = async (postId) => {
+    if (activeCommentPostId === postId) {
+      setActiveCommentPostId(null);
+      return;
+    }
+    setActiveCommentPostId(postId);
+    setPostComments([]); 
+    try {
+      const res = await fetch(`${API_BASE}/posts/${postId}/comments`);
+      if (res.ok) {
+        const data = await res.json();
+        setPostComments(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePostComment = async (e, postId) => {
+    e.preventDefault();
+    const token = localStorage.getItem('pidrop_token');
+    if (!token) return toast.error('You must be logged in to comment!');
+    if (!commentInput.trim()) return;
+
+    setIsSubmittingComment(true);
+    try {
+      const res = await fetch(`${API_BASE}/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: commentInput })
+      });
+      if (!res.ok) throw new Error('Failed to post comment');
+      const newComment = await res.json();
+      
+      setPostComments([...postComments, newComment]);
+      setCommentInput('');
+      
+      setFeed(prevFeed => prevFeed.map(p => 
+        p.id === postId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p
+      ));
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
   useEffect(() => {
     fetch(`${API_BASE}/posts/feed`)
       .then(res => {
@@ -25,6 +78,30 @@ export default function Feed() {
         setLoading(false);
       });
   }, []);
+
+  const handleLike = async (postId) => {
+    const token = localStorage.getItem('pidrop_token');
+    if (!token) return toast.error('You must be logged in to like drops!');
+    
+    try {
+      const res = await fetch(`${API_BASE}/posts/${postId}/like`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to like post');
+      const data = await res.json();
+      
+      // Instantly update the UI so it feels lightning fast
+      setFeed(prevFeed => prevFeed.map(p => {
+        if (p.id === postId) {
+          return { ...p, likes_count: data.liked ? (p.likes_count || 0) + 1 : (p.likes_count || 1) - 1 };
+        }
+        return p;
+      }));
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
 
   // --- SKELETON LOADER ---
   if (loading) return (
@@ -115,12 +192,55 @@ export default function Feed() {
                 
                 <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap">{post.description}</p>
                 
-                <div className="flex gap-3 mt-4 pt-4 border-t border-slate-100">
-                  <Link to="/inbox" className="flex-1 bg-slate-50 hover:bg-slate-100 text-cyan-700 font-bold py-2 rounded-xl transition-all border border-slate-200 flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
-                    <i className="fa-solid fa-envelope"></i> Message @{post.username}
+                {/* Engagement Bar */}
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+                  <div className="flex gap-4">
+                    <button onClick={() => handleLike(post.id)} className="flex items-center gap-1.5 text-slate-500 hover:text-orange-500 transition-colors text-sm font-bold active:scale-90">
+                      <i className="fa-solid fa-heart"></i> {post.likes_count || 0}
+                    </button>
+                    <button onClick={() => handleToggleComments(post.id)} className={`flex items-center gap-1.5 transition-colors text-sm font-bold ${activeCommentPostId === post.id ? 'text-cyan-600' : 'text-slate-500 hover:text-cyan-600'}`}>
+                      <i className="fa-solid fa-comment"></i> {post.comments_count || 0}
+                    </button>
+                  </div>
+                  <Link to={`/chat/${post.username}`} className="text-slate-400 hover:text-cyan-700 font-bold transition-all flex items-center gap-1.5 text-[10px] uppercase tracking-widest">
+                    <i className="fa-solid fa-paper-plane"></i> Message
                   </Link>
                 </div>
               </div>
+
+              {/* Expandable Comment Section */}
+              {activeCommentPostId === post.id && (
+                <div className="bg-slate-50 p-5 border-t border-slate-200">
+                  <div className="max-h-48 overflow-y-auto space-y-3 mb-4 pr-2">
+                    {postComments.length === 0 ? (
+                      <div className="text-xs text-slate-400 font-bold uppercase tracking-wider text-center py-4">No comments yet.</div>
+                    ) : (
+                      postComments.map((c) => (
+                        <div key={c.id} className="bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-xs font-black text-slate-900">@{c.username}</span>
+                            <span className="text-[10px] text-slate-400 font-bold">{new Date(c.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <p className="text-sm text-slate-700 font-medium">{c.text}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <form onSubmit={(e) => handlePostComment(e, post.id)} className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="Add a comment..." 
+                      value={commentInput} 
+                      onChange={(e) => setCommentInput(e.target.value)}
+                      className="flex-1 px-4 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 font-medium"
+                      required
+                    />
+                    <button disabled={isSubmittingComment} type="submit" className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 disabled:opacity-50 transition-all shadow-sm">
+                      Post
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
           ))}
         </div>

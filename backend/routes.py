@@ -645,6 +645,9 @@ def upload_profile_image(file: UploadFile = File(...), session: Session = Depend
     except Exception as e:
         print(f"\n❌ AVATAR UPLOAD CRASHED: {str(e)}\n")
         raise HTTPException(status_code=500, detail=f"Failed to upload avatar: {str(e)}")
+class CommentCreate(BaseModel):
+    text: str
+
 @router.post("/api/posts")
 def create_social_post(
     post_type: str = Form(...),
@@ -690,14 +693,33 @@ def create_social_post(
 
 @router.get("/api/posts/user/{target_username}")
 def get_user_posts(target_username: str, session: Session = Depends(get_session)):
-    """Fetches a specific user's wall."""
-    return session.exec(
+    """Fetches a specific user's wall with engagement metrics."""
+    posts = session.exec(
         select(Post).where(Post.username == target_username).order_by(Post.id.desc())
     ).all()
+    
+    wall = []
+    for p in posts:
+        like_count = len(session.exec(select(Like).where(Like.post_id == p.id)).all())
+        comment_count = len(session.exec(select(Comment).where(Comment.post_id == p.id)).all())
+        
+        wall.append({
+            "id": p.id,
+            "username": p.username,
+            "post_type": p.post_type,
+            "title": p.title,
+            "description": p.description,
+            "price": p.price,
+            "image_url": p.image_url,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "likes_count": like_count,
+            "comments_count": comment_count
+        })
+    return wall
 
 @router.get("/api/posts/feed")
 def get_global_feed(session: Session = Depends(get_session)):
-    """Fetches the global timeline with user avatars."""
+    """Fetches the global timeline with user avatars and engagement metrics."""
     posts = session.exec(select(Post).order_by(Post.id.desc())).all()
     feed = []
     
@@ -709,6 +731,9 @@ def get_global_feed(session: Session = Depends(get_session)):
         elif user:
             avatar = user.profile_image_url
             
+        like_count = len(session.exec(select(Like).where(Like.post_id == p.id)).all())
+        comment_count = len(session.exec(select(Comment).where(Comment.post_id == p.id)).all())
+            
         feed.append({
             "id": p.id,
             "username": p.username,
@@ -718,7 +743,9 @@ def get_global_feed(session: Session = Depends(get_session)):
             "price": p.price,
             "image_url": p.image_url,
             "created_at": p.created_at.isoformat() if p.created_at else None,
-            "user_avatar": avatar
+            "user_avatar": avatar,
+            "likes_count": like_count,
+            "comments_count": comment_count
         })
         
     return feed
@@ -738,6 +765,47 @@ def delete_post(id: int, session: Session = Depends(get_session), token: dict = 
     session.delete(post)
     session.commit()
     return {"message": "Post permanently removed."}
+
+# --- NEW ENGAGEMENT ENDPOINTS ---
+
+@router.post("/api/posts/{post_id}/like")
+def toggle_like(post_id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Toggles a like on or off for the current user."""
+    username = token.get("sub")
+    post = session.get(Post, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    existing_like = session.exec(select(Like).where((Like.post_id == post_id) & (Like.username == username))).first()
+    
+    if existing_like:
+        session.delete(existing_like)
+        session.commit()
+        return {"message": "Unliked", "liked": False}
+    else:
+        new_like = Like(post_id=post_id, username=username)
+        session.add(new_like)
+        session.commit()
+        return {"message": "Liked", "liked": True}
+
+@router.get("/api/posts/{post_id}/comments")
+def get_comments(post_id: int, session: Session = Depends(get_session)):
+    """Fetches all comments for a specific post."""
+    return session.exec(select(Comment).where(Comment.post_id == post_id).order_by(Comment.created_at.asc())).all()
+
+@router.post("/api/posts/{post_id}/comments")
+def add_comment(post_id: int, payload: CommentCreate, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Posts a new comment."""
+    username = token.get("sub")
+    post = session.get(Post, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+        
+    new_comment = Comment(post_id=post_id, username=username, text=payload.text)
+    session.add(new_comment)
+    session.commit()
+    session.refresh(new_comment)
+    return new_comment
 
 class CJSyncRequest(BaseModel):
     sku: str
