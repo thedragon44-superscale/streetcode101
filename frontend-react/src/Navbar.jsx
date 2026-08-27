@@ -14,6 +14,21 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
   const [currentUser, setCurrentUser] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // State for the new Global Search Engine
+  const [globalResults, setGlobalResults] = useState({ products: [], users: [] });
+  
+  // Fetch global search results from backend dynamically
+  useEffect(() => {
+    if (searchQuery && searchQuery.trim().length > 0) {
+      fetch(`${API_BASE}/search?q=${encodeURIComponent(searchQuery)}`)
+        .then(res => res.ok ? res.json() : { products: [], users: [] })
+        .then(data => setGlobalResults(data))
+        .catch(err => console.error("Search failed:", err));
+    } else {
+      setGlobalResults({ products: [], users: [] });
+    }
+  }, [searchQuery]);
+  
   // To highlight the active tab on the mobile bottom nav
   const location = useLocation();
   const isActive = (path) => location.pathname === path;
@@ -175,22 +190,51 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
                 {/* Auto-fill Search Dropdown */}
                 {searchQuery.trim().length > 0 && (
-                  <div className="absolute top-[110%] left-0 right-0 bg-slate-950 rounded-xl shadow-[0_30px_60px_rgba(0,0,0,0.9)] border border-slate-700 overflow-hidden z-[99999] flex flex-col">
-                    {searchResults.slice(0, 6).map(item => (
-                      <Link 
-                        key={item.sku} 
-                        to={`/product/${item.sku}`}
-                        onClick={() => setSearchQuery('')}
-                        className="flex items-center gap-4 p-3 bg-slate-950 hover:bg-slate-800 border-b border-slate-800/50 last:border-0 transition-colors text-left group"
-                      >
-                        <img src={item.image_url} alt={item.title} className="w-12 h-12 object-cover rounded-md bg-slate-900 border border-slate-800 shadow-sm relative z-10" />
-                        <div className="flex-1 overflow-hidden relative z-10">
-                          <h4 className="text-sm font-bold text-slate-100 truncate group-hover:text-orange-500 transition-colors">{item.title}</h4>
-                          <p className="text-xs text-blue-400 font-mono mt-0.5">${item.price.toFixed(2)}</p>
-                        </div>
-                      </Link>
-                    ))}
-                    {searchResults.length === 0 && (
+                  <div className="absolute top-[110%] left-0 right-0 bg-slate-950 rounded-xl shadow-[0_30px_60px_rgba(0,0,0,0.9)] border border-slate-700 overflow-hidden z-[99999] flex flex-col max-h-[70vh] overflow-y-auto">
+                    
+                    {/* Community Members Section */}
+                    {globalResults.users.length > 0 && (
+                      <div className="border-b border-slate-800/50">
+                        <div className="px-4 py-2 bg-slate-900 text-[10px] font-black text-cyan-500 uppercase tracking-widest">Community Members</div>
+                        {globalResults.users.slice(0, 4).map(user => (
+                          <Link 
+                            key={user.username} 
+                            to={`/profile/${user.username}`}
+                            onClick={() => setSearchQuery('')}
+                            className="flex items-center gap-4 p-3 bg-slate-950 hover:bg-slate-800 border-b border-slate-800/50 last:border-0 transition-colors text-left group"
+                          >
+                            <img src={user.profile_image_url} alt={user.username} className="w-10 h-10 object-cover rounded-full bg-slate-900 border border-slate-700 shadow-sm" />
+                            <div className="flex-1 overflow-hidden">
+                              <h4 className="text-sm font-bold text-slate-100 truncate group-hover:text-cyan-400 transition-colors">@{user.username}</h4>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Vault Drops Section */}
+                    {globalResults.products.length > 0 && (
+                      <div>
+                        <div className="px-4 py-2 bg-slate-900 text-[10px] font-black text-orange-500 uppercase tracking-widest">Vault Drops</div>
+                        {globalResults.products.slice(0, 6).map(item => (
+                          <Link 
+                            key={item.sku} 
+                            to={`/product/${item.sku}`}
+                            onClick={() => setSearchQuery('')}
+                            className="flex items-center gap-4 p-3 bg-slate-950 hover:bg-slate-800 border-b border-slate-800/50 last:border-0 transition-colors text-left group"
+                          >
+                            <img src={item.image_url} alt={item.title} className="w-12 h-12 object-cover rounded-md bg-slate-900 border border-slate-800 shadow-sm" />
+                            <div className="flex-1 overflow-hidden">
+                              <h4 className="text-sm font-bold text-slate-100 truncate group-hover:text-orange-500 transition-colors">{item.title}</h4>
+                              <p className="text-xs text-blue-400 font-mono mt-0.5">${item.price.toFixed(2)}</p>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* No Results Fallback */}
+                    {globalResults.users.length === 0 && globalResults.products.length === 0 && (
                       <div className="p-4 bg-slate-950 text-center text-slate-500 font-mono text-xs">NO RESULTS FOUND</div>
                     )}
                   </div>

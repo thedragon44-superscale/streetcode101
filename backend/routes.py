@@ -217,6 +217,40 @@ def get_catalog(session: Session = Depends(get_session)):
     """Fetches the catalog directly from PostgreSQL."""
     return session.exec(select(Product)).all()
 
+@router.get("/api/search")
+def global_search(q: str, session: Session = Depends(get_session)):
+    """Searches both the Product catalog and the User roster."""
+    if not q or len(q.strip()) < 1:
+        return {"products": [], "users": []}
+        
+    search_term = f"%{q.strip()}%"
+    
+    # 1. Search Products (matching title or description)
+    # Using .ilike() for case-insensitive matching
+    products = session.exec(
+        select(Product).where(
+            Product.title.ilike(search_term) | Product.description.ilike(search_term)
+        ).limit(10)
+    ).all()
+    
+    # 2. Search Users (matching username)
+    users = session.exec(
+        select(User).where(
+            User.username.ilike(search_term)
+        ).limit(10)
+    ).all()
+    
+    # Strip out sensitive data (like passwords/emails) before sending users to the frontend
+    safe_users = [
+        {"username": u.username, "profile_image_url": u.profile_image_url} 
+        for u in users
+    ]
+    
+    return {
+        "products": products,
+        "users": safe_users
+    }
+
 @router.post("/api/products")
 def create_product(
     sku: str = Form(...),
