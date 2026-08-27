@@ -36,6 +36,10 @@ export default function Profile() {
   const [commentInput, setCommentInput] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
+  // Edit Post State
+  const [editingPostId, setEditingPostId] = useState(null);
+  const [editPayload, setEditPayload] = useState({ title: '', description: '', price: '' });
+
   const token = localStorage.getItem('pidrop_token');
   const isMyProfile = username === 'me';
 
@@ -208,6 +212,49 @@ export default function Profile() {
     localStorage.removeItem('pidrop_token');
     clearCart();
     navigate('/login');
+  };
+
+  const handleDeleteMyPost = async (id) => {
+    if (!window.confirm("Are you sure you want to permanently delete this post?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/posts/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to delete post');
+      setListings(prev => prev.filter(p => p.id !== id));
+      toast.success('Post deleted successfully');
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleEditSubmit = async (e, id) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE}/posts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editPayload.title || null,
+          description: editPayload.description || null,
+          price: editPayload.price ? parseFloat(editPayload.price) : null
+        })
+      });
+      if (!res.ok) throw new Error('Failed to edit post');
+      
+      setListings(prev => prev.map(p => p.id === id ? { 
+        ...p, 
+        title: editPayload.title, 
+        description: editPayload.description, 
+        price: editPayload.price ? parseFloat(editPayload.price) : p.price 
+      } : p));
+      
+      setEditingPostId(null);
+      toast.success('Post updated!');
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
   const handleLike = async (postId) => {
@@ -384,21 +431,58 @@ export default function Profile() {
               </div>
             ) : (
               listings.map(item => (
-                <div key={item.id} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 hover:shadow-md transition">
+                <div key={item.id} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 hover:shadow-md transition group relative">
+                  
+                  {/* Floating Action Menu (Only visible on your own profile) */}
+                  {isMyProfile && profile?.username !== 'admin' && (
+                    <div className="absolute top-4 right-4 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-white p-1 rounded-lg shadow-sm border border-slate-100 z-10">
+                      <button onClick={() => {
+                        setEditingPostId(item.id);
+                        setEditPayload({ title: item.title || '', description: item.description || '', price: item.price || '' });
+                      }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-md transition-colors" title="Edit Post">
+                        <i className="fa-solid fa-pen"></i>
+                      </button>
+                      <button onClick={() => handleDeleteMyPost(item.id)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors" title="Delete Post">
+                        <i className="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex flex-col sm:flex-row gap-5">
                     {item.post_type !== 'text' && item.image_url && (
                       <img src={item.image_url} alt="Post media" className="w-full sm:w-32 h-32 object-cover rounded-2xl bg-slate-50 border border-slate-100 flex-shrink-0" />
                     )}
                     <div className="flex flex-col flex-1 min-w-0">
-                      {item.post_type === 'vendor_drop' && item.title && (
-                        <div className="flex justify-between items-start mb-1">
-                          <h3 className="font-bold text-slate-900 truncate pr-4 uppercase tracking-wide">{item.title}</h3>
-                          {item.price && <span className="text-lg font-black text-emerald-600">${item.price.toFixed(2)}</span>}
-                        </div>
+                      
+                      {/* Editing View vs Normal View */}
+                      {editingPostId === item.id ? (
+                        <form onSubmit={(e) => handleEditSubmit(e, item.id)} className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-2">
+                          {item.post_type === 'vendor_drop' && (
+                            <div className="flex gap-2">
+                              <input type="text" value={editPayload.title} onChange={e => setEditPayload({...editPayload, title: e.target.value})} className="flex-1 p-2 rounded-xl text-sm border border-slate-300 focus:ring-2 focus:ring-cyan-500" placeholder="Title" required />
+                              <input type="number" step="0.01" value={editPayload.price} onChange={e => setEditPayload({...editPayload, price: e.target.value})} className="w-24 p-2 rounded-xl text-sm border border-slate-300 focus:ring-2 focus:ring-cyan-500" placeholder="Price" required />
+                            </div>
+                          )}
+                          <textarea value={editPayload.description} onChange={e => setEditPayload({...editPayload, description: e.target.value})} className="w-full p-3 rounded-xl text-sm border border-slate-300 focus:ring-2 focus:ring-cyan-500" rows="3" required></textarea>
+                          <div className="flex gap-2">
+                            <button type="submit" className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-600 shadow-sm active:scale-95">Save Changes</button>
+                            <button type="button" onClick={() => setEditingPostId(null)} className="bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-300 active:scale-95">Cancel</button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          {item.post_type === 'vendor_drop' && item.title && (
+                            <div className="flex justify-between items-start mb-1 pr-16">
+                              <h3 className="font-bold text-slate-900 truncate uppercase tracking-wide">{item.title}</h3>
+                              {item.price && <span className="text-lg font-black text-emerald-600">${item.price.toFixed(2)}</span>}
+                            </div>
+                          )}
+                          <p className={`text-slate-800 mb-3 whitespace-pre-wrap pr-4 sm:pr-16 ${item.post_type === 'text' ? 'text-base font-medium' : 'text-sm font-medium'}`}>
+                            {item.description}
+                          </p>
+                        </>
                       )}
-                      <p className={`text-slate-800 line-clamp-3 mb-3 whitespace-pre-wrap ${item.post_type === 'text' ? 'text-base font-medium' : 'text-sm font-medium'}`}>
-                        {item.description}
-                      </p>
+
                       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                         <div className="flex gap-4">
                           <button onClick={() => handleLike(item.id)} className="flex items-center gap-1.5 text-slate-500 hover:text-orange-500 transition-colors text-sm font-bold active:scale-90">

@@ -766,6 +766,35 @@ def delete_post(id: int, session: Session = Depends(get_session), token: dict = 
     session.commit()
     return {"message": "Post permanently removed."}
 
+class PostEditRequest(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    price: float | None = None
+
+@router.patch("/api/posts/{id}")
+def edit_post(id: int, payload: PostEditRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Allows the author to edit their own post."""
+    username = token.get("sub")
+    post = session.get(Post, id)
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+        
+    if post.username != username:
+        raise HTTPException(status_code=403, detail="Unauthorized. You can only edit your own posts.")
+        
+    if payload.title is not None:
+        post.title = payload.title
+    if payload.description is not None:
+        post.description = payload.description
+    if payload.price is not None:
+        post.price = payload.price
+        
+    session.add(post)
+    session.commit()
+    session.refresh(post)
+    return {"message": "Post updated successfully", "post": post}
+
 # --- NEW ENGAGEMENT ENDPOINTS ---
 
 @router.post("/api/posts/{post_id}/like")

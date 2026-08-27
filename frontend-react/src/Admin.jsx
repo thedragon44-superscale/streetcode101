@@ -45,7 +45,7 @@ export default function Admin() {
       const [ordersRes, productsRes, feedRes, promosRes, usersRes] = await Promise.all([
         fetch(`${API_BASE}/orders`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${API_BASE}/products`),
-        fetch(`${API_BASE}/listings/feed`),
+        fetch(`${API_BASE}/posts/feed`),
         fetch(`${API_BASE}/admin/promos`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${API_BASE}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
@@ -231,17 +231,34 @@ export default function Admin() {
     } catch (err) { toast.error(err.message); }
   };
 
-  const handleDeleteListing = async (id) => {
-    if (window.confirm(`Delete this user listing?`)) {
-      try {
-        const response = await fetch(`${API_BASE}/admin/listings/${id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error('Failed to delete listing');
-        toast.success(`Listing removed from feed.`);
-        fetchData(); 
-      } catch (err) { toast.error(err.message); }
+  const handleDeletePost = async (id, username, titleOrDesc) => {
+    const reason = window.prompt(`Delete this post by @${username}?\n\nEnter the reason (this will be emailed to the user):`);
+    
+    if (reason === null) return; // Admin clicked Cancel
+    if (reason.trim() === '') return toast.error('You must provide a reason to notify the user.');
+
+    try {
+      // 1. Delete the post
+      const delRes = await fetch(`${API_BASE}/posts/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!delRes.ok) throw new Error('Failed to delete post');
+
+      // 2. Automatically notify the user via the existing admin email endpoint
+      const snippet = titleOrDesc.length > 30 ? titleOrDesc.substring(0, 30) + '...' : titleOrDesc;
+      const emailBody = `Yo @${username},\n\nYour recent post ("${snippet}") was removed from the community timeline by a moderator.\n\nReason: ${reason}\n\nPlease review the community guidelines.`;
+      
+      await fetch(`${API_BASE}/admin/users/${username}/email`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: '⚠️ Post Removed by Moderator', body: emailBody })
+      });
+
+      toast.success(`Post deleted and @${username} was notified.`);
+      fetchData(); 
+    } catch (err) { 
+      toast.error(err.message); 
     }
   };
 
@@ -523,7 +540,7 @@ export default function Admin() {
           <div className="animate-fade-in">
             <header className="mb-8">
               <h1 className="text-3xl font-black text-slate-900">Feed Moderation</h1>
-              <p className="text-slate-500 mt-1 font-medium">Monitor and remove peer-to-peer vendor listings.</p>
+              <p className="text-slate-500 mt-1 font-medium">Monitor and remove posts from the community timeline.</p>
             </header>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -531,8 +548,8 @@ export default function Admin() {
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
                   <tr>
                     <th className="px-6 py-5">User</th>
-                    <th className="px-6 py-5">Listing Details</th>
-                    <th className="px-6 py-5">Price</th>
+                    <th className="px-6 py-5">Post Type</th>
+                    <th className="px-6 py-5">Content Snapshot</th>
                     <th className="px-6 py-5 text-right">Kill Switch</th>
                   </tr>
                 </thead>
@@ -541,22 +558,28 @@ export default function Admin() {
                     <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <img src={item.user_avatar} alt={item.username} className="w-8 h-8 rounded-full border border-slate-200" />
+                          <img src={item.user_avatar} alt={item.username} className="w-8 h-8 rounded-full border border-slate-200 object-cover" />
                           <span className="font-bold text-slate-900">@{item.username}</span>
                         </div>
                       </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${item.post_type === 'vendor_drop' ? 'bg-orange-100 text-orange-700' : item.post_type === 'image' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-700'}`}>
+                          {item.post_type.replace('_', ' ')}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 flex items-center gap-4">
-                        <img src={item.image_url} alt={item.title} className="w-12 h-12 rounded-lg object-cover border border-slate-200 bg-slate-100" />
-                        <div>
-                          <div className="font-bold text-slate-900 text-base">{item.title}</div>
+                        {item.post_type !== 'text' && item.image_url && (
+                          <img src={item.image_url} alt="Post media" className="w-10 h-10 rounded-lg object-cover border border-slate-200 bg-slate-100 flex-shrink-0" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          {item.title && <div className="font-bold text-slate-900 text-sm truncate w-48">{item.title}</div>}
                           <div className="text-xs text-slate-500 truncate w-48">{item.description}</div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 font-black text-slate-900 text-base">${item.price.toFixed(2)}</td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end">
-                          <button onClick={() => handleDeleteListing(item.id)} className="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white px-4 py-2 rounded-lg transition-all font-bold text-xs uppercase tracking-wider flex items-center gap-2">
-                            <i className="fa-solid fa-trash"></i> Delete
+                          <button onClick={() => handleDeletePost(item.id, item.username, item.title || item.description)} className="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white px-4 py-2 rounded-lg transition-all font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm">
+                            <i className="fa-solid fa-trash"></i> Delete & Notify
                           </button>
                         </div>
                       </td>
@@ -565,7 +588,7 @@ export default function Admin() {
                 </tbody>
               </table>
               {socialFeed.length === 0 && (
-                <div className="text-center py-20 text-slate-400 font-medium">No user listings currently active.</div>
+                <div className="text-center py-20 text-slate-400 font-medium">No posts currently active in the timeline.</div>
               )}
             </div>
           </div>
