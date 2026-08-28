@@ -291,13 +291,13 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
                           notifications.map(n => (
                             <Link key={n.id} to={`/profile/${n.actor_username}`} onClick={() => setIsNotificationsOpen(false)} className={`p-4 border-b border-slate-800/50 flex gap-3 items-start hover:bg-slate-800 transition-colors ${n.is_read ? 'opacity-50' : 'bg-slate-900/30'}`}>
                               <div className="text-orange-500 mt-0.5 text-sm">
-                                <i className={`fa-solid ${n.action.includes('liked') ? 'fa-heart' : 'fa-comment'}`}></i>
+                                <i className={`fa-solid ${(n.action || '').includes('liked') ? 'fa-heart' : 'fa-comment'}`}></i>
                               </div>
                               <div>
                                 <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                                  <span className="font-bold text-white">@{n.actor_username}</span> {n.action}
+                                  <span className="font-bold text-white">@{n.actor_username}</span> {n.action || 'interacted with your post'}
                                 </p>
-                                <span className="text-[9px] text-slate-500 font-bold uppercase mt-1 block">{new Date(n.created_at).toLocaleDateString()}</span>
+                                <span className="text-[9px] text-slate-500 font-bold uppercase mt-1 block">{n.created_at ? new Date(n.created_at).toLocaleDateString() : 'Just now'}</span>
                               </div>
                             </Link>
                           ))
