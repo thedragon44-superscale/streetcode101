@@ -105,8 +105,8 @@ class ImageUpdate(BaseModel):
 class OrderStatusUpdate(BaseModel):
     status: str
 
-def send_automated_email(to_email: str, subject: str, body: str):
-    """Universal SMTP dispatcher for welcomes, tracking, and alerts."""
+def send_automated_email(to_email: str, subject: str, body: str, html_body: str = None):
+    """Universal SMTP dispatcher for welcomes, tracking, alerts, and HTML marketing."""
     smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
     smtp_port = int(os.getenv("SMTP_PORT", 587))
     smtp_user = os.getenv("SMTP_USER")
@@ -118,7 +118,12 @@ def send_automated_email(to_email: str, subject: str, body: str):
         
     try:
         msg = EmailMessage()
-        msg.set_content(body)
+        msg.set_content(body) # Fallback for plain-text email clients
+        
+        # Inject the HTML layer if provided
+        if html_body:
+            msg.add_alternative(html_body, subtype='html')
+            
         msg["Subject"] = subject
         msg["From"] = smtp_user
         msg["To"] = to_email
@@ -1642,15 +1647,51 @@ def subscribe_newsletter(req: SubscribeRequest, session: Session = Depends(get_s
         session.add(new_sub)
         session.commit()
         
-        # Fire a quick automated welcome email
+        plain_text_fallback = "You're officially on the list. Use code VAULT-Q70KHNSF5G at checkout to claim your drop. Create an account to permanently secure your vault access."
+        
+        html_template = f"""
+        <!DOCTYPE html>
+        <html>
+        <body style="margin:0; padding:0; background-color:#f8fafc; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+            <div style="max-width:600px; margin: 40px auto; background-color:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                
+                <!-- Hero Image Placeholder -->
+                <div style="width:100%; height:200px; background-color:#0f172a; display:flex; align-items:center; justify-content:center; text-align:center;">
+                    <!-- Swap this img src out with your actual S3/MinIO bucket URL later -->
+                    <img src="https://via.placeholder.com/600x200/0f172a/ffffff?text=STREET+CODE+101+VAULT" alt="Street Code 101" style="width:100%; height:auto; display:block;" />
+                </div>
+
+                <!-- Live Text Content -->
+                <div style="padding: 40px 30px;">
+                    <h1 style="margin-top:0; color:#0f172a; font-size:24px; font-weight:900; text-transform:uppercase; letter-spacing:-0.5px;">Welcome to the Ledger</h1>
+                    <p style="color:#475569; font-size:16px; line-height:1.6; font-weight:500;">You're officially on the list. You now have exclusive access to our community drops, vendor network, and secure marketplace.</p>
+                    <p style="color:#475569; font-size:16px; line-height:1.6; font-weight:500;">Use the secure vault code below at checkout to claim your introductory drop:</p>
+
+                    <!-- Vault Code Box -->
+                    <div style="margin: 30px 0; padding: 20px; background-color:#f8fafc; border-radius:8px; text-align:center; border:2px dashed #cbd5e1;">
+                        <span style="font-family:monospace; font-size:24px; font-weight:900; color:#f97316; letter-spacing:2px;">VAULT-Q70KHNSF5G</span>
+                    </div>
+
+                    <!-- Dark CTA Button -->
+                    <div style="text-align:center; margin-top:40px; margin-bottom:10px;">
+                        <a href="https://streetcode101.com" style="display:inline-block; background-color:#0f172a; color:#ffffff; text-decoration:none; padding:16px 36px; font-size:14px; font-weight:900; border-radius:12px; text-transform:uppercase; letter-spacing:1px;">Enter The Vault</a>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Fire the dual-layer automated welcome email
         send_automated_email(
             to_email=req.email,
             subject="Welcome to the 101 Ledger",
-            body="You're officially on the list. Use code 101_VAULT_10 at checkout for 10% off your first drop. Create an account to permanently secure your vault access."
+            body=plain_text_fallback,
+            html_body=html_template
         )
 
-    # We return the code even if they already exist, so the UI can proceed cleanly
-    return {"message": "Access Granted", "code": "101_VAULT_10"}
+    # Return the updated code
+    return {"message": "Access Granted", "code": "VAULT-Q70KHNSF5G"}
 
 @router.get("/api/admin/users")
 def get_all_users(session: Session = Depends(get_session), token: dict = Depends(verify_token)):

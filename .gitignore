@@ -2,6 +2,7 @@
 backend/.env
 **/.env
 .env.local
+git_token
 
 # Python Environments
 backend/venv/
@@ -16,6 +17,9 @@ frontend-react/dist/
 backend/*.db
 backend/*.sqlite3
 minio-data/
+
+# Media & Assets
+marketing-photos/
 
 # OS Files
 .DS_Store
