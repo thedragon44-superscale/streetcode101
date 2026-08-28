@@ -1,6 +1,6 @@
 from sqlmodel import Session, text, select
 from models import User, Transaction, P2POrder, CashoutRequest, SQLModel
-from routes import engine  # <-- Import engine from routes instead
+from database import engine 
 
 def run_patch():
     # 1. Create the new tables (Transaction, P2POrder, CashoutRequest)
@@ -9,12 +9,11 @@ def run_patch():
 
     with engine.begin() as conn:
         try:
-            # 2. Add the wallet_balance column to existing User table safely
-            conn.execute(text("ALTER TABLE user ADD COLUMN wallet_balance FLOAT DEFAULT 0.0;"))
+            # Added double quotes around "user" to bypass PostgreSQL reserved keyword restrictions
+            conn.execute(text('ALTER TABLE "user" ADD COLUMN wallet_balance FLOAT DEFAULT 0.0;'))
             print("✅ Wallet balances added to existing users.")
         except Exception as e:
-            # If it already exists, it will throw an error, which we can safely ignore
-            print("⚠️ Wallet column already exists or altered (Safe to ignore).")
+            print(f"⚠️ Column check: {e}")
 
     # 3. Mint the 1 Billion Coin Treasury
     with Session(engine) as session:
