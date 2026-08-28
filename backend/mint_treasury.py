@@ -1,5 +1,6 @@
 from sqlmodel import Session, text, select
-from models import engine, User, Transaction, P2POrder, CashoutRequest, SQLModel
+from models import User, Transaction, P2POrder, CashoutRequest, SQLModel
+from routes import engine  # <-- Import engine from routes instead
 
 def run_patch():
     # 1. Create the new tables (Transaction, P2POrder, CashoutRequest)
