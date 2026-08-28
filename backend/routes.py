@@ -95,7 +95,8 @@ class RegisterRequest(BaseModel):
     password: str
 
 class ProfileUpdate(BaseModel):
-    bio: str
+    bio: str | None = None
+    email_opt_in: bool | None = None
 
 class ImageUpdate(BaseModel):
     image_url: str
@@ -201,13 +202,18 @@ def get_my_profile(session: Session = Depends(get_session), token: dict = Depend
 
 @router.patch("/api/profile/me")
 def update_my_profile(payload: ProfileUpdate, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Updates the user's bio."""
+    """Updates the user's profile settings."""
     username = token.get("sub")
     if username == "admin":
-        raise HTTPException(status_code=400, detail="Admin bio cannot be updated here")
+        raise HTTPException(status_code=400, detail="Admin profile cannot be updated here")
         
     user = session.exec(select(User).where(User.username == username)).first()
-    user.bio = payload.bio
+    
+    if payload.bio is not None:
+        user.bio = payload.bio
+    if payload.email_opt_in is not None:
+        user.email_opt_in = payload.email_opt_in
+        
     session.add(user)
     session.commit()
     return {"message": "Profile updated successfully"}
