@@ -1,3 +1,4 @@
+import Post from './Post';
 import EmailCaptureModal from './EmailCaptureModal';
 import Legal from './Legal';
 import ForgotPassword from './ForgotPassword';
@@ -37,6 +38,7 @@ function App() {
           <Route path="/legal/:section" element={<Legal />} />
           <Route path="/product/:sku" element={<ProductPage />} />
           <Route path="/profile/:username" element={<Profile />} />
+          <Route path="/post/:id" element={<Post />} />
           <Route path="/chat/:targetUsername" element={<Chat />} />
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/feed" element={<Feed />} />

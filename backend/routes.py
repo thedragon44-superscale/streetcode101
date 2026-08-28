@@ -756,6 +756,37 @@ def get_global_feed(session: Session = Depends(get_session)):
         
     return feed
 
+@router.get("/api/posts/{id}")
+def get_single_post(id: int, session: Session = Depends(get_session)):
+    """Fetches a single post with engagement metrics for the standalone view."""
+    p = session.get(Post, id)
+    if not p:
+        raise HTTPException(status_code=404, detail="Post not found")
+        
+    user = session.exec(select(User).where(User.username == p.username)).first()
+    avatar = "/default.png"
+    if p.username == "admin":
+        avatar = "/dragon_logo.png"
+    elif user:
+        avatar = user.profile_image_url
+        
+    like_count = len(session.exec(select(Like).where(Like.post_id == p.id)).all())
+    comment_count = len(session.exec(select(Comment).where(Comment.post_id == p.id)).all())
+    
+    return {
+        "id": p.id,
+        "username": p.username,
+        "post_type": p.post_type,
+        "title": p.title,
+        "description": p.description,
+        "price": p.price,
+        "image_url": p.image_url,
+        "created_at": p.created_at.isoformat() if p.created_at else None,
+        "user_avatar": avatar,
+        "likes_count": like_count,
+        "comments_count": comment_count
+    }
+
 @router.delete("/api/posts/{id}")
 def delete_post(id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Allows Admin (or the author) to delete a post."""

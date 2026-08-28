@@ -289,7 +289,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
                           <div className="p-8 text-center text-slate-500 font-mono text-xs">NO NEW ALERTS</div>
                         ) : (
                           notifications.map(n => (
-                            <Link key={n.id} to={`/profile/${n.actor_username}`} onClick={() => setIsNotificationsOpen(false)} className={`p-4 border-b border-slate-800/50 flex gap-3 items-start hover:bg-slate-800 transition-colors ${n.is_read ? 'opacity-50' : 'bg-slate-900/30'}`}>
+                            <Link key={n.id} to={`/post/${n.post_id}`} onClick={() => setIsNotificationsOpen(false)} className={`p-4 border-b border-slate-800/50 flex gap-3 items-start hover:bg-slate-800 transition-colors ${n.is_read ? 'opacity-50' : 'bg-slate-900/30'}`}>
                               <div className="text-orange-500 mt-0.5 text-sm">
                                 <i className={`fa-solid ${(n.action || '').includes('liked') ? 'fa-heart' : 'fa-comment'}`}></i>
                               </div>
