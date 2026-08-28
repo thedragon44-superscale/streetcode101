@@ -268,11 +268,11 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
                 </Link>
 
                 {/* Notification Bell Dropdown */}
-                <div className="relative flex items-center">
-                  <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="relative text-slate-400 hover:text-orange-500 transition-colors px-2 flex items-center">
+                <div className="relative flex items-center h-full">
+                  <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="relative text-slate-400 hover:text-orange-500 transition-colors px-2 flex items-center h-full">
                     <i className="fa-solid fa-bell text-xl"></i>
                     {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black font-mono shadow-md border-2 border-slate-950 box-content">
+                      <span className="absolute top-[-5px] right-[-5px] bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black font-mono shadow-md border-2 border-slate-950 box-content">
                         {unreadCount}
                       </span>
                     )}
@@ -280,13 +280,13 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
                   {/* Dropdown Panel */}
                   {isNotificationsOpen && (
-                    <div className="absolute top-12 right-0 w-80 bg-slate-950 rounded-xl shadow-[0_30px_60px_rgba(0,0,0,0.9)] border border-slate-700 overflow-hidden z-[99999] flex flex-col max-h-[60vh]">
-                      <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
-                        <span className="text-[10px] font-black text-cyan-500 uppercase tracking-widest">Notifications</span>
+                    <div className="absolute top-full mt-5 right-0 w-80 bg-slate-950 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-slate-700 overflow-hidden flex flex-col max-h-[60vh] z-[99999]">
+                      <div className="px-5 py-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
+                        <span className="text-xs font-black text-cyan-500 uppercase tracking-widest leading-none block pt-1">Notifications</span>
                       </div>
                       <div className="overflow-y-auto">
                         {notifications.length === 0 ? (
-                          <div className="p-6 text-center text-slate-500 font-mono text-xs">NO NEW ALERTS</div>
+                          <div className="p-8 text-center text-slate-500 font-mono text-xs">NO NEW ALERTS</div>
                         ) : (
                           notifications.map(n => (
                             <Link key={n.id} to={`/profile/${n.actor_username}`} onClick={() => setIsNotificationsOpen(false)} className={`p-4 border-b border-slate-800/50 flex gap-3 items-start hover:bg-slate-800 transition-colors ${n.is_read ? 'opacity-50' : 'bg-slate-900/30'}`}>
