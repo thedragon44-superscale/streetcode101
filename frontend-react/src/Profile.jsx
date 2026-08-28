@@ -229,6 +229,28 @@ export default function Profile() {
     }
   };
 
+  const handleToggleFollow = async () => {
+    if (!token) return toast.error('You must be logged in to follow users.');
+    try {
+      const res = await fetch(`${API_BASE}/users/${profile.username}/follow`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to toggle follow status');
+      const data = await res.json();
+      
+      // Instantly update the UI without reloading
+      setProfile(prev => ({
+        ...prev,
+        is_following: data.is_following,
+        followers_count: data.is_following ? (prev.followers_count || 0) + 1 : (prev.followers_count || 1) - 1
+      }));
+      toast.success(data.message);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('pidrop_token');
     clearCart();
@@ -352,11 +374,41 @@ export default function Profile() {
             </div>
 
             {/* Info */}
-            <div className="text-center sm:text-left">
-              <h1 className="text-3xl font-black text-slate-900">@{profile.username}</h1>
-              <p className="text-sm font-bold text-cyan-600 mt-1 uppercase tracking-widest">
-                {profile.username === 'admin' ? 'Master Admin' : 'Verified Vendor'}
-              </p>
+            <div className="text-center sm:text-left flex-1">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+                <div>
+                  <h1 className="text-3xl font-black text-slate-900">@{profile.username}</h1>
+                  <p className="text-sm font-bold text-cyan-600 mt-1 uppercase tracking-widest">
+                    {profile.username === 'admin' ? 'Master Admin' : 'Verified Vendor'}
+                  </p>
+                </div>
+                
+                {/* Follow Button (Hidden on your own profile) */}
+                {!isMyProfile && (
+                  <button 
+                    onClick={handleToggleFollow}
+                    className={`px-6 py-2 rounded-xl text-sm font-bold shadow-sm transition active:scale-95 uppercase tracking-wider ${
+                      profile.is_following 
+                        ? 'bg-slate-200 text-slate-700 hover:bg-red-100 hover:text-red-600' 
+                        : 'bg-slate-900 text-white hover:bg-orange-500'
+                    }`}
+                  >
+                    {profile.is_following ? 'Unfollow' : 'Follow'}
+                  </button>
+                )}
+              </div>
+
+              {/* Network Stats */}
+              <div className="flex items-center justify-center sm:justify-start gap-6 mt-4 pb-4 border-b border-slate-100">
+                <div className="text-center sm:text-left">
+                  <span className="block text-xl font-black text-slate-900">{profile.followers_count || 0}</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Followers</span>
+                </div>
+                <div className="text-center sm:text-left">
+                  <span className="block text-xl font-black text-slate-900">{profile.following_count || 0}</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Following</span>
+                </div>
+              </div>
 
               <div className="mt-6">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Bio / Manifesto</h3>
