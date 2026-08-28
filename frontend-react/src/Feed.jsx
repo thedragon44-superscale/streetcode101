@@ -116,8 +116,14 @@ export default function Feed() {
     }
   };
 
+  const [feedType, setFeedType] = useState('global'); // 'global' or 'following'
+
   useEffect(() => {
-    fetch(`${API_BASE}/posts/feed`)
+    setLoading(true);
+    const token = localStorage.getItem('pidrop_token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    fetch(`${API_BASE}/posts/feed?filter=${feedType}`, { headers })
       .then(res => {
         if (!res.ok) throw new Error('Failed to load feed');
         return res.json();
@@ -130,7 +136,7 @@ export default function Feed() {
         setError(err.message);
         setLoading(false);
       });
-  }, []);
+  }, [feedType]);
 
   const handleLike = async (postId) => {
     const token = localStorage.getItem('pidrop_token');
@@ -183,14 +189,34 @@ export default function Feed() {
       <Navbar />
 
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase">Social Feed</h1>
             <p className="text-slate-500 text-sm font-medium mt-1">Live drops from the community ledger.</p>
           </div>
-          <Link to="/profile/me" className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-all active:scale-95 text-sm uppercase tracking-wider hidden sm:block">
-            Post a Drop
-          </Link>
+          
+          <div className="flex items-center gap-4">
+            <div className="flex bg-white shadow-sm border border-slate-200 p-1 rounded-xl">
+              <button 
+                onClick={() => setFeedType('global')} 
+                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${feedType === 'global' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Global
+              </button>
+              <button 
+                onClick={() => {
+                  if (!localStorage.getItem('pidrop_token')) return toast.error('Log in to see your following feed!');
+                  setFeedType('following');
+                }} 
+                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${feedType === 'following' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Following
+              </button>
+            </div>
+            <Link to="/profile/me" className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-all active:scale-95 text-sm uppercase tracking-wider hidden sm:block whitespace-nowrap">
+              Post a Drop
+            </Link>
+          </div>
         </div>
 
         {error && (
