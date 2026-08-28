@@ -872,14 +872,28 @@ def get_my_notifications(session: Session = Depends(get_session), token: dict = 
         .limit(30)
     ).all()
     
-    # Mark as read so the red dot clears
+    # 1. Extract the data safely BEFORE we commit and expire the objects
+    safe_notifs = []
+    for n in notifs:
+        safe_notifs.append({
+            "id": n.id,
+            "receiver_username": n.receiver_username,
+            "actor_username": n.actor_username,
+            "action": n.action,
+            "post_id": n.post_id,
+            "is_read": n.is_read,
+            "created_at": n.created_at.isoformat() if n.created_at else None
+        })
+    
+    # 2. Mark as read so the red dot clears
     for n in notifs:
         if not n.is_read:
             n.is_read = True
             session.add(n)
     session.commit()
     
-    return notifs
+    # 3. Return the safe data
+    return safe_notifs
 
 @router.post("/api/posts/{post_id}/like")
 def toggle_like(post_id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
