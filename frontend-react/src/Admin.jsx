@@ -37,6 +37,12 @@ export default function Admin() {
     sku: '', title: '', price: '', description: '', category: ''
   });
 
+  // --- DELETE POST MODAL STATE ---
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [postToDelete, setPostToDelete] = useState(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [isDeletingPost, setIsDeletingPost] = useState(false);
+
   // ==========================================
   // API FETCHING LOGIC
   // ==========================================
@@ -231,37 +237,44 @@ export default function Admin() {
     } catch (err) { toast.error(err.message); }
   };
 
-  const handleDeletePost = async (id, username, titleOrDesc) => {
-    const reason = window.prompt(`Delete this post by @${username}?\n\nEnter the reason (this will be emailed to the user):`);
-    
-    if (reason === null) return; // Admin clicked Cancel
-    if (reason.trim() === '') return toast.error('You must provide a reason to notify the user.');
+  const handleDeletePostClick = (id, username, titleOrDesc) => {
+    setPostToDelete({ id, username, titleOrDesc });
+    setDeleteReason('');
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDeletePost = async (e) => {
+    e.preventDefault();
+    if (!deleteReason.trim()) return toast.error('You must provide a reason to notify the user.');
+    setIsDeletingPost(true);
 
     try {
       // 1. Delete the post
-      const delRes = await fetch(`${API_BASE}/posts/${id}`, {
+      const delRes = await fetch(`${API_BASE}/posts/${postToDelete.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!delRes.ok) throw new Error('Failed to delete post');
 
-      // 2. Automatically notify the user via the existing admin email endpoint
-      const snippet = titleOrDesc.length > 30 ? titleOrDesc.substring(0, 30) + '...' : titleOrDesc;
-      const emailBody = `Yo @${username},\n\nYour recent post ("${snippet}") was removed from the community timeline by a moderator.\n\nReason: ${reason}\n\nPlease review the community guidelines.`;
+      // 2. Automatically notify the user
+      const snippet = postToDelete.titleOrDesc.length > 30 ? postToDelete.titleOrDesc.substring(0, 30) + '...' : postToDelete.titleOrDesc;
+      const emailBody = `Yo @${postToDelete.username},\n\nYour recent post ("${snippet}") was removed from the community timeline by a moderator.\n\nReason: ${deleteReason}\n\nPlease review the community guidelines.`;
       
-      await fetch(`${API_BASE}/admin/users/${username}/email`, {
+      await fetch(`${API_BASE}/admin/users/${postToDelete.username}/email`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: '⚠️ Post Removed by Moderator', body: emailBody })
       });
 
-      toast.success(`Post deleted and @${username} was notified.`);
+      toast.success(`Post deleted and @${postToDelete.username} was notified.`);
+      setIsDeleteModalOpen(false);
       fetchData(); 
     } catch (err) { 
       toast.error(err.message); 
+    } finally {
+      setIsDeletingPost(false);
     }
   };
-
   const handleResyncAll = async () => {
     if (!window.confirm("Are you sure? This will update all products.")) return;
     setIsSyncing(true);
@@ -578,7 +591,7 @@ export default function Admin() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end">
-                          <button onClick={() => handleDeletePost(item.id, item.username, item.title || item.description)} className="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white px-4 py-2 rounded-lg transition-all font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm">
+                          <button onClick={() => handleDeletePostClick(item.id, item.username, item.title || item.description)} className="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white px-4 py-2 rounded-lg transition-all font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm">
                             <i className="fa-solid fa-trash"></i> Delete & Notify
                           </button>
                         </div>
@@ -830,6 +843,30 @@ export default function Admin() {
               </div>
               <button type="submit" disabled={isSendingEmail} className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-black py-3 rounded-xl shadow-lg transition-all">
                 {isSendingEmail ? 'Dispatching...' : 'Send Secure Email'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- DELETE POST MODAL --- */}
+      {isDeleteModalOpen && postToDelete && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h2 className="text-xl font-black text-slate-900">Delete Post by @{postToDelete.username}</h2>
+              <button onClick={() => setIsDeleteModalOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-xl p-2">✕</button>
+            </div>
+            <form onSubmit={confirmDeletePost} className="p-6 space-y-4">
+              <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-bold border border-red-100">
+                ⚠️ This will permanently delete the post and email the user.
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Reason for Deletion (Emailed to User)</label>
+                <textarea required value={deleteReason} onChange={e => setDeleteReason(e.target.value)} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 font-medium" rows="3" placeholder="e.g. Violation of community guidelines regarding..."></textarea>
+              </div>
+              <button type="submit" disabled={isDeletingPost} className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-black py-3 rounded-xl shadow-lg transition-all active:scale-[0.98]">
+                {isDeletingPost ? 'Deleting...' : 'Delete & Notify'}
               </button>
             </form>
           </div>
