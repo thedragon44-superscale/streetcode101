@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import Navbar from './Navbar';
+import { parseMentions } from './utils';
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -115,7 +115,7 @@ export default function Post() {
           )}
 
           <p className="text-slate-800 text-lg leading-relaxed whitespace-pre-wrap mb-8 font-medium">
-            {post.description}
+            {parseMentions(post.description)}
           </p>
 
           <div className="flex gap-6 pt-4 border-t border-slate-100 mb-8">
@@ -138,7 +138,7 @@ export default function Post() {
                     <Link to={`/profile/${c.username}`} className="text-xs font-black text-slate-900 hover:text-cyan-600 transition-colors">@{c.username}</Link>
                     <span className="text-[10px] text-slate-400 font-bold">{new Date(c.created_at).toLocaleDateString()}</span>
                   </div>
-                  <p className="text-sm text-slate-700 font-medium">{c.text}</p>
+                  <p className="text-sm text-slate-700 font-medium">{parseMentions(c.text)}</p>
                 </div>
               ))
             )}

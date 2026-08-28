@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from './Navbar';
 import toast from 'react-hot-toast';
+import { parseMentions } from './utils';
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -190,7 +191,7 @@ export default function Feed() {
                   <h2 className="text-lg font-black text-slate-900 mb-2 uppercase tracking-wide">{post.title}</h2>
                 )}
                 
-                <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap">{post.description}</p>
+                <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap">{parseMentions(post.description)}</p>
                 
                 {/* Engagement Bar */}
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
@@ -221,7 +222,7 @@ export default function Feed() {
                             <span className="text-xs font-black text-slate-900">@{c.username}</span>
                             <span className="text-[10px] text-slate-400 font-bold">{new Date(c.created_at).toLocaleDateString()}</span>
                           </div>
-                          <p className="text-sm text-slate-700 font-medium">{c.text}</p>
+                          <p className="text-sm text-slate-700 font-medium">{parseMentions(c.text)}</p>
                         </div>
                       ))
                     )}

@@ -13,6 +13,7 @@ import urllib.parse
 import json
 import random
 import string
+import re
 from email.message import EmailMessage
 
 # ==========================================
@@ -695,6 +696,29 @@ def create_social_post(
     session.add(new_post)
     session.commit()
     session.refresh(new_post)
+    
+    # --- MENTION ENGINE: POSTS ---
+    mentioned_usernames = set(re.findall(r'@([a-zA-Z0-9_]+)', description))
+    for mentioned in mentioned_usernames:
+        if mentioned == username:
+            continue
+        mentioned_user = session.exec(select(User).where(User.username == mentioned)).first()
+        if mentioned_user:
+            new_notif = Notification(
+                receiver_username=mentioned,
+                actor_username=username,
+                action="mentioned you in a post",
+                post_id=new_post.id
+            )
+            session.add(new_notif)
+            if getattr(mentioned_user, "email_opt_in", False):
+                send_automated_email(
+                    to_email=mentioned_user.email,
+                    subject="You were mentioned in a Drop!",
+                    body=f"Yo @{mentioned_user.username},\n\n@{username} just mentioned you in a post:\n\"{description}\"\n\nLog in to check it out."
+                )
+    session.commit()
+
     return new_post
 
 @router.get("/api/posts/user/{target_username}")
@@ -981,7 +1005,7 @@ def add_comment(post_id: int, payload: CommentCreate, session: Session = Depends
     new_comment = Comment(post_id=post_id, username=username, text=payload.text)
     session.add(new_comment)
     
-    # Generate Notification & Email Alert
+    # 1. Post Owner Notification
     if post.username != username:
         new_notif = Notification(
             receiver_username=post.username,
@@ -998,6 +1022,27 @@ def add_comment(post_id: int, payload: CommentCreate, session: Session = Depends
                 subject="New Comment on your Drop!",
                 body=f"Yo @{post_owner.username},\n\n@{username} just commented on your post:\n\"{payload.text}\"\n\nLog in to reply!"
             )
+
+    # --- MENTION ENGINE: COMMENTS ---
+    mentioned_usernames = set(re.findall(r'@([a-zA-Z0-9_]+)', payload.text))
+    for mentioned in mentioned_usernames:
+        if mentioned == username or mentioned == post.username: # Prevent self-tags and double-notifying the post owner
+            continue
+        mentioned_user = session.exec(select(User).where(User.username == mentioned)).first()
+        if mentioned_user:
+            mention_notif = Notification(
+                receiver_username=mentioned,
+                actor_username=username,
+                action="mentioned you in a comment",
+                post_id=post.id
+            )
+            session.add(mention_notif)
+            if getattr(mentioned_user, "email_opt_in", False):
+                send_automated_email(
+                    to_email=mentioned_user.email,
+                    subject="You were mentioned in a Comment!",
+                    body=f"Yo @{mentioned_user.username},\n\n@{username} just mentioned you in a comment:\n\"{payload.text}\"\n\nLog in to check it out."
+                )
             
     session.commit()
     session.refresh(new_comment)
