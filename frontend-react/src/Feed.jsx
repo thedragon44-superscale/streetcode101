@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from './Navbar';
 import toast from 'react-hot-toast';
@@ -16,6 +16,58 @@ export default function Feed() {
   const [postComments, setPostComments] = useState([]);
   const [commentInput, setCommentInput] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
+  // Mention Auto-complete State
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionSuggestions, setMentionSuggestions] = useState([]);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (showMentionDropdown && mentionQuery.trim().length > 0) {
+      fetch(`${API_BASE}/search?q=${encodeURIComponent(mentionQuery)}`)
+        .then(res => res.json())
+        .then(data => setMentionSuggestions(data.users || []))
+        .catch(err => console.error(err));
+    } else {
+      setMentionSuggestions([]);
+    }
+  }, [mentionQuery, showMentionDropdown]);
+
+  const handleCommentChange = (e) => {
+    const val = e.target.value;
+    setCommentInput(val);
+
+    // Track the cursor to see if we are currently typing a mention
+    const cursor = e.target.selectionStart;
+    const textBeforeCursor = val.slice(0, cursor);
+    const mentionMatch = textBeforeCursor.match(/@([a-zA-Z0-9_]*)$/);
+
+    if (mentionMatch) {
+      setMentionQuery(mentionMatch[1]);
+      setShowMentionDropdown(true);
+    } else {
+      setShowMentionDropdown(false);
+    }
+  };
+
+  const handleSelectMention = (username) => {
+    if (inputRef.current) {
+      const cursor = inputRef.current.selectionStart;
+      const textBeforeCursor = commentInput.slice(0, cursor);
+      const textAfterCursor = commentInput.slice(cursor);
+      
+      // Replace the raw @text with the full @username
+      const newTextBefore = textBeforeCursor.replace(/@([a-zA-Z0-9_]*)$/, `@${username} `);
+      setCommentInput(newTextBefore + textAfterCursor);
+    } else {
+      const newValue = commentInput.replace(/@([a-zA-Z0-9_]*)$/, `@${username} `);
+      setCommentInput(newValue);
+    }
+    
+    setShowMentionDropdown(false);
+    inputRef.current?.focus();
+  };
 
   const handleToggleComments = async (postId) => {
     if (activeCommentPostId === postId) {
@@ -227,19 +279,40 @@ export default function Feed() {
                       ))
                     )}
                   </div>
-                  <form onSubmit={(e) => handlePostComment(e, post.id)} className="flex gap-2">
-                    <input 
-                      type="text" 
-                      placeholder="Add a comment..." 
-                      value={commentInput} 
-                      onChange={(e) => setCommentInput(e.target.value)}
-                      className="flex-1 px-4 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 font-medium"
-                      required
-                    />
-                    <button disabled={isSubmittingComment} type="submit" className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 disabled:opacity-50 transition-all shadow-sm">
-                      Post
-                    </button>
-                  </form>
+                  <div className="relative">
+                    {/* Mention Dropdown Menu */}
+                    {showMentionDropdown && mentionSuggestions.length > 0 && (
+                      <div className="absolute bottom-full left-0 mb-2 w-64 bg-white border border-slate-200 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.1)] overflow-hidden z-50 animate-fade-in">
+                        {mentionSuggestions.map(u => (
+                          <button
+                            key={u.username}
+                            type="button"
+                            onClick={() => handleSelectMention(u.username)}
+                            className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors text-left"
+                          >
+                            <img src={u.profile_image_url} alt={u.username} className="w-8 h-8 rounded-full object-cover border border-slate-200 bg-slate-100" />
+                            <span className="text-sm font-bold text-slate-900">@{u.username}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <form onSubmit={(e) => handlePostComment(e, post.id)} className="flex gap-2">
+                      <input 
+                        ref={inputRef}
+                        type="text" 
+                        placeholder="Add a comment..." 
+                        value={commentInput} 
+                        onChange={handleCommentChange}
+                        className="flex-1 px-4 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 font-medium"
+                        required
+                        autoComplete="off"
+                      />
+                      <button disabled={isSubmittingComment} type="submit" className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 disabled:opacity-50 transition-all shadow-sm">
+                        Post
+                      </button>
+                    </form>
+                  </div>
                 </div>
               )}
             </div>
