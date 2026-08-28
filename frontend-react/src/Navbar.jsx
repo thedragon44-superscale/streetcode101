@@ -14,6 +14,11 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
   const [currentUser, setCurrentUser] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Notification State
+  const [notifications, setNotifications] = useState([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
   // State for the new Global Search Engine
   const [globalResults, setGlobalResults] = useState({ products: [], users: [] });
   
@@ -122,6 +127,13 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
         if (data) {
           setCurrentUser(data);
           setCheckoutEmail(prev => prev || data.email || '');
+          
+          fetch(`${API_BASE}/notifications`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+          .then(res => res.ok ? res.json() : [])
+          .then(notifs => setNotifications(notifs))
+          .catch(err => console.log('Failed to fetch notifications:', err));
         }
       })
       .catch(err => console.log('Auth check failed:', err));
@@ -254,6 +266,47 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
                 <Link to="/inbox" className="text-xs font-mono font-bold text-slate-400 hover:text-orange-500 transition-colors uppercase tracking-widest">
                   INBOX
                 </Link>
+
+                {/* Notification Bell Dropdown */}
+                <div className="relative flex items-center">
+                  <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="relative text-slate-400 hover:text-orange-500 transition-colors px-2 flex items-center">
+                    <i className="fa-solid fa-bell text-xl"></i>
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black font-mono shadow-md border-2 border-slate-950 box-content">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Dropdown Panel */}
+                  {isNotificationsOpen && (
+                    <div className="absolute top-12 right-0 w-80 bg-slate-950 rounded-xl shadow-[0_30px_60px_rgba(0,0,0,0.9)] border border-slate-700 overflow-hidden z-[99999] flex flex-col max-h-[60vh]">
+                      <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
+                        <span className="text-[10px] font-black text-cyan-500 uppercase tracking-widest">Notifications</span>
+                      </div>
+                      <div className="overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="p-6 text-center text-slate-500 font-mono text-xs">NO NEW ALERTS</div>
+                        ) : (
+                          notifications.map(n => (
+                            <Link key={n.id} to={`/profile/${n.actor_username}`} onClick={() => setIsNotificationsOpen(false)} className={`p-4 border-b border-slate-800/50 flex gap-3 items-start hover:bg-slate-800 transition-colors ${n.is_read ? 'opacity-50' : 'bg-slate-900/30'}`}>
+                              <div className="text-orange-500 mt-0.5 text-sm">
+                                <i className={`fa-solid ${n.action.includes('liked') ? 'fa-heart' : 'fa-comment'}`}></i>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                                  <span className="font-bold text-white">@{n.actor_username}</span> {n.action}
+                                </p>
+                                <span className="text-[9px] text-slate-500 font-bold uppercase mt-1 block">{new Date(n.created_at).toLocaleDateString()}</span>
+                              </div>
+                            </Link>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {currentUser.username === 'admin' && (
                   <Link to="/admin" className="text-xs font-mono font-bold text-orange-500 hover:text-orange-400 transition-colors uppercase tracking-widest border border-orange-500/30 px-3 py-1.5 rounded-md bg-orange-500/10">
                     ADMIN

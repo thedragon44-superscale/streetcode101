@@ -13,6 +13,7 @@ class User(SQLModel, table=True):
     is_verified: bool = Field(default=False)
     has_spun: bool = Field(default=False)
     discount_percent: float = Field(default=0.0)
+    email_opt_in: bool = Field(default=False)
 
 class Product(SQLModel, table=True):
     sku: str = Field(primary_key=True, index=True)
@@ -82,3 +83,12 @@ class LedgerSubscriber(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
     subscribed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Notification(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    receiver_username: str = Field(index=True)
+    actor_username: str
+    action: str # "liked your post" or "commented on your post"
+    post_id: Optional[int] = None
+    is_read: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

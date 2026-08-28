@@ -43,7 +43,7 @@ from sqlmodel import Session, select
 from typing import List
 
 from database import get_session, engine
-from models import Product, Order, User, Post, Like, Comment, Message, CartItem, PromoCode, LedgerSubscriber
+from models import Product, Order, User, Post, Like, Comment, Message, CartItem, PromoCode, LedgerSubscriber, Notification
 
 router = APIRouter()
 security = HTTPBearer()
@@ -855,6 +855,26 @@ def edit_post(id: int, payload: PostEditRequest, session: Session = Depends(get_
 
 # --- NEW ENGAGEMENT ENDPOINTS ---
 
+@router.get("/api/notifications")
+def get_my_notifications(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Fetches all notifications for the logged-in user and marks them as read."""
+    username = token.get("sub")
+    notifs = session.exec(
+        select(Notification)
+        .where(Notification.receiver_username == username)
+        .order_by(Notification.created_at.desc())
+        .limit(30)
+    ).all()
+    
+    # Mark as read so the red dot clears
+    for n in notifs:
+        if not n.is_read:
+            n.is_read = True
+            session.add(n)
+    session.commit()
+    
+    return notifs
+
 @router.post("/api/posts/{post_id}/like")
 def toggle_like(post_id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Toggles a like on or off for the current user."""
@@ -872,6 +892,25 @@ def toggle_like(post_id: int, session: Session = Depends(get_session), token: di
     else:
         new_like = Like(post_id=post_id, username=username)
         session.add(new_like)
+        
+        # Generate Notification & Email Alert
+        if post.username != username:
+            new_notif = Notification(
+                receiver_username=post.username,
+                actor_username=username,
+                action="liked your post",
+                post_id=post.id
+            )
+            session.add(new_notif)
+            
+            post_owner = session.exec(select(User).where(User.username == post.username)).first()
+            if post_owner and getattr(post_owner, "email_opt_in", False):
+                send_automated_email(
+                    to_email=post_owner.email,
+                    subject="New Like on your Drop!",
+                    body=f"Yo @{post_owner.username},\n\n@{username} just liked your recent post!\nLog in to see who's interacting with your drops."
+                )
+                
         session.commit()
         return {"message": "Liked", "liked": True}
 
@@ -890,6 +929,25 @@ def add_comment(post_id: int, payload: CommentCreate, session: Session = Depends
         
     new_comment = Comment(post_id=post_id, username=username, text=payload.text)
     session.add(new_comment)
+    
+    # Generate Notification & Email Alert
+    if post.username != username:
+        new_notif = Notification(
+            receiver_username=post.username,
+            actor_username=username,
+            action="commented on your post",
+            post_id=post.id
+        )
+        session.add(new_notif)
+        
+        post_owner = session.exec(select(User).where(User.username == post.username)).first()
+        if post_owner and getattr(post_owner, "email_opt_in", False):
+            send_automated_email(
+                to_email=post_owner.email,
+                subject="New Comment on your Drop!",
+                body=f"Yo @{post_owner.username},\n\n@{username} just commented on your post:\n\"{payload.text}\"\n\nLog in to reply!"
+            )
+            
     session.commit()
     session.refresh(new_comment)
     return new_comment

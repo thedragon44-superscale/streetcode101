@@ -16,10 +16,11 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Edit Bio State
+  // Profile Settings State
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [newBio, setNewBio] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [emailOptIn, setEmailOptIn] = useState(false);
 
   // New Post State
   const [showListingForm, setShowListingForm] = useState(false);
@@ -106,6 +107,7 @@ export default function Profile() {
       .then((data) => {
         setProfile(data);
         setNewBio(data.bio || '');
+        setEmailOptIn(data.email_opt_in || false);
         
         // Once we know the actual username, fetch their wall listings!
         return fetch(`${API_BASE}/posts/user/${data.username}`);
@@ -162,6 +164,25 @@ export default function Profile() {
       setProfile({ ...profile, bio: newBio });
       setIsEditingBio(false);
       toast.success('Bio updated!');
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleToggleEmail = async () => {
+    const newValue = !emailOptIn;
+    setEmailOptIn(newValue); // Optimistic UI update
+    try {
+      const res = await fetch(`${API_BASE}/profile/me`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email_opt_in: newValue })
+      });
+      if (!res.ok) {
+        setEmailOptIn(!newValue);
+        throw new Error('Failed to update settings');
+      }
+      toast.success(newValue ? 'Email alerts enabled!' : 'Email alerts disabled.');
     } catch (err) {
       toast.error(err.message);
     }
@@ -363,6 +384,22 @@ export default function Profile() {
                     )}
                   </div>
                 )}
+
+                {/* Email Alert Toggle */}
+                {isMyProfile && profile.username !== 'admin' && (
+                  <div className="mt-5 pt-5 border-t border-slate-100 flex items-center gap-3 justify-center sm:justify-start">
+                    <button 
+                      onClick={handleToggleEmail}
+                      className={`w-10 h-5 rounded-full flex items-center p-1 transition-colors ${emailOptIn ? 'bg-emerald-500 justify-end' : 'bg-slate-300 justify-start'}`}
+                    >
+                      <div className="w-3.5 h-3.5 bg-white rounded-full shadow-sm"></div>
+                    </button>
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {emailOptIn ? 'Email Alerts: ON' : 'Email Alerts: OFF'}
+                    </span>
+                  </div>
+                )}
+
               </div>
             </div>
           </div>
