@@ -14,7 +14,7 @@ export function parseMentions(text) {
         <Link 
           key={index} 
           to={`/profile/${username}`} 
-          className="text-cyan-600 font-bold hover:underline hover:text-orange-500 transition-colors"
+          className="text-orange-500 font-bold hover:underline hover:text-orange-400 transition-colors"
           onClick={(e) => e.stopPropagation()} // Prevent triggering parent clicks (like opening a post)
         >
           {part}

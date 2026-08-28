@@ -231,27 +231,29 @@ def global_search(q: str, session: Session = Depends(get_session)):
         return {"products": [], "users": []}
         
     search_term = f"%{q.strip()}%"
+    raw_query = q.strip().lower()
     
-    # 1. Search Products (matching title or description)
-    # Using .ilike() for case-insensitive matching
+    # 1. Search Products
     products = session.exec(
         select(Product).where(
             Product.title.ilike(search_term) | Product.description.ilike(search_term)
         ).limit(10)
     ).all()
     
-    # 2. Search Users (matching username)
+    # 2. Search Users
     users = session.exec(
-        select(User).where(
-            User.username.ilike(search_term)
-        ).limit(10)
+        select(User).where(User.username.ilike(search_term)).limit(10)
     ).all()
     
-    # Strip out sensitive data (like passwords/emails) before sending users to the frontend
     safe_users = [
         {"username": u.username, "profile_image_url": u.profile_image_url} 
         for u in users
     ]
+    
+    # --- ADMIN INJECTION LOGIC ---
+    # If the user's search query matches part of the word "admin", manually add it to the top!
+    if raw_query in "admin":
+        safe_users.insert(0, {"username": "admin", "profile_image_url": "/dragon_logo.png"})
     
     return {
         "products": products,
