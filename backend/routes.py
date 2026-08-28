@@ -193,13 +193,33 @@ def login(request: AuthRequest, session: Session = Depends(get_session)):
 def get_my_profile(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches the profile of the currently logged-in user."""
     username = token.get("sub")
+    
+    # Calculate network metrics for the logged-in user
+    followers_count = len(session.exec(select(Follow).where(Follow.following_username == username)).all())
+    following_count = len(session.exec(select(Follow).where(Follow.follower_username == username)).all())
+
     if username == "admin":
-        return {"username": "admin", "bio": "Master Admin Override", "profile_image_url": "/dragon_logo.png"}
+        return {
+            "username": "admin", 
+            "bio": "Master Admin Override", 
+            "profile_image_url": "/dragon_logo.png",
+            "followers_count": followers_count,
+            "following_count": following_count,
+            "email_opt_in": False
+        }
         
     user = session.exec(select(User).where(User.username == username)).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+        
+    return {
+        "username": user.username,
+        "bio": user.bio,
+        "profile_image_url": user.profile_image_url,
+        "email_opt_in": getattr(user, "email_opt_in", False),
+        "followers_count": followers_count,
+        "following_count": following_count
+    }
 
 @router.patch("/api/profile/me")
 def update_my_profile(payload: ProfileUpdate, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
