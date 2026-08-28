@@ -92,3 +92,9 @@ class Notification(SQLModel, table=True):
     post_id: Optional[int] = None
     is_read: bool = Field(default=False)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Follow(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    follower_username: str = Field(index=True)
+    following_username: str = Field(index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

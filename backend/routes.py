@@ -44,7 +44,7 @@ from sqlmodel import Session, select
 from typing import List
 
 from database import get_session, engine
-from models import Product, Order, User, Post, Like, Comment, Message, CartItem, PromoCode, LedgerSubscriber, Notification
+from models import Product, Order, User, Post, Like, Comment, Message, CartItem, PromoCode, LedgerSubscriber, Notification, Follow
 
 router = APIRouter()
 security = HTTPBearer()
@@ -546,25 +546,61 @@ def update_order_status(order_id: int, payload: OrderStatusUpdate, session: Sess
         
     return {"message": f"Order {order_id} status updated to {payload.status}"}
 
+# Optional security allows us to see if the visitor is logged in (to check if they follow the user) without blocking guests
+optional_security = HTTPBearer(auto_error=False)
+
 @router.get("/api/profile/{username}")
-def get_public_profile(username: str, session: Session = Depends(get_session)):
-    """Fetches the public profile of any user (No authentication required)."""
+def get_public_profile(
+    username: str, 
+    session: Session = Depends(get_session),
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security)
+):
+    """Fetches a public profile along with their follower/following stats."""
+    
+    # 1. Figure out who is visiting the profile
+    visitor_username = None
+    if credentials:
+        try:
+            payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
+            visitor_username = payload.get("sub")
+        except:
+            pass
+
+    # 2. Calculate network metrics
+    followers_count = len(session.exec(select(Follow).where(Follow.following_username == username)).all())
+    following_count = len(session.exec(select(Follow).where(Follow.follower_username == username)).all())
+    
+    is_following = False
+    if visitor_username:
+        check_follow = session.exec(
+            select(Follow).where((Follow.follower_username == visitor_username) & (Follow.following_username == username))
+        ).first()
+        if check_follow:
+            is_following = True
+
+    # 3. Handle Admin override
     if username.lower() == "admin":
         return {
             "username": "admin", 
             "bio": "Official Street Code 101 Storefront", 
-            "profile_image_url": "/dragon_logo.png"
+            "profile_image_url": "/dragon_logo.png",
+            "followers_count": followers_count,
+            "following_count": following_count,
+            "is_following": is_following
         }
         
+    # 4. Handle standard users
     user = session.exec(select(User).where(User.username == username)).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    # We return a specific dictionary to ensure we NEVER accidentally leak the password_hash!
     return {
         "username": user.username,
         "bio": user.bio,
-        "profile_image_url": user.profile_image_url
+        "profile_image_url": user.profile_image_url,
+        "followers_count": followers_count,
+        "following_count": following_count,
+        "is_following": is_following
     }
 
 # --- PASSWORD RECOVERY ---
@@ -951,6 +987,50 @@ def get_my_notifications(session: Session = Depends(get_session), token: dict = 
     
     # 3. Return the safe data
     return safe_notifs
+
+@router.post("/api/users/{target_username}/follow")
+def toggle_follow(target_username: str, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Toggles following/unfollowing a user."""
+    current_user = token.get("sub")
+    
+    if current_user == target_username:
+        raise HTTPException(status_code=400, detail="You cannot follow yourself.")
+        
+    target = session.exec(select(User).where(User.username == target_username)).first()
+    if not target and target_username != "admin":
+        raise HTTPException(status_code=404, detail="User not found.")
+        
+    existing_follow = session.exec(
+        select(Follow).where((Follow.follower_username == current_user) & (Follow.following_username == target_username))
+    ).first()
+    
+    if existing_follow:
+        session.delete(existing_follow)
+        session.commit()
+        return {"message": f"Unfollowed @{target_username}", "is_following": False}
+    else:
+        new_follow = Follow(follower_username=current_user, following_username=target_username)
+        session.add(new_follow)
+        
+        # Fire off a notification!
+        if target_username != "admin":
+            new_notif = Notification(
+                receiver_username=target_username,
+                actor_username=current_user,
+                action="started following you",
+                post_id=0 # 0 indicates a profile-level notification, not a post
+            )
+            session.add(new_notif)
+            
+            if getattr(target, "email_opt_in", False):
+                send_automated_email(
+                    to_email=target.email,
+                    subject="You have a new follower!",
+                    body=f"Yo @{target.username},\n\n@{current_user} just started following you on Street Code 101!\n\nLog in to check out their profile."
+                )
+                
+        session.commit()
+        return {"message": f"Following @{target_username}", "is_following": True}
 
 @router.post("/api/posts/{post_id}/like")
 def toggle_like(post_id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
