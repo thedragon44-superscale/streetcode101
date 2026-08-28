@@ -14,6 +14,7 @@ class User(SQLModel, table=True):
     has_spun: bool = Field(default=False)
     discount_percent: float = Field(default=0.0)
     email_opt_in: bool = Field(default=False)
+    wallet_balance: float = Field(default=0.0) # The StreetCoin Wallet
 
 class Product(SQLModel, table=True):
     sku: str = Field(primary_key=True, index=True)
@@ -97,4 +98,39 @@ class Follow(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     follower_username: str = Field(index=True)
     following_username: str = Field(index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Transaction(SQLModel, table=True):
+    """The Immutable Double-Entry Ledger."""
+    id: int | None = Field(default=None, primary_key=True)
+    sender_username: str = Field(index=True)
+    receiver_username: str = Field(index=True)
+    amount: float
+    # Types: 'onramp' (Stripe purchase), 'p2p_escrow' (Purchase), 'escrow_release' (Tracking verified), 'offramp' (Zelle cashout)
+    transaction_type: str 
+    status: str = Field(default="completed") # 'pending', 'completed', 'refunded'
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class P2POrder(SQLModel, table=True):
+    """Tracks physical item sales and their Escrow state."""
+    id: int | None = Field(default=None, primary_key=True)
+    buyer_username: str = Field(index=True)
+    vendor_username: str = Field(index=True)
+    post_id: int
+    amount: float
+    shipping_address: str
+    tracking_number: str | None = Field(default=None)
+    # Statuses: 'pending_tracking', 'shipped', 'completed', 'cancelled', 'refunded'
+    status: str = Field(default="pending_tracking") 
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class CashoutRequest(SQLModel, table=True):
+    """The Zelle Offramp Queue for the Master Admin."""
+    id: int | None = Field(default=None, primary_key=True)
+    username: str = Field(index=True)
+    amount_coins: float
+    usd_payout: float # The amount AFTER the platform tax
+    zelle_contact: str # Email or Phone number for Zelle
+    status: str = Field(default="pending") # 'pending', 'approved', 'rejected'
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
