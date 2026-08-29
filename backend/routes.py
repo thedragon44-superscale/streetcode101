@@ -36,7 +36,7 @@ import boto3
 import uuid
 from botocore.config import Config
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import bcrypt
 from pydantic import BaseModel
