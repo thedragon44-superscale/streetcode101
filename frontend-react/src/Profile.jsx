@@ -732,9 +732,10 @@ export default function Profile() {
 
       {/* --- NATIVE STRIPE TOP-UP MODAL --- */}
       {showTopUpModal && clientSecret && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden relative border border-slate-200">
-            <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col relative border border-slate-200">
+            {/* Header (Pinned to top) */}
+            <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-3xl shrink-0">
               <h3 className="font-black text-slate-900 text-lg flex items-center gap-2">
                 <i className="fa-solid fa-coins text-orange-500"></i> Secure Top-Up
               </h3>
@@ -745,7 +746,9 @@ export default function Profile() {
                 ✕
               </button>
             </div>
-            <div className="p-6">
+            
+            {/* Body (Scrollable) */}
+            <div className="p-6 overflow-y-auto">
               <Elements stripe={stripePromise} options={{ clientSecret }}>
                 <CheckoutForm onSuccess={handleTopUpSuccess} />
               </Elements>
