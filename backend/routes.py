@@ -485,7 +485,7 @@ def submit_order(order_data: Order, session: Session = Depends(get_session)):
 
 @router.post("/api/wallet/topup")
 def create_wallet_topup(req: TopUpRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Generates a Stripe Checkout session to buy StreetCoins with exact fee coverage."""
+    """Generates a native Stripe PaymentIntent to buy StreetCoins with exact fee coverage."""
     username = token.get("sub")
     user = session.exec(select(User).where(User.username == username)).first()
     
@@ -495,36 +495,22 @@ def create_wallet_topup(req: TopUpRequest, session: Session = Depends(get_sessio
     if req.coins <= 0:
         raise HTTPException(status_code=400, detail="Must purchase at least 1 coin")
         
-    # THE SURCHARGE ALGORITHM:
-    # Target Net Amount = req.coins (since 1 SC = 1 USD)
-    # Total Charge = (Target + $0.30) / (1 - 0.029)
+    # THE SURCHARGE ALGORITHM
     total_usd = (req.coins + 0.30) / 0.971
     total_cents = int(round(total_usd * 100))
     
     try:
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
-                'price_data': {
-                    'currency': 'usd',
-                    'product_data': {
-                        'name': f'{req.coins} StreetCoins',
-                        'description': 'Digital currency for the Street Code 101 marketplace.',
-                    },
-                    'unit_amount': total_cents,
-                },
-                'quantity': 1,
-            }],
-            mode='payment',
-            success_url=os.getenv("FRONTEND_URL", "http://localhost:5173") + '/profile/me?topup=success',
-            cancel_url=os.getenv("FRONTEND_URL", "http://localhost:5173") + '/profile/me?topup=cancelled',
+        intent = stripe.PaymentIntent.create(
+            amount=total_cents,
+            currency="usd",
+            automatic_payment_methods={"enabled": True},
             metadata={
                 'type': 'wallet_topup',
                 'username': user.username,
                 'coins': str(req.coins)
             }
         )
-        return {"url": checkout_session.url}
+        return {"clientSecret": intent.client_secret, "totalUsd": total_usd}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -543,11 +529,11 @@ async def stripe_webhook(request: Request, session: Session = Depends(get_sessio
     except stripe.error.SignatureVerificationError as e:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    if event['type'] == 'checkout.session.completed':
-        session_data = event['data']['object']
-        metadata = session_data.get('metadata', {})
+    # Listen for native PaymentIntent successes
+    if event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']
+        metadata = payment_intent.get('metadata', {})
         
-        # --- LOGIC: Check if this is a StreetCoin Top-Up ---
         if metadata.get('type') == 'wallet_topup':
             username = metadata.get('username')
             coins_purchased = float(metadata.get('coins'))
@@ -557,11 +543,9 @@ async def stripe_webhook(request: Request, session: Session = Depends(get_sessio
             user = session.exec(select(User).where(User.username == username)).first()
             
             if admin and user and getattr(admin, "wallet_balance", 0) >= coins_purchased:
-                # 1. Double-Entry Ledger Transfer
                 admin.wallet_balance -= coins_purchased
                 user.wallet_balance += coins_purchased
                 
-                # 2. Log the immutable transaction
                 tx = Transaction(
                     sender_username="admin",
                     receiver_username=user.username,
@@ -574,9 +558,12 @@ async def stripe_webhook(request: Request, session: Session = Depends(get_sessio
                 session.add(user)
                 session.add(tx)
                 session.commit()
-                print(f"💰 TOP-UP SUCCESS: {coins_purchased} SC securely transferred to @{username}.")
+                print(f"💰 NATIVE TOP-UP SUCCESS: {coins_purchased} SC securely transferred to @{username}.")
                 
             return {"status": "success"}
+
+    # Leave checkout.session.completed below just in case any other features use it
+    if event['type'] == 'checkout.session.completed':
 
     return {"status": "success"}
 

@@ -3,6 +3,11 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Navbar from './Navbar';
 import { useCart } from './CartContext';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
+import CheckoutForm from './CheckoutForm';
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -43,23 +48,11 @@ export default function Profile() {
 
   // Wallet State
   const [topUpAmount, setTopUpAmount] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
 
   const token = localStorage.getItem('pidrop_token');
   const isMyProfile = username === 'me';
-
-  // Stripe Redirect Handler (Checks the URL for ?topup=success)
-  useEffect(() => {
-    const query = new URLSearchParams(window.location.search);
-    if (query.get('topup') === 'success') {
-      toast.success('💰 Wallet topped up successfully!');
-      // Clean the URL so it doesn't keep triggering on refresh
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-    if (query.get('topup') === 'cancelled') {
-      toast.error('Top-up cancelled.');
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
 
   const handleTopUp = async () => {
     const targetCoins = parseInt(topUpAmount);
@@ -78,11 +71,24 @@ export default function Profile() {
       
       if (!res.ok) throw new Error(data.detail || 'Top-up failed');
       
-      // Redirect the user directly to the Stripe Checkout URL
-      window.location.href = data.url; 
+      // Native flow: save client secret and open the embedded modal
+      setClientSecret(data.clientSecret);
+      setShowTopUpModal(true);
     } catch (err) {
       toast.error(err.message);
     }
+  };
+
+  const handleTopUpSuccess = () => {
+    setShowTopUpModal(false);
+    setClientSecret('');
+    
+    // Optimistically update the UI balance so it feels instant
+    setProfile(prev => ({
+      ...prev,
+      wallet_balance: (prev.wallet_balance || 0) + parseInt(topUpAmount)
+    }));
+    setTopUpAmount('');
   };
 
   const handleToggleComments = async (postId) => {
@@ -723,6 +729,31 @@ export default function Profile() {
           </div>
         </div>
       </main>
+
+      {/* --- NATIVE STRIPE TOP-UP MODAL --- */}
+      {showTopUpModal && clientSecret && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden relative border border-slate-200">
+            <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+              <h3 className="font-black text-slate-900 text-lg flex items-center gap-2">
+                <i className="fa-solid fa-coins text-orange-500"></i> Secure Top-Up
+              </h3>
+              <button 
+                onClick={() => { setShowTopUpModal(false); setClientSecret(''); }}
+                className="text-slate-400 hover:text-slate-700 font-bold p-1 transition"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6">
+              <Elements stripe={stripePromise} options={{ clientSecret }}>
+                <CheckoutForm onSuccess={handleTopUpSuccess} />
+              </Elements>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
