@@ -919,13 +919,13 @@ export default function Admin() {
       {/* --- EDIT PRODUCT MODAL --- */}
       {isEditModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
               <h2 className="text-xl font-black text-slate-900">Edit Product</h2>
               <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-xl p-2">✕</button>
             </div>
             
-            <form onSubmit={handleEditProduct} className="p-6 space-y-4">
+            <form onSubmit={handleEditProduct} className="p-6 space-y-4 overflow-y-auto flex-1">
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-2 flex items-center gap-3">
                 <span className="text-2xl">🔒</span>
                 <div>
