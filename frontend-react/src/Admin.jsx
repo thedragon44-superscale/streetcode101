@@ -485,8 +485,8 @@ export default function Admin() {
               </div>
             </header>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <table className="w-full text-left text-sm text-slate-600">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+              <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
                   <tr>
                     <th className="px-6 py-5">Order ID</th>
@@ -554,8 +554,8 @@ export default function Admin() {
               </div>
             </header>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <table className="w-full text-left text-sm text-slate-600">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+              <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
                   <tr>
                     <th className="px-6 py-5">Product Info</th>
@@ -639,8 +639,8 @@ export default function Admin() {
               <p className="text-slate-500 mt-1 font-medium">Monitor and remove posts from the community timeline.</p>
             </header>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <table className="w-full text-left text-sm text-slate-600">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+              <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
                   <tr>
                     <th className="px-6 py-5">User</th>
@@ -737,8 +737,8 @@ export default function Admin() {
             </form>
 
             {/* Promos Ledger */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <table className="w-full text-left text-sm text-slate-600">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+              <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
                   <tr>
                     <th className="px-6 py-5">Access Code</th>
@@ -794,8 +794,8 @@ export default function Admin() {
               <p className="text-slate-500 mt-1 font-medium">Manage registered accounts and VIP discounts.</p>
             </header>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <table className="w-full text-left text-sm text-slate-600">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+              <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
                   <tr>
                     <th className="px-6 py-5">User</th>
