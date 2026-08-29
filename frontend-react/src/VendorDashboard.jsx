@@ -8,6 +8,41 @@ export default function VendorDashboard() {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [trackingInputs, setTrackingInputs] = useState({});
+  const [cashoutAmount, setCashoutAmount] = useState('');
+  const [zelleContact, setZelleContact] = useState('');
+  const [isCashingOut, setIsCashingOut] = useState(false);
+
+  const handleCashout = async () => {
+    const amount = parseFloat(cashoutAmount);
+    if (!amount || amount < 10) return toast.error("Minimum cashout is 10 SC.");
+    if (amount > metrics.availableBalance) return toast.error("Insufficient balance.");
+    if (!zelleContact.trim()) return toast.error("Zelle contact is required.");
+
+    setIsCashingOut(true);
+    try {
+      const token = localStorage.getItem('pidrop_token');
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vendor/cashout`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ amount_coins: amount, zelle_contact: zelleContact })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Cashout failed');
+      
+      toast.success("Cashout requested successfully!");
+      setMetrics(prev => ({ ...prev, availableBalance: prev.availableBalance - amount }));
+      setCashoutAmount('');
+      setZelleContact('');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsCashingOut(false);
+    }
+  };
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -199,7 +234,65 @@ export default function VendorDashboard() {
             </div>
           )}
         </div>
+{/* FIAT OFFRAMP */}
+        <h2 className="text-xl font-black uppercase tracking-wide text-slate-900 mb-4 mt-12">Fiat Offramp</h2>
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-2">Convert to USD via Zelle</h3>
+              <p className="text-sm font-bold text-slate-500 mb-6">Withdraw your available StreetCoins directly to your bank account. The platform retains a 5% infrastructure tax.</p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Zelle Email or Phone Number</label>
+                  <input 
+                    type="text" 
+                    placeholder="name@email.com" 
+                    value={zelleContact}
+                    onChange={(e) => setZelleContact(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Amount to Withdraw (Min 10 SC)</label>
+                  <div className="relative">
+                    <input 
+                      type="number" 
+                      placeholder="0.00" 
+                      value={cashoutAmount}
+                      onChange={(e) => setCashoutAmount(e.target.value)}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-orange-500 focus:outline-none pl-12"
+                    />
+                    <i className="fa-solid fa-coins absolute left-4 top-1/2 -translate-y-1/2 text-orange-500"></i>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleCashout}
+                  disabled={isCashingOut}
+                  className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white font-black py-4 rounded-xl transition-colors uppercase tracking-wider mt-2"
+                >
+                  {isCashingOut ? 'Processing...' : 'Request Cashout'}
+                </button>
+              </div>
+            </div>
 
+            <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 flex flex-col justify-center">
+              <div className="flex justify-between items-center mb-4 text-sm font-bold text-slate-500 uppercase tracking-wider">
+                <span>Requested</span>
+                <span>{parseFloat(cashoutAmount || 0).toFixed(2)} SC</span>
+              </div>
+              <div className="flex justify-between items-center mb-4 text-sm font-bold text-red-400 uppercase tracking-wider">
+                <span>Platform Tax (5%)</span>
+                <span>-{(parseFloat(cashoutAmount || 0) * 0.05).toFixed(2)} SC</span>
+              </div>
+              <div className="h-px bg-slate-200 w-full mb-4"></div>
+              <div className="flex justify-between items-center text-xl font-black text-slate-900 uppercase tracking-tight">
+                <span>Total Payout</span>
+                <span className="text-emerald-500">${(parseFloat(cashoutAmount || 0) * 0.95).toFixed(2)} USD</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );

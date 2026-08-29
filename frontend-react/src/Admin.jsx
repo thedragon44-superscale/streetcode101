@@ -63,9 +63,23 @@ export default function Admin() {
       setSocialFeed(await feedRes.json());
       setPromos(promosRes.ok ? await promosRes.json() : []);
       setUsers(usersRes.ok ? await usersRes.json() : []);
+      
+      const cashoutsRes = await fetch(`${API_BASE}/admin/cashouts`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (cashoutsRes.ok) setCashouts(await cashoutsRes.json());
     } catch (err) {
       console.error("Error fetching data:", err);
     }
+  };
+
+  const [cashouts, setCashouts] = useState([]);
+
+  const fetchCashouts = async () => {
+    const res = await fetch(`${API_BASE}/admin/cashouts`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (res.ok) setCashouts(await res.json());
   };
 
   // ==========================================
@@ -344,6 +358,10 @@ export default function Admin() {
           </button>
           <button onClick={() => setActiveTab('community')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'community' ? 'bg-blue-500/10 text-blue-400' : 'hover:bg-slate-800 hover:text-white'}`}>
             🌍 Community
+          </button>
+          <button onClick={() => setActiveTab('cashouts')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'cashouts' ? 'bg-emerald-500/10 text-emerald-400' : 'hover:bg-slate-800 hover:text-white'} flex justify-between items-center`}>
+            <span>💸 Cashouts</span>
+            {cashouts.filter(c => c.status === 'pending').length > 0 && <span className="bg-emerald-500 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-full">{cashouts.filter(c => c.status === 'pending').length}</span>}
           </button>
         </nav>
         <div className="p-4 border-t border-slate-800">
@@ -759,6 +777,60 @@ export default function Admin() {
               </table>
               {users.length === 0 && (
                 <div className="text-center py-20 text-slate-400 font-medium">No community members registered yet.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- CASHOUTS VIEW --- */}
+        {activeTab === 'cashouts' && (
+          <div className="animate-fade-in">
+            <header className="mb-8">
+              <h1 className="text-3xl font-black text-slate-900">Fiat Offramp Queue</h1>
+              <p className="text-slate-500 mt-1 font-medium">Review and fulfill vendor cashout requests via Zelle.</p>
+            </header>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden p-6">
+              {cashouts.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 font-medium">No pending cashouts.</div>
+              ) : (
+                <div className="space-y-4">
+                  {cashouts.map(req => (
+                    <div key={req.id} className="bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                      <div>
+                        <span className="text-orange-600 font-black uppercase text-sm block tracking-widest mb-1">@{req.username}</span>
+                        <span className="text-slate-600 font-bold text-sm block">Zelle Contact: <span className="text-slate-900">{req.zelle_contact}</span></span>
+                        <div className="text-emerald-600 font-black text-xl mt-2">${req.usd_payout.toFixed(2)} USD Payout</div>
+                        <div className="text-slate-400 text-xs font-bold uppercase mt-1">Requested: {req.amount_coins.toFixed(2)} SC (5% Tax Applied)</div>
+                      </div>
+                      <div className="flex shrink-0">
+                        {req.status === 'pending' ? (
+                          <button 
+                            onClick={async () => {
+                              if (!window.confirm(`Did you successfully send $${req.usd_payout.toFixed(2)} to ${req.zelle_contact} via Zelle?`)) return;
+                              try {
+                                const res = await fetch(`${API_BASE}/admin/cashouts/${req.id}/approve`, {
+                                  method: 'POST',
+                                  headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                if (!res.ok) throw new Error("Failed to approve");
+                                toast.success("Cashout fulfilled. Coins burned.");
+                                fetchCashouts();
+                              } catch (err) {
+                                toast.error(err.message);
+                              }
+                            }}
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-colors active:scale-95 shadow-sm"
+                          >
+                            Mark Fulfilled
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 font-black text-xs uppercase bg-slate-200 px-4 py-2 rounded-xl border border-slate-300">Fulfilled</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>

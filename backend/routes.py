@@ -2115,3 +2115,91 @@ def release_escrow(order_id: int, req: TrackingRequest, session: Session = Depen
     )
     
     return {"message": "Escrow released successfully."}
+
+class CashoutSubmitRequest(BaseModel):
+    amount_coins: float
+    zelle_contact: str
+
+@router.post("/api/vendor/cashout")
+def submit_cashout_request(req: CashoutSubmitRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Locks coins from the vendor's wallet and submits a Zelle cashout request."""
+    from models import CashoutRequest
+    
+    username = token.get("sub")
+    user = session.exec(select(User).where(User.username == username)).first()
+    admin = session.exec(select(User).where(User.username == "admin")).first()
+    
+    if req.amount_coins < 10:
+        raise HTTPException(status_code=400, detail="Minimum cashout is 10 SC.")
+        
+    if getattr(user, "wallet_balance", 0) < req.amount_coins:
+        raise HTTPException(status_code=400, detail="Insufficient StreetCoin balance.")
+        
+    # 5% Platform Infrastructure Tax
+    usd_payout = req.amount_coins * 0.95
+    
+    # Deduct from vendor immediately to prevent double spending
+    user.wallet_balance -= req.amount_coins
+    admin.wallet_balance += req.amount_coins
+    
+    cashout = CashoutRequest(
+        username=username,
+        amount_coins=req.amount_coins,
+        usd_payout=usd_payout,
+        zelle_contact=req.zelle_contact,
+        status="pending"
+    )
+    
+    session.add(user)
+    session.add(admin)
+    session.add(cashout)
+    session.commit()
+    
+    return {"message": "Cashout request submitted securely."}
+
+@router.get("/api/admin/cashouts")
+def get_admin_cashouts(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    from models import CashoutRequest
+    return session.exec(select(CashoutRequest).order_by(CashoutRequest.id.desc())).all()
+
+@router.post("/api/admin/cashouts/{req_id}/approve")
+def approve_cashout(req_id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    from models import CashoutRequest, Transaction
+    cashout = session.get(CashoutRequest, req_id)
+    
+    if not cashout or cashout.status != "pending":
+        raise HTTPException(status_code=400, detail="Invalid or already processed request.")
+        
+    admin = session.exec(select(User).where(User.username == "admin")).first()
+    
+    # Burn the coins from the master vault since fiat has physically left the ecosystem
+    admin.wallet_balance -= cashout.amount_coins
+    cashout.status = "approved"
+    
+    tx = Transaction(
+        sender_username="admin",
+        receiver_username=cashout.username,
+        amount=cashout.amount_coins,
+        transaction_type="offramp",
+        status="completed"
+    )
+    
+    session.add(admin)
+    session.add(cashout)
+    session.add(tx)
+    session.commit()
+    
+    vendor = session.exec(select(User).where(User.username == cashout.username)).first()
+    if vendor:
+        send_automated_email(
+            to_email=vendor.email,
+            subject="Street Code 101 - Cashout Approved",
+            body=f"Yo @{vendor.username},\n\nYour cashout of {cashout.amount_coins} SC has been fulfilled. ${cashout.usd_payout:.2f} USD has been dispatched to your Zelle: {cashout.zelle_contact}."
+        )
+        
+    return {"message": "Cashout approved. Coins removed from circulation."}
