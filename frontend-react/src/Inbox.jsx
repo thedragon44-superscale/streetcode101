@@ -83,14 +83,14 @@ export default function Inbox() {
 
         {/* META-Style Search Bar */}
         <div className="mb-8 relative z-10">
-          <div className="relative">
-            <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <div className="flex items-center bg-white border border-slate-200 rounded-2xl px-4 py-1.5 shadow-sm focus-within:ring-2 focus-within:ring-orange-500 transition-all">
+            <i className="fa-solid fa-magnifying-glass text-slate-400 mr-3"></i>
             <input 
               type="text" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search users to message..."
-              className="w-full bg-white border border-slate-200 text-slate-900 placeholder-slate-400 rounded-2xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all shadow-sm font-medium"
+              className="w-full bg-transparent border-none focus:ring-0 focus:outline-none py-2 text-sm font-medium text-slate-900 placeholder-slate-400"
             />
           </div>
           
@@ -130,9 +130,9 @@ export default function Inbox() {
         )}
 
         <div className="space-y-3 relative z-0">
-          {conversations.map((conv) => (
+          {conversations.map((conv, idx) => (
             <Link 
-              key={conv.contact} 
+              key={`${conv.contact}-${idx}`} 
               to={`/chat/${conv.contact}`}
               className="block bg-white rounded-2xl p-4 shadow-sm border border-slate-200 hover:shadow-md hover:border-orange-300 transition-all group"
             >

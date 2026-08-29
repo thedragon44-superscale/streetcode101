@@ -9,13 +9,36 @@ def getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
     return orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
 socket.getaddrinfo = getaddrinfo_ipv4
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, Session, select
 from database import engine
 from models import Product, Order, User, Post, Message
 from routes import router
+import json
+
+# --- WEBSOCKET CONNECTION MANAGER ---
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except:
+                pass
+
+manager = ConnectionManager()
 
 app = FastAPI(title="Dropshipping API with Postgres", version="0.3.0")
 
@@ -32,6 +55,21 @@ app.add_middleware(
 
 # Bring in all the endpoints defined in routes.py
 app.include_router(router)
+
+@app.websocket("/api/ws/chat/{token}")
+async def websocket_endpoint(websocket: WebSocket, token: str):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Wait for any message from the frontend
+            data = await websocket.receive_text()
+            
+            # Broadcast it back out to all connected clients
+            # (In a production app, you would parse the token to identify the user
+            # and only send it to the specific recipient, plus save it to the DB)
+            await manager.broadcast(data)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 @app.on_event("startup")
 def on_startup():
