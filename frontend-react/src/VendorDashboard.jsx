@@ -1,62 +1,79 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from './Navbar';
 import toast from 'react-hot-toast';
 
 export default function VendorDashboard() {
-  // We will replace this with a fetch to /api/vendor/dashboard in the next phase
-  const [metrics] = useState({
-    availableBalance: 450.00,
-    escrowBalance: 120.50,
-    totalSales: 24,
-  });
-
-  const [orders, setOrders] = useState([
-    {
-      id: 'ORD-101-8X9P',
-      productName: 'Mechanical Keyboard (Red Switches)',
-      buyerUsername: 'garvmarcos',
-      shippingAddress: 'Garv Marcos | 123 ATX Ave, Austin, TX 78701',
-      date: '2026-08-28',
-      price: 120.50,
-      status: 'pending',
-      escrowStatus: 'locked',
-      trackingNumber: ''
-    },
-    {
-      id: 'ORD-101-4K2M',
-      productName: 'Vintage Denim Jacket',
-      buyerUsername: 'streetwear_king',
-      shippingAddress: 'John Doe | 456 Fashion St, New York, NY 10001',
-      date: '2026-08-25',
-      price: 85.00,
-      status: 'shipped',
-      escrowStatus: 'released',
-      trackingNumber: '1Z9999999999999999'
-    }
-  ]);
-
+  const [metrics, setMetrics] = useState({ availableBalance: 0, escrowBalance: 0, totalSales: 0 });
+  const [orders, setOrders] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [trackingInputs, setTrackingInputs] = useState({});
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      const token = localStorage.getItem('pidrop_token');
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vendor/dashboard`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setMetrics({
+            availableBalance: data.availableBalance,
+            escrowBalance: data.escrowBalance,
+            totalSales: data.totalSales
+          });
+          setOrders(data.orders);
+        }
+      } catch (err) {
+        toast.error("Failed to load dashboard.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
 
   const handleTrackingChange = (orderId, val) => {
     setTrackingInputs(prev => ({ ...prev, [orderId]: val }));
   };
 
-  const submitTracking = (orderId) => {
+  const submitTracking = async (orderId, rawId) => {
     const trackingNo = trackingInputs[orderId];
     if (!trackingNo || trackingNo.trim() === '') {
       return toast.error('Enter a valid tracking number.');
     }
     
-    // UI Mock Update - We will connect this to the Escrow Release endpoint next
-    setOrders(prev => prev.map(o => {
-      if (o.id === orderId) {
-        return { ...o, status: 'shipped', escrowStatus: 'released', trackingNumber: trackingNo };
-      }
-      return o;
-    }));
-    
-    toast.success(`Tracking added! Escrow released for ${orderId}`);
+    const token = localStorage.getItem('pidrop_token');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vendor/orders/${rawId}/ship`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ tracking_number: trackingNo })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to release escrow');
+      
+      // Optmistic UI Update
+      setOrders(prev => prev.map(o => 
+        o.id === orderId ? { ...o, status: 'shipped', escrowStatus: 'released', trackingNumber: trackingNo } : o
+      ));
+      
+      const orderPayout = orders.find(o => o.id === orderId)?.price || 0;
+      setMetrics(prev => ({
+        ...prev,
+        availableBalance: prev.availableBalance + orderPayout,
+        escrowBalance: prev.escrowBalance - orderPayout
+      }));
+      
+      toast.success(`Tracking sent & Escrow Released!`);
+    } catch(err) {
+      toast.error(err.message);
+    }
   };
 
   return (

@@ -1932,3 +1932,96 @@ def email_user_directly(username: str, payload: AdminEmailRequest, session: Sess
         
     send_automated_email(to_email=user.email, subject=payload.subject, body=payload.body)
     return {"message": f"Secure email dispatched to @{username}"}
+
+class TrackingRequest(BaseModel):
+    tracking_number: str
+
+@router.get("/api/vendor/dashboard")
+def get_vendor_dashboard(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Fetches live escrow metrics and fulfillment queue for the vendor."""
+    username = token.get("sub")
+    user = session.exec(select(User).where(User.username == username)).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Fetch all orders (Reverse chronological order)
+    orders = session.exec(select(Order).order_by(Order.id.desc())).all()
+    
+    formatted_orders = []
+    escrow_balance = 0.0
+    total_sales = 0
+    
+    for o in orders:
+        product, price = resolve_product_and_price(session, o.sku)
+        order_total = price * o.quantity if product else 0.0
+        total_sales += 1
+        
+        if o.status == "processing":
+            escrow_balance += order_total
+            
+        formatted_orders.append({
+            "id": f"ORD-{o.id}",
+            "raw_id": o.id,
+            "productName": product.title if product else f"SKU: {o.sku}",
+            "buyerUsername": o.customer_email.split('@')[0], 
+            "shippingAddress": o.shipping_address,
+            "date": "Just now", 
+            "price": order_total,
+            "status": o.status,
+            "escrowStatus": "locked" if o.status == "processing" else "released",
+            "trackingNumber": getattr(o, "tracking_number", "")
+        })
+        
+    return {
+        "availableBalance": getattr(user, "wallet_balance", 0.0),
+        "escrowBalance": escrow_balance,
+        "totalSales": total_sales,
+        "orders": formatted_orders
+    }
+
+@router.post("/api/vendor/orders/{order_id}/ship")
+def release_escrow(order_id: int, req: TrackingRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Logs the tracking number and instantly releases StreetCoin from Escrow to Vendor."""
+    username = token.get("sub")
+    vendor = session.exec(select(User).where(User.username == username)).first()
+    admin = session.exec(select(User).where(User.username == "admin")).first()
+    
+    order = session.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.status == "shipped":
+        raise HTTPException(status_code=400, detail="Escrow already released")
+        
+    order.status = "shipped"
+    order.tracking_number = req.tracking_number
+    
+    # Process the Escrow Release
+    product, price = resolve_product_and_price(session, order.sku)
+    payout = price * order.quantity
+    
+    if admin and vendor and admin.wallet_balance >= payout:
+        admin.wallet_balance -= payout
+        vendor.wallet_balance += payout
+        
+        from models import Transaction
+        tx = Transaction(
+            sender_username="admin",
+            receiver_username=vendor.username,
+            amount=payout,
+            transaction_type="escrow_release",
+            status="completed"
+        )
+        session.add(admin)
+        session.add(vendor)
+        session.add(tx)
+        
+    session.commit()
+    
+    send_automated_email(
+        to_email=order.customer_email,
+        subject=f"Street Code 101 - Order Shipped! #{order.id}",
+        body=f"Great news!\n\nYour drop has officially shipped.\nTracking Number: {req.tracking_number}\n\nStay street."
+    )
+    
+    return {"message": "Escrow released successfully."}
