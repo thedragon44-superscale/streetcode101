@@ -516,7 +516,7 @@ def create_wallet_topup(req: TopUpRequest, session: Session = Depends(get_sessio
 
 @router.post("/api/webhook")
 async def stripe_webhook(request: Request, session: Session = Depends(get_session)):
-    """Listens for successful Stripe Checkout events."""
+    """Listens for successful Stripe events."""
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
     
@@ -524,12 +524,12 @@ async def stripe_webhook(request: Request, session: Session = Depends(get_sessio
         event = stripe.Webhook.construct_event(
             payload, sig_header, os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_fallback")
         )
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=400, detail="Invalid payload")
-    except stripe.error.SignatureVerificationError as e:
+    except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    # Listen for native PaymentIntent successes
+    # Native PaymentIntent success (Wallet Top-Up)
     if event['type'] == 'payment_intent.succeeded':
         payment_intent = event['data']['object']
         metadata = payment_intent.get('metadata', {})
@@ -558,12 +558,32 @@ async def stripe_webhook(request: Request, session: Session = Depends(get_sessio
                 session.add(user)
                 session.add(tx)
                 session.commit()
-                print(f"💰 NATIVE TOP-UP SUCCESS: {coins_purchased} SC securely transferred to @{username}.")
+                print(f"💰 NATIVE TOP-UP SUCCESS: {coins_purchased} SC transferred to @{username}.")
                 
             return {"status": "success"}
 
-    # Leave checkout.session.completed below just in case any other features use it
-    if event['type'] == 'checkout.session.completed':
+    # Hosted Checkout success (Physical Dropshipping Orders)
+    elif event['type'] == 'checkout.session.completed':
+        session_data = event['data']['object']
+        metadata = session_data.get('metadata', {})
+        
+        if metadata.get('type') != 'wallet_topup':
+            customer_email = session_data.get("customer_details", {}).get("email", "unknown@email.com")
+            shipping_details = session_data.get("shipping_details", {}).get("address", {})
+            address_str = f"{shipping_details.get('line1', '')}, {shipping_details.get('city', '')}, {shipping_details.get('state', '')} {shipping_details.get('postal_code', '')}"
+            sku = metadata.get("sku", "UNKNOWN")
+            quantity = int(metadata.get("quantity", 1))
+
+            new_order = Order(
+                sku=sku,
+                quantity=quantity,
+                customer_email=customer_email,
+                shipping_address=address_str,
+                status="processing"
+            )
+            session.add(new_order)
+            session.commit()
+            return {"status": "success"}
 
     return {"status": "success"}
 
