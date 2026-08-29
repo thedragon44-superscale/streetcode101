@@ -40,17 +40,23 @@ export default function Chat() {
       .catch(err => console.error(err));
 
     // 2. Establish WebSocket Connection
-    ws.current = new WebSocket(`${WS_BASE}/${token}`);
+    const socket = new WebSocket(`${WS_BASE}/${token}`);
+    ws.current = socket;
 
-    ws.current.onmessage = (event) => {
+    socket.onmessage = (event) => {
       const newMsg = JSON.parse(event.data);
       if (newMsg.sender === targetUsername || newMsg.receiver === targetUsername) {
         setMessages(prev => [...prev, newMsg]);
       }
     };
 
+    // Graceful cleanup to prevent React Strict Mode connection crashes
     return () => {
-      if (ws.current) ws.current.close();
+      if (socket.readyState === WebSocket.CONNECTING) {
+        socket.onopen = () => socket.close();
+      } else if (socket.readyState === WebSocket.OPEN) {
+        socket.close();
+      }
     };
   }, [targetUsername, token, navigate]);
 
