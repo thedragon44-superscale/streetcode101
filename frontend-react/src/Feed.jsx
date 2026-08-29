@@ -195,11 +195,11 @@ export default function Feed() {
             <p className="text-slate-500 text-sm font-medium mt-1">Live drops from the community ledger.</p>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="flex bg-white shadow-sm border border-slate-200 p-1 rounded-xl">
+          <div className="flex items-center justify-between w-full sm:w-auto gap-3">
+            <div className="flex bg-white shadow-sm border border-slate-200 p-1 rounded-xl flex-1 sm:flex-none">
               <button 
                 onClick={() => setFeedType('global')} 
-                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${feedType === 'global' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${feedType === 'global' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 Global
               </button>
@@ -208,13 +208,13 @@ export default function Feed() {
                   if (!localStorage.getItem('pidrop_token')) return toast.error('Log in to see your following feed!');
                   setFeedType('following');
                 }} 
-                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${feedType === 'following' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${feedType === 'following' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 Following
               </button>
             </div>
-            <Link to="/profile/me" className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-all active:scale-95 text-sm uppercase tracking-wider hidden sm:block whitespace-nowrap">
-              Post a Drop
+            <Link to="/profile/me" className="bg-orange-500 hover:bg-orange-600 text-white font-black py-2 px-4 rounded-xl shadow-md transition-all active:scale-95 text-xs uppercase tracking-wider flex items-center justify-center gap-2 whitespace-nowrap">
+              <i className="fa-solid fa-pen-to-square"></i> Post
             </Link>
           </div>
         </div>
