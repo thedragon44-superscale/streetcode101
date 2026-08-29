@@ -2203,3 +2203,33 @@ def approve_cashout(req_id: int, session: Session = Depends(get_session), token:
         )
         
     return {"message": "Cashout approved. Coins removed from circulation."}
+
+@router.get("/api/admin/analytics")
+def get_admin_analytics(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Calculates platform-wide financial metrics for the admin dashboard."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    from models import User, Order, CashoutRequest
+    
+    # 1. Total SC in Circulation (All user wallets combined, excluding admin vault)
+    users = session.exec(select(User).where(User.username != "admin")).all()
+    total_circulation = sum(getattr(u, "wallet_balance", 0.0) for u in users)
+    
+    # 2. Total Escrow Liability (Locked funds awaiting tracking numbers)
+    processing_orders = session.exec(select(Order).where(Order.status == "processing")).all()
+    escrow_liability = 0.0
+    for o in processing_orders:
+        product, price = resolve_product_and_price(session, o.sku)
+        if product:
+            escrow_liability += price * o.quantity
+            
+    # 3. Platform Tax Revenue (The 5% retained from fulfilled cashouts)
+    completed_cashouts = session.exec(select(CashoutRequest).where(CashoutRequest.status == "approved")).all()
+    total_revenue_usd = sum(c.amount_coins - c.usd_payout for c in completed_cashouts)
+    
+    return {
+        "total_circulation": total_circulation,
+        "escrow_liability": escrow_liability,
+        "total_revenue_usd": total_revenue_usd
+    }

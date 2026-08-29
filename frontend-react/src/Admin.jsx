@@ -43,17 +43,20 @@ export default function Admin() {
   const [deleteReason, setDeleteReason] = useState('');
   const [isDeletingPost, setIsDeletingPost] = useState(false);
 
+  const [analytics, setAnalytics] = useState({ total_circulation: 0, escrow_liability: 0, total_revenue_usd: 0 });
+
   // ==========================================
   // API FETCHING LOGIC
   // ==========================================
   const fetchData = async () => {
     try {
-      const [ordersRes, productsRes, feedRes, promosRes, usersRes] = await Promise.all([
+      const [ordersRes, productsRes, feedRes, promosRes, usersRes, analyticsRes] = await Promise.all([
         fetch(`${API_BASE}/orders`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${API_BASE}/products`),
         fetch(`${API_BASE}/posts/feed`),
         fetch(`${API_BASE}/admin/promos`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(`${API_BASE}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE}/admin/analytics`, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
 
       if (ordersRes.status === 401) return handleLogout();
@@ -63,6 +66,7 @@ export default function Admin() {
       setSocialFeed(await feedRes.json());
       setPromos(promosRes.ok ? await promosRes.json() : []);
       setUsers(usersRes.ok ? await usersRes.json() : []);
+      setAnalytics(analyticsRes.ok ? await analyticsRes.json() : { total_circulation: 0, escrow_liability: 0, total_revenue_usd: 0 });
       
       const cashoutsRes = await fetch(`${API_BASE}/admin/cashouts`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -331,42 +335,54 @@ export default function Admin() {
     <div className="h-screen bg-slate-50 flex flex-col md:flex-row font-sans overflow-hidden">
       
       {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl z-10">
-        <div className="p-6 bg-slate-950 border-b border-slate-800 flex items-center gap-3">
-          <img src="/sb.png" alt="101 Token" className="h-10 w-10 object-cover rounded-full shadow-lg" />
-          <span className="text-xl font-black text-white tracking-tight uppercase">Admin Console</span>
+      <aside className="w-full md:w-64 bg-[#0f1115] text-slate-300 flex flex-col shadow-2xl z-10 border-r border-slate-800/50">
+        <div className="p-6 bg-[#0f1115] flex items-center gap-3 pt-8 pb-6">
+          <img src="/sb.png" alt="101 Token" className="h-8 w-8 object-cover rounded-full shadow-lg" />
+          <span className="text-lg font-black text-white tracking-tight uppercase">Admin Console</span>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
-          <button onClick={() => navigate('/')} className="w-full text-left px-4 py-3 rounded-xl font-bold transition-all text-cyan-400 hover:bg-slate-800 hover:text-cyan-300 mb-4 border border-slate-700/50 bg-slate-800/50">
-            🏪 Back to Storefront
+        
+        {/* Added overflow-y-auto so the tabs scroll smoothly! */}
+        <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto pb-10">
+          
+          <button onClick={() => navigate('/')} className="w-full text-left px-4 py-3 rounded-full font-bold transition-all text-slate-300 hover:bg-white/5 hover:text-white mb-6 border border-slate-700/50 flex items-center gap-3 text-sm shadow-sm">
+            <i className="fa-solid fa-store w-5 text-center"></i> Storefront
           </button>
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'dashboard' ? 'bg-cyan-500/10 text-cyan-400' : 'hover:bg-slate-800 hover:text-white'}`}>
-            📊 Dashboard
+
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 mb-2 mt-4">Overview</div>
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'dashboard' ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <i className="fa-solid fa-chart-pie w-5 text-center"></i> Dashboard
           </button>
-          <button onClick={() => setActiveTab('orders')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'orders' ? 'bg-orange-500/10 text-orange-500' : 'hover:bg-slate-800 hover:text-white'} flex justify-between items-center`}>
-            <span>📦 Orders</span>
-            {pendingOrdersCount > 0 && <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">{pendingOrdersCount}</span>}
+
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 mb-2 mt-6">Commerce</div>
+          <button onClick={() => setActiveTab('orders')} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex justify-between items-center text-sm ${activeTab === 'orders' ? 'bg-orange-500/10 text-orange-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <div className="flex items-center gap-3"><i className="fa-solid fa-box-open w-5 text-center"></i> Orders</div>
+            {pendingOrdersCount > 0 && <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full">{pendingOrdersCount}</span>}
           </button>
-          <button onClick={() => setActiveTab('products')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'products' ? 'bg-orange-500/10 text-orange-500' : 'hover:bg-slate-800 hover:text-white'}`}>
-            🏷️ Products
+          <button onClick={() => setActiveTab('products')} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'products' ? 'bg-orange-500/10 text-orange-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <i className="fa-solid fa-tags w-5 text-center"></i> Products
           </button>
-          <button onClick={() => setActiveTab('social')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'social' ? 'bg-purple-500/10 text-purple-400' : 'hover:bg-slate-800 hover:text-white'}`}>
-            👥 Social Feed
-          </button>
-          <button onClick={() => setActiveTab('promos')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'promos' ? 'bg-emerald-500/10 text-emerald-400' : 'hover:bg-slate-800 hover:text-white'}`}>
-            🎟️ Promos
-          </button>
-          <button onClick={() => setActiveTab('community')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'community' ? 'bg-blue-500/10 text-blue-400' : 'hover:bg-slate-800 hover:text-white'}`}>
-            🌍 Community
-          </button>
-          <button onClick={() => setActiveTab('cashouts')} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'cashouts' ? 'bg-emerald-500/10 text-emerald-400' : 'hover:bg-slate-800 hover:text-white'} flex justify-between items-center`}>
-            <span>💸 Cashouts</span>
+          <button onClick={() => setActiveTab('cashouts')} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex justify-between items-center text-sm ${activeTab === 'cashouts' ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <div className="flex items-center gap-3"><i className="fa-solid fa-money-bill-transfer w-5 text-center"></i> Cashouts</div>
             {cashouts.filter(c => c.status === 'pending').length > 0 && <span className="bg-emerald-500 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-full">{cashouts.filter(c => c.status === 'pending').length}</span>}
           </button>
+
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 mb-2 mt-6">Community</div>
+          <button onClick={() => setActiveTab('social')} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'social' ? 'bg-purple-500/10 text-purple-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <i className="fa-solid fa-users-viewfinder w-5 text-center"></i> Social Feed
+          </button>
+          <button onClick={() => setActiveTab('community')} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'community' ? 'bg-blue-500/10 text-blue-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <i className="fa-solid fa-globe w-5 text-center"></i> Roster
+          </button>
+          
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 mb-2 mt-6">Marketing</div>
+          <button onClick={() => setActiveTab('promos')} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'promos' ? 'bg-pink-500/10 text-pink-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <i className="fa-solid fa-ticket w-5 text-center"></i> Promos
+          </button>
         </nav>
-        <div className="p-4 border-t border-slate-800">
-          <button onClick={handleLogout} className="w-full px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg transition-all text-sm">
-            Log Out
+        
+        <div className="p-4 bg-[#0f1115] border-t border-slate-800/50">
+          <button onClick={handleLogout} className="w-full px-4 py-3 hover:bg-white/5 text-slate-400 hover:text-white font-bold rounded-full transition-all text-sm flex items-center justify-center gap-2">
+            <i className="fa-solid fa-arrow-right-from-bracket"></i> Log Out
           </button>
         </div>
       </aside>
@@ -379,21 +395,41 @@ export default function Admin() {
           <div className="animate-fade-in">
             <header className="mb-8">
               <h1 className="text-3xl font-black text-slate-900">Command Center</h1>
-              <p className="text-slate-500 mt-1 font-medium">High-level storefront metrics.</p>
+              <p className="text-slate-500 mt-1 font-medium">High-level storefront and economy metrics.</p>
             </header>
             
+            <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Storefront Operations</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-                <div className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">Total Revenue</div>
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-bl-full"></div>
+                <div className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">Storefront Sales (Gross)</div>
                 <div className="text-4xl font-black text-slate-900">${totalRevenue.toFixed(2)}</div>
               </div>
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-                <div className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">Pending Orders</div>
-                <div className="text-4xl font-black text-orange-500">{pendingOrdersCount}</div>
+                <div className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">Fulfillment Queue</div>
+                <div className="text-4xl font-black text-orange-500">{pendingOrdersCount} <span className="text-sm text-slate-400">pending</span></div>
               </div>
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-                <div className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">Total Products</div>
-                <div className="text-4xl font-black text-cyan-600">{products.length}</div>
+                <div className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">Active Catalog</div>
+                <div className="text-4xl font-black text-cyan-600">{products.length} <span className="text-sm text-slate-400">products</span></div>
+              </div>
+            </div>
+
+            <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Digital Economy Health</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-500/20 rounded-bl-full"></div>
+                <div className="text-cyan-500 text-sm font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><i className="fa-solid fa-coins"></i> Circulating StreetCoin</div>
+                <div className="text-4xl font-black text-white">{analytics.total_circulation.toFixed(2)} <span className="text-lg text-slate-500">SC</span></div>
+              </div>
+              <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/20 rounded-bl-full"></div>
+                <div className="text-orange-400 text-sm font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><i className="fa-solid fa-lock"></i> Locked in Escrow</div>
+                <div className="text-4xl font-black text-white">{analytics.escrow_liability.toFixed(2)} <span className="text-lg text-slate-500">SC</span></div>
+              </div>
+              <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-200 shadow-sm flex flex-col justify-center">
+                <div className="text-emerald-700 text-sm font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><i className="fa-solid fa-sack-dollar"></i> Platform Tax Revenue (5%)</div>
+                <div className="text-4xl font-black text-emerald-600">${analytics.total_revenue_usd.toFixed(2)} <span className="text-lg text-emerald-400">USD</span></div>
               </div>
             </div>
           </div>
