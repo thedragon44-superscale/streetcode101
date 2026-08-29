@@ -443,6 +443,16 @@ export default function Profile() {
                     {profile.is_following ? 'Unfollow' : 'Follow'}
                   </button>
                 )}
+                
+                {/* Vendor Dashboard Button (Only on your own profile) */}
+                {isMyProfile && profile.username !== 'admin' && (
+                  <Link 
+                    to="/vendor"
+                    className="mt-4 sm:mt-0 px-6 py-2 bg-slate-900 hover:bg-orange-500 text-white rounded-xl text-sm font-bold shadow-sm transition active:scale-95 uppercase tracking-wider flex items-center gap-2"
+                  >
+                    <i className="fa-solid fa-shop"></i> Vendor Console
+                  </Link>
+                )}
               </div>
 
               {/* Network Stats */}

@@ -14,6 +14,7 @@ import Profile from './Profile';
 import Feed from './Feed';
 import Chat from './Chat';
 import Inbox from './Inbox';
+import VendorDashboard from './VendorDashboard';
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
           <Route path="/legal/:section" element={<Legal />} />
           <Route path="/product/:sku" element={<ProductPage />} />
           <Route path="/profile/:username" element={<Profile />} />
+          <Route path="/vendor" element={<VendorDashboard />} />
           <Route path="/post/:id" element={<Post />} />
           <Route path="/chat/:targetUsername" element={<Chat />} />
           <Route path="/inbox" element={<Inbox />} />
