@@ -46,16 +46,21 @@ app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["https://streetcode101.com", "https://www.streetcode101.com"], 
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
 app.include_router(router)
 
 @app.websocket("/api/ws/chat/{token}")
+@app.websocket("/ws/chat/{token}")
 async def websocket_endpoint(websocket: WebSocket, token: str):
+    if not token or token == "null":
+        await websocket.close(code=1008)
+        return
+
     await manager.connect(websocket)
     try:
         while True:
