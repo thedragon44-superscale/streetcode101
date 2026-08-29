@@ -52,10 +52,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router)
-
+# Ensure WebSockets are evaluated BEFORE any HTTP catch-all routes in routes.py
 @app.websocket("/api/ws/chat/{token}")
 @app.websocket("/ws/chat/{token}")
+@app.websocket("/chat/{token}")
 async def websocket_endpoint(websocket: WebSocket, token: str):
     if not token or token == "null":
         await websocket.close(code=1008)
@@ -68,6 +68,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
             await manager.broadcast(data)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+# Bring in all the endpoints defined in routes.py
+app.include_router(router)
 
 @app.on_event("startup")
 def on_startup():

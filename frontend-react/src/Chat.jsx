@@ -67,7 +67,8 @@ export default function Chat() {
 
   const sendMessage = (e) => {
     e.preventDefault();
-    if (!input.trim() || !ws.current) return;
+    // Guardrail: Do not attempt to transmit if the connection is dead or connecting
+    if (!input.trim() || !ws.current || ws.current.readyState !== WebSocket.OPEN) return;
 
     ws.current.send(JSON.stringify({
       receiver: targetUsername,
