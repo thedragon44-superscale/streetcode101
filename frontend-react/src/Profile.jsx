@@ -732,7 +732,7 @@ export default function Profile() {
 
       {/* --- NATIVE STRIPE TOP-UP MODAL --- */}
       {showTopUpModal && clientSecret && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col relative border border-slate-200">
             {/* Header (Pinned to top) */}
             <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-3xl shrink-0">
