@@ -534,21 +534,21 @@ export default function Admin() {
         {/* --- PRODUCTS VIEW --- */}
         {activeTab === 'products' && (
           <div className="animate-fade-in">
-            <header className="mb-8 flex justify-between items-end">
+            <header className="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
               <div>
                 <h1 className="text-3xl font-black text-slate-900">Inventory</h1>
                 <p className="text-slate-500 mt-1 font-medium">Manage your storefront products.</p>
               </div>
-              <div className="flex gap-3">
-                <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
+              <div className="w-full md:w-auto">
+                <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm w-full">
                   <input 
                     type="text" 
                     value={cjSku}
                     onChange={(e) => setCjSku(e.target.value)}
                     placeholder="Enter CJ SKU..."
-                    className="px-3 py-2 border-none text-sm focus:ring-0 font-medium w-48 bg-transparent text-slate-700 placeholder-slate-400 uppercase tracking-wider"
+                    className="w-full md:w-48 px-3 py-2 border-none text-sm focus:ring-0 font-medium bg-transparent text-slate-700 placeholder-slate-400 uppercase tracking-wider min-w-0"
                   />
-                  <button onClick={handleSyncCJ} disabled={isSyncing} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-6 py-2 rounded-lg shadow-sm transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 text-xs tracking-widest uppercase">
+                  <button onClick={handleSyncCJ} disabled={isSyncing} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-4 md:px-6 py-2 rounded-lg shadow-sm transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 text-xs tracking-widest uppercase whitespace-nowrap">
                     {isSyncing ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-cloud-arrow-down"></i>}
                     Import SKU
                   </button>
