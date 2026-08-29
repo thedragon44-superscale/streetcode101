@@ -393,6 +393,13 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
           <i className="fa-solid fa-layer-group text-xl"></i>
           <span className="text-[10px] font-bold tracking-wide font-mono uppercase">Feed</span>
         </Link>
+
+        {currentUser && (
+          <Link to="/inbox" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/inbox') || location.pathname.startsWith('/chat') ? 'text-orange-500' : 'text-slate-500 hover:text-blue-400'}`}>
+            <i className="fa-solid fa-envelope text-xl"></i>
+            <span className="text-[10px] font-bold tracking-wide font-mono uppercase">Inbox</span>
+          </Link>
+        )}
         
         <button onClick={() => setIsCartOpen(true)} className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isCartOpen ? 'text-orange-500' : 'text-slate-500 hover:text-blue-400'}`}>
           <div className="relative">
