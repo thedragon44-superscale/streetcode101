@@ -485,9 +485,9 @@ export default function Admin() {
               </div>
             </header>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full text-left text-sm text-slate-600 block md:table">
+                <thead className="hidden md:table-header-group bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
                   <tr>
                     <th className="px-6 py-5">Order ID</th>
                     <th className="px-6 py-5">Customer Details</th>
@@ -495,19 +495,21 @@ export default function Admin() {
                     <th className="px-6 py-5">Status & Tracking</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="block md:table-row-group divide-y divide-slate-100">
                   {filteredOrders.map((order) => (
-                    <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 font-black text-slate-900 text-base">#{order.id}</td>
-                      <td className="px-6 py-4">
+                    <tr key={order.id} className="block md:table-row hover:bg-slate-50 transition-colors p-4 md:p-0">
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4 font-black text-slate-900 text-base before:content-['Order_ID:'] before:md:hidden before:mr-2 before:text-xs before:text-slate-400 before:uppercase before:font-bold">
+                        #{order.id}
+                      </td>
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4 border-b md:border-0 border-slate-100 mb-2 md:mb-0">
                         <div className="font-bold text-slate-900">{order.customer_email}</div>
-                        <div className="text-xs text-slate-500 mt-1 leading-relaxed max-w-[200px]">{order.shipping_address}</div>
+                        <div className="text-xs text-slate-500 mt-1 leading-relaxed">{order.shipping_address}</div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded inline-block font-bold border border-slate-200 mb-2">{order.sku}</div>
-                        <div className="text-xs font-black text-slate-500 bg-slate-100 w-fit px-2 py-0.5 rounded-full">Qty: {order.quantity}</div>
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4 flex justify-between items-center md:table-cell mb-2 md:mb-0">
+                        <div className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded inline-block font-bold border border-slate-200">{order.sku}</div>
+                        <div className="text-xs font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Qty: {order.quantity}</div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4">
                         <select 
                           className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-orange-500 block w-full p-2.5 font-bold cursor-pointer shadow-sm" 
                           defaultValue={order.status}
@@ -554,9 +556,9 @@ export default function Admin() {
               </div>
             </header>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full text-left text-sm text-slate-600 block md:table">
+                <thead className="hidden md:table-header-group bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
                   <tr>
                     <th className="px-6 py-5">Product Info</th>
                     <th className="px-6 py-5">SKU</th>
@@ -565,37 +567,39 @@ export default function Admin() {
                     <th className="px-6 py-5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="block md:table-row-group divide-y divide-slate-100">
                   {products.map((product) => {
-                    // Calculate Profit Margin based on your 2.5x markup model
                     const baseCost = product.price / 2.5;
                     const profit = product.price - baseCost;
 
                     return (
-                      <tr key={product.sku} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 flex items-center gap-4">
+                      <tr key={product.sku} className="block md:table-row hover:bg-slate-50 transition-colors p-4 md:p-0 relative">
+                        <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4 flex items-start gap-4 mb-2 md:mb-0">
                           <button 
                             onClick={() => handleToggleFeatured(product.sku)}
-                            className={`text-xl transition-all hover:scale-125 ${product.is_featured ? 'text-yellow-400 drop-shadow-md' : 'text-slate-300 hover:text-yellow-200'}`}
+                            className={`text-xl transition-all hover:scale-125 pt-1 ${product.is_featured ? 'text-yellow-400 drop-shadow-md' : 'text-slate-300 hover:text-yellow-200'}`}
                             title="Set as Featured Drop"
                           >
                             <i className="fa-solid fa-crown"></i>
                           </button>
-                          <img src={product.image_url} alt={product.title} className="w-12 h-12 rounded-lg object-cover border border-slate-200 bg-slate-100" />
-                          <button onClick={() => { setEditingProduct(product); setIsEditModalOpen(true); }} className="font-bold text-slate-900 text-base hover:text-orange-500 hover:underline text-left transition-colors">
-                            {product.title}
-                          </button>
+                          <img src={product.image_url} alt={product.title} className="w-16 h-16 md:w-12 md:h-12 rounded-lg object-cover border border-slate-200 bg-slate-100" />
+                          <div className="flex-1">
+                            <button onClick={() => { setEditingProduct(product); setIsEditModalOpen(true); }} className="font-bold text-slate-900 text-base md:text-base hover:text-orange-500 hover:underline text-left transition-colors mb-1 block leading-tight">
+                              {product.title}
+                            </button>
+                            <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold border border-slate-200 md:hidden">{product.sku}</span>
+                          </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="hidden md:table-cell px-6 py-4">
                           <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold border border-slate-200">{product.sku}</span>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="font-black text-slate-900 text-base">${product.price.toFixed(2)}</div>
-                          <div className="text-xs font-bold text-emerald-600 mt-0.5">
+                        <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4 flex items-center justify-between md:table-cell border-b md:border-0 border-slate-100">
+                          <div className="font-black text-slate-900 text-lg md:text-base">${product.price.toFixed(2)}</div>
+                          <div className="text-xs font-bold text-emerald-600">
                             +${profit.toFixed(2)} Profit
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="block md:table-cell px-2 md:px-6 py-3 md:py-4 flex items-center justify-between md:justify-start">
                           <div className="flex items-center gap-2">
                             <span className={`w-2 h-2 rounded-full ${product.in_stock ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-red-500'}`}></span>
                             <span className={`text-xs font-black uppercase tracking-widest ${product.in_stock ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -603,12 +607,10 @@ export default function Admin() {
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end">
-                            <button onClick={() => handleDeleteProduct(product.sku)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 w-8 h-8 rounded-lg transition-all flex items-center justify-center active:scale-90" title="Delete Product">
-                              <i className="fa-solid fa-xmark text-lg"></i>
-                            </button>
-                          </div>
+                        <td className="absolute top-4 right-4 md:relative md:top-auto md:right-auto md:table-cell md:px-6 md:py-4 md:text-right">
+                          <button onClick={() => handleDeleteProduct(product.sku)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 w-8 h-8 rounded-lg transition-all flex items-center justify-center active:scale-90" title="Delete Product">
+                            <i className="fa-solid fa-trash text-sm md:text-lg"></i>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -639,9 +641,9 @@ export default function Admin() {
               <p className="text-slate-500 mt-1 font-medium">Monitor and remove posts from the community timeline.</p>
             </header>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full text-left text-sm text-slate-600 block md:table">
+                <thead className="hidden md:table-header-group bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
                   <tr>
                     <th className="px-6 py-5">User</th>
                     <th className="px-6 py-5">Post Type</th>
@@ -649,33 +651,38 @@ export default function Admin() {
                     <th className="px-6 py-5 text-right">Kill Switch</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="block md:table-row-group divide-y divide-slate-100">
                   {socialFeed.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4">
+                    <tr key={item.id} className="block md:table-row hover:bg-slate-50 transition-colors p-4 md:p-0 relative">
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4">
                         <div className="flex items-center gap-3">
-                          <img src={item.user_avatar} alt={item.username} className="w-8 h-8 rounded-full border border-slate-200 object-cover" />
-                          <span className="font-bold text-slate-900">@{item.username}</span>
+                          <img src={item.user_avatar} alt={item.username} className="w-10 h-10 md:w-8 md:h-8 rounded-full border border-slate-200 object-cover" />
+                          <div>
+                            <span className="font-bold text-slate-900 block">@{item.username}</span>
+                            <span className={`md:hidden px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider mt-1 inline-block ${item.post_type === 'vendor_drop' ? 'bg-orange-100 text-orange-700' : item.post_type === 'image' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-700'}`}>
+                              {item.post_type.replace('_', ' ')}
+                            </span>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="hidden md:table-cell px-6 py-4">
                         <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${item.post_type === 'vendor_drop' ? 'bg-orange-100 text-orange-700' : item.post_type === 'image' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-700'}`}>
                           {item.post_type.replace('_', ' ')}
                         </span>
                       </td>
-                      <td className="px-6 py-4 flex items-center gap-4">
+                      <td className="block md:table-cell px-2 md:px-6 py-3 md:py-4 flex items-start gap-4">
                         {item.post_type !== 'text' && item.image_url && (
-                          <img src={item.image_url} alt="Post media" className="w-10 h-10 rounded-lg object-cover border border-slate-200 bg-slate-100 flex-shrink-0" />
+                          <img src={item.image_url} alt="Post media" className="w-16 h-16 md:w-10 md:h-10 rounded-lg object-cover border border-slate-200 bg-slate-100 flex-shrink-0" />
                         )}
                         <div className="min-w-0 flex-1">
-                          {item.title && <div className="font-bold text-slate-900 text-sm truncate w-48">{item.title}</div>}
-                          <div className="text-xs text-slate-500 truncate w-48">{item.description}</div>
+                          {item.title && <div className="font-bold text-slate-900 text-sm md:truncate md:w-48 leading-tight mb-1">{item.title}</div>}
+                          <div className="text-xs text-slate-500 line-clamp-2 md:truncate md:w-48 leading-relaxed">{item.description}</div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end">
-                          <button onClick={() => handleDeletePostClick(item.id, item.username, item.title || item.description)} className="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white px-4 py-2 rounded-lg transition-all font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm">
-                            <i className="fa-solid fa-trash"></i> Delete & Notify
+                      <td className="block md:table-cell px-2 md:px-6 pt-2 pb-2 md:py-4 border-t md:border-0 border-slate-100 mt-2 md:mt-0">
+                        <div className="flex md:justify-end">
+                          <button onClick={() => handleDeletePostClick(item.id, item.username, item.title || item.description)} className="w-full md:w-auto bg-red-50 hover:bg-red-500 text-red-600 hover:text-white px-4 py-2.5 rounded-lg transition-all font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm">
+                            <i className="fa-solid fa-trash"></i> Delete Post
                           </button>
                         </div>
                       </td>
@@ -737,9 +744,9 @@ export default function Admin() {
             </form>
 
             {/* Promos Ledger */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full text-left text-sm text-slate-600 block md:table">
+                <thead className="hidden md:table-header-group bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
                   <tr>
                     <th className="px-6 py-5">Access Code</th>
                     <th className="px-6 py-5">Discount</th>
@@ -748,26 +755,26 @@ export default function Admin() {
                     <th className="px-6 py-5 text-right">Kill Switch</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="block md:table-row-group divide-y divide-slate-100">
                   {promos.map((promo) => (
-                    <tr key={promo.id} className={`transition-colors ${promo.is_active ? 'hover:bg-slate-50' : 'bg-slate-50/50 opacity-75'}`}>
-                      <td className="px-6 py-4">
-                        <span className="font-mono text-sm bg-slate-100 text-slate-900 px-3 py-1.5 rounded-lg font-bold border border-slate-200">
+                    <tr key={promo.id} className={`block md:table-row transition-colors p-4 md:p-0 relative ${promo.is_active ? 'hover:bg-slate-50' : 'bg-slate-50/50 opacity-75'}`}>
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4">
+                        <span className="font-mono text-sm bg-slate-100 text-slate-900 px-3 py-1.5 rounded-lg font-bold border border-slate-300 block w-fit">
                           {promo.code}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-black text-emerald-600 text-base">
+                      <td className="block md:table-cell px-2 md:px-6 py-1 md:py-4 font-black text-emerald-600 text-lg md:text-base">
                         {promo.discount_percent}% OFF
                       </td>
-                      <td className="px-6 py-4 font-bold text-slate-700">
+                      <td className="block md:table-cell px-2 md:px-6 py-1 md:py-4 font-bold text-slate-700 text-sm before:content-['Usages:'] before:mr-2 before:text-xs before:text-slate-400 before:uppercase before:font-black before:md:hidden">
                         {promo.usage_count}
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-xs font-black uppercase tracking-widest px-2 py-1 rounded-full ${promo.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4">
+                        <span className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-2 py-1 rounded-full ${promo.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                           {promo.is_active ? 'Active' : 'Disabled'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="absolute top-4 right-4 md:relative md:top-auto md:right-auto md:table-cell md:px-6 md:py-4 md:text-right">
                         <button 
                           onClick={() => handleTogglePromo(promo.id)} 
                           className={`w-12 h-6 rounded-full flex items-center p-1 transition-colors shadow-inner ${promo.is_active ? 'bg-emerald-500 justify-end' : 'bg-slate-400 justify-start'}`}
@@ -794,9 +801,9 @@ export default function Admin() {
               <p className="text-slate-500 mt-1 font-medium">Manage registered accounts and VIP discounts.</p>
             </header>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full text-left text-sm text-slate-600 block md:table">
+                <thead className="hidden md:table-header-group bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
                   <tr>
                     <th className="px-6 py-5">User</th>
                     <th className="px-6 py-5">Email</th>
@@ -804,35 +811,41 @@ export default function Admin() {
                     <th className="px-6 py-5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="block md:table-row-group divide-y divide-slate-100">
                   {users.map((user) => (
-                    <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 flex items-center gap-3">
-                        <img src={user.profile_image_url} alt={user.username} className="w-8 h-8 rounded-full border border-slate-200 object-cover" />
-                        <span className="font-bold text-slate-900">@{user.username}</span>
+                    <tr key={user.id} className="block md:table-row hover:bg-slate-50 transition-colors p-4 md:p-0">
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4 flex items-center gap-3">
+                        <img src={user.profile_image_url} alt={user.username} className="w-10 h-10 md:w-8 md:h-8 rounded-full border border-slate-200 object-cover" />
+                        <div>
+                          <span className="font-bold text-slate-900 block text-base md:text-sm">@{user.username}</span>
+                          <span className="text-slate-500 font-mono text-[10px] md:hidden block mt-0.5">{user.email}</span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-500 font-mono text-xs">{user.email}</td>
-                      <td className="px-6 py-4">
-                        <input 
-                          type="number" 
-                          min="0" max="100" 
-                          defaultValue={user.discount_percent}
-                          onBlur={(e) => {
-                            if (e.target.value != user.discount_percent) handleUpdateUserDiscount(user.username, e.target.value);
-                          }}
-                          className="w-20 px-2 py-1 border border-slate-200 rounded text-slate-900 font-bold focus:border-orange-500 focus:outline-none"
-                        /> <span className="text-xs font-bold text-slate-500">%</span>
+                      <td className="hidden md:table-cell px-6 py-4 text-slate-500 font-mono text-xs">{user.email}</td>
+                      <td className="block md:table-cell px-2 md:px-6 py-3 md:py-4 border-t md:border-0 border-slate-100 mt-2 md:mt-0 flex items-center justify-between md:table-cell">
+                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest md:hidden">Vault Discount:</span>
+                        <div>
+                          <input 
+                            type="number" 
+                            min="0" max="100" 
+                            defaultValue={user.discount_percent}
+                            onBlur={(e) => {
+                              if (e.target.value != user.discount_percent) handleUpdateUserDiscount(user.username, e.target.value);
+                            }}
+                            className="w-16 md:w-20 px-2 py-1 border border-slate-300 rounded-md text-slate-900 font-bold focus:border-orange-500 focus:outline-none shadow-sm"
+                          /> <span className="text-xs font-bold text-slate-500">%</span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button onClick={() => navigate(`/chat/${user.username}`)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-bold text-xs transition-colors">
-                            Message
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4">
+                        <div className="flex md:justify-end gap-2 w-full">
+                          <button onClick={() => navigate(`/chat/${user.username}`)} className="flex-1 md:flex-none bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 md:py-1.5 rounded-lg font-bold text-xs transition-colors flex items-center justify-center gap-2">
+                            <i className="fa-solid fa-comment-dots md:hidden"></i> Message
                           </button>
                           <button 
                             onClick={() => { setEmailTarget(user); setIsEmailModalOpen(true); }} 
-                            className="bg-orange-50 hover:bg-orange-500 text-orange-600 hover:text-white px-3 py-1.5 rounded-lg font-bold text-xs transition-colors"
+                            className="flex-1 md:flex-none bg-orange-50 hover:bg-orange-500 text-orange-600 hover:text-white px-3 py-2 md:py-1.5 rounded-lg font-bold text-xs transition-colors flex items-center justify-center gap-2"
                           >
-                            Email
+                            <i className="fa-solid fa-envelope md:hidden"></i> Email
                           </button>
                         </div>
                       </td>
