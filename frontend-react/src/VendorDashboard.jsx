@@ -200,7 +200,7 @@ export default function VendorDashboard() {
                     {order.status === 'pending' ? (
                       <div className="space-y-2">
                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Input Tracking to Release Funds</label>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <input 
                             type="text"
                             placeholder="e.g. 1Z9999..."
@@ -210,7 +210,7 @@ export default function VendorDashboard() {
                           />
                           <button 
                             onClick={() => submitTracking(order.id)}
-                            className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
+                            className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
                           >
                             Submit
                           </button>
