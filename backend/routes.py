@@ -395,6 +395,20 @@ def validate_promo(req: PromoValidateRequest, session: Session = Depends(get_ses
         raise HTTPException(status_code=400, detail="Invalid or expired promo code.")
     return {"code": promo.code, "discount_percent": promo.discount_percent}
 
+def resolve_product_and_price(session: Session, sku: str):
+    """Helper to find a product by base SKU or variant SKU."""
+    product = session.get(Product, sku)
+    if product:
+        return product, product.price
+    
+    # Fallback: Search inside variants
+    for p in session.exec(select(Product)).all():
+        if p.variants:
+            for v in p.variants:
+                if v.get("variant_sku") == sku:
+                    return p, float(v.get("price", p.price))
+    return None, 0.0
+
 @router.post("/api/create-payment-intent")
 def create_payment_intent(
     req: PaymentIntentRequest, 
@@ -403,13 +417,12 @@ def create_payment_intent(
 ):
     """Securely calculates price on the backend and requests a PaymentIntent."""
     
-    # 1. Calculate Base Total from verified DB prices
     base_total = 0.0
     for item in req.items:
-        product = session.get(Product, item.sku)
+        product, item_price = resolve_product_and_price(session, item.sku)
         if not product or not product.in_stock:
             raise HTTPException(status_code=400, detail=f"Product {item.sku} unavailable")
-        base_total += product.price * item.quantity
+        base_total += item_price * item.quantity
 
     # 2. Calculate Total Discount
     total_discount_percent = 0.0
@@ -454,7 +467,7 @@ def create_payment_intent(
 @router.post("/api/checkout")
 def submit_order(order_data: Order, session: Session = Depends(get_session)):
     """Saves a new customer order to the database (Stripe/Card Checkout)."""
-    product = session.get(Product, order_data.sku)
+    product, _ = resolve_product_and_price(session, order_data.sku)
     if not product or not product.in_stock:
         raise HTTPException(status_code=400, detail="Product unavailable")
 
@@ -501,10 +514,10 @@ def checkout_with_streetcoin(req: StreetCoinCheckoutRequest, session: Session = 
     # 1. Calculate final exact total (including promos/vault discounts)
     base_total = 0.0
     for item in req.items:
-        product = session.get(Product, item.sku)
+        product, item_price = resolve_product_and_price(session, item.sku)
         if not product or not product.in_stock:
             raise HTTPException(status_code=400, detail=f"Product {item.sku} unavailable")
-        base_total += product.price * item.quantity
+        base_total += item_price * item.quantity
 
     total_discount = getattr(user, "discount_percent", 0.0)
     if req.promo_code:
@@ -1693,17 +1706,23 @@ def get_user_cart(session: Session = Depends(get_session), token: dict = Depends
     """Fetches the saved cart for the logged-in user."""
     username = token.get("sub")
     
-    # Get all saved cart items for this user
     saved_items = session.exec(select(CartItem).where(CartItem.username == username)).all()
     
-    # We need to return the full product details so the frontend can render images/prices
     cart_products = []
     for item in saved_items:
-        product = session.get(Product, item.sku)
+        product, item_price = resolve_product_and_price(session, item.sku)
         if product and product.in_stock:
-            # Convert SQLAlchemy object to dictionary so we can inject the quantity
             prod_dict = product.dict()
             prod_dict["cart_quantity"] = item.quantity
+            prod_dict["sku"] = item.sku
+            prod_dict["price"] = item_price
+            
+            if product.variants:
+                for v in product.variants:
+                    if v.get("variant_sku") == item.sku:
+                        prod_dict["title"] = f"{product.title} ({v.get('color', '')} / {v.get('size', '')})"
+                        prod_dict["image_url"] = v.get("image_url", product.image_url)
+                        
             cart_products.append(prod_dict)
             
     return cart_products
