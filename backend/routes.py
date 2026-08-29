@@ -82,6 +82,9 @@ BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
 class ForgotPasswordRequest(BaseModel):
     email: str
 
+class TopUpRequest(BaseModel):
+    coins: int
+
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
@@ -196,26 +199,16 @@ def login(request: AuthRequest, session: Session = Depends(get_session)):
 
 @router.get("/api/profile/me")
 def get_my_profile(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Fetches the profile of the currently logged-in user."""
+    """Fetches the profile of the currently logged-in user (now supports Wallets)."""
     username = token.get("sub")
     
-    # Calculate network metrics for the logged-in user
-    followers_count = len(session.exec(select(Follow).where(Follow.following_username == username)).all())
-    following_count = len(session.exec(select(Follow).where(Follow.follower_username == username)).all())
-
-    if username == "admin":
-        return {
-            "username": "admin", 
-            "bio": "Master Admin Override", 
-            "profile_image_url": "/dragon_logo.png",
-            "followers_count": followers_count,
-            "following_count": following_count,
-            "email_opt_in": False
-        }
-        
     user = session.exec(select(User).where(User.username == username)).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+        
+    # Calculate network metrics
+    followers_count = len(session.exec(select(Follow).where(Follow.following_username == username)).all())
+    following_count = len(session.exec(select(Follow).where(Follow.follower_username == username)).all())
         
     return {
         "username": user.username,
@@ -223,7 +216,8 @@ def get_my_profile(session: Session = Depends(get_session), token: dict = Depend
         "profile_image_url": user.profile_image_url,
         "email_opt_in": getattr(user, "email_opt_in", False),
         "followers_count": followers_count,
-        "following_count": following_count
+        "following_count": following_count,
+        "wallet_balance": getattr(user, "wallet_balance", 0.0) # Expose the new wallet to the frontend!
     }
 
 @router.patch("/api/profile/me")
@@ -488,6 +482,103 @@ def submit_order(order_data: Order, session: Session = Depends(get_session)):
         "status": order_data.status,
         "message": "Order saved securely to database!"
     }
+
+@router.post("/api/wallet/topup")
+def create_wallet_topup(req: TopUpRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Generates a Stripe Checkout session to buy StreetCoins with exact fee coverage."""
+    username = token.get("sub")
+    user = session.exec(select(User).where(User.username == username)).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if req.coins <= 0:
+        raise HTTPException(status_code=400, detail="Must purchase at least 1 coin")
+        
+    # THE SURCHARGE ALGORITHM:
+    # Target Net Amount = req.coins (since 1 SC = 1 USD)
+    # Total Charge = (Target + $0.30) / (1 - 0.029)
+    total_usd = (req.coins + 0.30) / 0.971
+    total_cents = int(round(total_usd * 100))
+    
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f'{req.coins} StreetCoins',
+                        'description': 'Digital currency for the Street Code 101 marketplace.',
+                    },
+                    'unit_amount': total_cents,
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=os.getenv("FRONTEND_URL", "http://localhost:5173") + '/profile/me?topup=success',
+            cancel_url=os.getenv("FRONTEND_URL", "http://localhost:5173") + '/profile/me?topup=cancelled',
+            metadata={
+                'type': 'wallet_topup',
+                'username': user.username,
+                'coins': str(req.coins)
+            }
+        )
+        return {"url": checkout_session.url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/webhook")
+async def stripe_webhook(request: Request, session: Session = Depends(get_session)):
+    """Listens for successful Stripe Checkout events."""
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_fallback")
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    except stripe.error.SignatureVerificationError as e:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    if event['type'] == 'checkout.session.completed':
+        session_data = event['data']['object']
+        metadata = session_data.get('metadata', {})
+        
+        # --- LOGIC: Check if this is a StreetCoin Top-Up ---
+        if metadata.get('type') == 'wallet_topup':
+            username = metadata.get('username')
+            coins_purchased = float(metadata.get('coins'))
+            
+            from models import Transaction
+            admin = session.exec(select(User).where(User.username == "admin")).first()
+            user = session.exec(select(User).where(User.username == username)).first()
+            
+            if admin and user and getattr(admin, "wallet_balance", 0) >= coins_purchased:
+                # 1. Double-Entry Ledger Transfer
+                admin.wallet_balance -= coins_purchased
+                user.wallet_balance += coins_purchased
+                
+                # 2. Log the immutable transaction
+                tx = Transaction(
+                    sender_username="admin",
+                    receiver_username=user.username,
+                    amount=coins_purchased,
+                    transaction_type="onramp",
+                    status="completed"
+                )
+                
+                session.add(admin)
+                session.add(user)
+                session.add(tx)
+                session.commit()
+                print(f"💰 TOP-UP SUCCESS: {coins_purchased} SC securely transferred to @{username}.")
+                
+            return {"status": "success"}
+
+    return {"status": "success"}
 
 @router.get("/api/orders", response_model=List[Order])
 def get_all_orders(session: Session = Depends(get_session), token: dict = Depends(verify_token)):

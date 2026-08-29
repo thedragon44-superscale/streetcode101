@@ -41,8 +41,49 @@ export default function Profile() {
   const [editingPostId, setEditingPostId] = useState(null);
   const [editPayload, setEditPayload] = useState({ title: '', description: '', price: '' });
 
+  // Wallet State
+  const [topUpAmount, setTopUpAmount] = useState('');
+
   const token = localStorage.getItem('pidrop_token');
   const isMyProfile = username === 'me';
+
+  // Stripe Redirect Handler (Checks the URL for ?topup=success)
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    if (query.get('topup') === 'success') {
+      toast.success('💰 Wallet topped up successfully!');
+      // Clean the URL so it doesn't keep triggering on refresh
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    if (query.get('topup') === 'cancelled') {
+      toast.error('Top-up cancelled.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  const handleTopUp = async () => {
+    const targetCoins = parseInt(topUpAmount);
+    if (!targetCoins || targetCoins < 1) return toast.error('Enter a valid amount');
+    
+    try {
+      const res = await fetch(`${API_BASE}/wallet/topup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ coins: targetCoins })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.detail || 'Top-up failed');
+      
+      // Redirect the user directly to the Stripe Checkout URL
+      window.location.href = data.url; 
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
 
   const handleToggleComments = async (postId) => {
     if (activeCommentPostId === postId) {
@@ -409,6 +450,59 @@ export default function Profile() {
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Following</span>
                 </div>
               </div>
+
+              {/* --- STREETCOIN WALLET SECTION (Only visible on your own profile) --- */}
+              {isMyProfile && (
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm mt-6 mb-6 animate-fade-in relative overflow-hidden">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                      <i className="fa-solid fa-coins text-orange-500"></i>
+                    </div>
+                    <h2 className="text-xl font-black text-slate-900">StreetCoin Wallet</h2>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 mb-6">
+                    <span className="text-5xl font-black text-slate-900">
+                      {profile.wallet_balance?.toFixed(2) || '0.00'}
+                    </span>
+                    <span className="text-slate-400 font-bold uppercase tracking-wider mt-3">SC</span>
+                  </div>
+
+                  <div className="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200">
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                      Purchase Coins (1 SC = $1 USD)
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                      <div className="w-full sm:flex-1 relative">
+                        <span className="absolute left-4 top-3.5 text-slate-400 font-black">SC</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={topUpAmount}
+                          onChange={(e) => setTopUpAmount(e.target.value)}
+                          placeholder="0"
+                          className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-black text-lg bg-white shadow-inner"
+                        />
+                        
+                        {/* Dynamic Surcharge Math Display */}
+                        {topUpAmount > 0 && (
+                          <div className="absolute -bottom-6 left-1 text-[11px] font-bold text-slate-500 tracking-wide truncate w-[120%]">
+                            + ${(((parseInt(topUpAmount) + 0.30) / 0.971) - parseInt(topUpAmount)).toFixed(2)} Fee = <span className="text-slate-900">${((parseInt(topUpAmount) + 0.30) / 0.971).toFixed(2)} Total</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <button
+                        onClick={handleTopUp}
+                        disabled={!topUpAmount || topUpAmount < 1}
+                        className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black py-3 px-8 rounded-xl shadow-md transition-all active:scale-[0.98] uppercase tracking-wider whitespace-nowrap"
+                      >
+                        Checkout
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="mt-6">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Bio / Manifesto</h3>
