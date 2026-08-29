@@ -338,13 +338,13 @@ export default function Admin() {
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden" 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] md:hidden transition-opacity" 
           onClick={() => setIsMobileMenuOpen(false)}
         ></div>
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform duration-300 ease-in-out z-50 w-64 bg-[#0f1115] text-slate-300 flex flex-col shadow-2xl border-r border-slate-800/50`}>
+      <aside className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform duration-300 ease-in-out z-[100] w-64 bg-[#0f1115] text-slate-300 flex flex-col shadow-2xl border-r border-slate-800/50`}>
         <div className="p-6 bg-[#0f1115] flex items-center justify-between gap-3 pt-8 pb-6">
           <div className="flex items-center gap-3">
             <img src="/sb.png" alt="101 Token" className="h-8 w-8 object-cover rounded-full shadow-lg" />
