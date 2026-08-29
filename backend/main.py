@@ -42,7 +42,6 @@ manager = ConnectionManager()
 
 app = FastAPI(title="Dropshipping API with Postgres", version="0.3.0")
 
-# Mount the .well-known directory for Apple Pay domain verification
 app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
 
 app.add_middleware(
@@ -53,7 +52,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Bring in all the endpoints defined in routes.py
 app.include_router(router)
 
 @app.websocket("/api/ws/chat/{token}")
@@ -61,12 +59,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
     await manager.connect(websocket)
     try:
         while True:
-            # Wait for any message from the frontend
             data = await websocket.receive_text()
-            
-            # Broadcast it back out to all connected clients
-            # (In a production app, you would parse the token to identify the user
-            # and only send it to the specific recipient, plus save it to the DB)
             await manager.broadcast(data)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
@@ -75,7 +68,6 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
 def on_startup():
     SQLModel.metadata.create_all(engine)
     
-    # Optional: Seed the database with our mock products if it's empty
     with Session(engine) as session:
         existing = session.exec(select(Product)).first()
         if not existing:
