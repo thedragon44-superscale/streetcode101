@@ -414,6 +414,14 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
           )}
           <span className="text-[10px] font-bold tracking-wide font-mono uppercase">{currentUser ? 'Profile' : 'Log In'}</span>
         </Link>
+        
+        {/* Mobile Admin Link (Only visible if Master Admin) */}
+        {currentUser?.username === 'admin' && (
+          <Link to="/admin" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/admin') ? 'text-orange-500' : 'text-orange-500/50 hover:text-orange-400'}`}>
+            <i className="fa-solid fa-screwdriver-wrench text-xl"></i>
+            <span className="text-[10px] font-bold tracking-wide font-mono uppercase">Admin</span>
+          </Link>
+        )}
       </div>
 
       <div className="h-16 sm:hidden bg-slate-950"></div>

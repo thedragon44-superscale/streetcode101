@@ -10,6 +10,7 @@ export default function Admin() {
 
   // --- DASHBOARD STATE ---
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [socialFeed, setSocialFeed] = useState([]);
@@ -334,9 +335,69 @@ export default function Admin() {
   return (
     <div className="h-screen bg-slate-50 flex flex-col md:flex-row font-sans overflow-hidden">
       
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setIsMobileMenuOpen(false)}
+        ></div>
+      )}
+
       {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-[#0f1115] text-slate-300 flex flex-col shadow-2xl z-10 border-r border-slate-800/50">
-        <div className="p-6 bg-[#0f1115] flex items-center gap-3 pt-8 pb-6">
+      <aside className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform duration-300 ease-in-out z-50 w-64 bg-[#0f1115] text-slate-300 flex flex-col shadow-2xl border-r border-slate-800/50`}>
+        <div className="p-6 bg-[#0f1115] flex items-center justify-between gap-3 pt-8 pb-6">
+          <div className="flex items-center gap-3">
+            <img src="/sb.png" alt="101 Token" className="h-8 w-8 object-cover rounded-full shadow-lg" />
+            <span className="text-lg font-black text-white tracking-tight uppercase">Console</span>
+          </div>
+          <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400 hover:text-white text-xl">
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        
+        <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto pb-10">
+          <button onClick={() => { navigate('/'); setIsMobileMenuOpen(false); }} className="w-full text-left px-4 py-3 rounded-full font-bold transition-all text-slate-300 hover:bg-white/5 hover:text-white mb-6 border border-slate-700/50 flex items-center gap-3 text-sm shadow-sm">
+            <i className="fa-solid fa-store w-5 text-center"></i> Storefront
+          </button>
+
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 mb-2 mt-4">Overview</div>
+          <button onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'dashboard' ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <i className="fa-solid fa-chart-pie w-5 text-center"></i> Dashboard
+          </button>
+
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 mb-2 mt-6">Commerce</div>
+          <button onClick={() => { setActiveTab('orders'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex justify-between items-center text-sm ${activeTab === 'orders' ? 'bg-orange-500/10 text-orange-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <div className="flex items-center gap-3"><i className="fa-solid fa-box-open w-5 text-center"></i> Orders</div>
+            {pendingOrdersCount > 0 && <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full">{pendingOrdersCount}</span>}
+          </button>
+          <button onClick={() => { setActiveTab('products'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'products' ? 'bg-orange-500/10 text-orange-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <i className="fa-solid fa-tags w-5 text-center"></i> Products
+          </button>
+          <button onClick={() => { setActiveTab('cashouts'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex justify-between items-center text-sm ${activeTab === 'cashouts' ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <div className="flex items-center gap-3"><i className="fa-solid fa-money-bill-transfer w-5 text-center"></i> Cashouts</div>
+            {cashouts.filter(c => c.status === 'pending').length > 0 && <span className="bg-emerald-500 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-full">{cashouts.filter(c => c.status === 'pending').length}</span>}
+          </button>
+
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 mb-2 mt-6">Community</div>
+          <button onClick={() => { setActiveTab('social'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'social' ? 'bg-purple-500/10 text-purple-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <i className="fa-solid fa-users-viewfinder w-5 text-center"></i> Social Feed
+          </button>
+          <button onClick={() => { setActiveTab('community'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'community' ? 'bg-blue-500/10 text-blue-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <i className="fa-solid fa-globe w-5 text-center"></i> Roster
+          </button>
+          
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 mb-2 mt-6">Marketing</div>
+          <button onClick={() => { setActiveTab('promos'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'promos' ? 'bg-pink-500/10 text-pink-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <i className="fa-solid fa-ticket w-5 text-center"></i> Promos
+          </button>
+        </nav>
+        
+        <div className="p-4 bg-[#0f1115] border-t border-slate-800/50">
+          <button onClick={handleLogout} className="w-full px-4 py-3 hover:bg-white/5 text-slate-400 hover:text-white font-bold rounded-full transition-all text-sm flex items-center justify-center gap-2">
+            <i className="fa-solid fa-arrow-right-from-bracket"></i> Log Out
+          </button>
+        </div>
+      </aside>
           <img src="/sb.png" alt="101 Token" className="h-8 w-8 object-cover rounded-full shadow-lg" />
           <span className="text-lg font-black text-white tracking-tight uppercase">Admin Console</span>
         </div>
@@ -388,7 +449,24 @@ export default function Admin() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-8 overflow-y-auto relative">
+      <main className="flex-1 overflow-y-auto relative bg-slate-50 h-screen">
+        
+        {/* Mobile Navbar Header */}
+        <div className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+          <div className="flex items-center gap-3">
+            <img src="/sb.png" alt="Logo" className="w-8 h-8 rounded-full" />
+            <span className="font-black text-slate-900 tracking-tight uppercase">Admin</span>
+          </div>
+          <button 
+            onClick={() => setIsMobileMenuOpen(true)} 
+            className="w-10 h-10 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center justify-center text-slate-700 transition-colors"
+          >
+            <i className="fa-solid fa-bars"></i>
+          </button>
+        </div>
+
+        {/* Content Wrapper */}
+        <div className="p-4 md:p-8 pb-24">
         
         {/* --- DASHBOARD VIEW --- */}
         {activeTab === 'dashboard' && (
@@ -871,6 +949,7 @@ export default function Admin() {
             </div>
           </div>
         )}
+        </div>
       </main>
 
       {/* --- EDIT PRODUCT MODAL --- */}
