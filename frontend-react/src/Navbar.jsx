@@ -172,6 +172,49 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
     }
   };
 
+  const handleStreetCoinCheckout = async () => {
+    if (cart.length === 0) return;
+    setIsSubmitting(true);
+
+    const aptString = checkoutApt ? ` ${checkoutApt}` : '';
+    const fullShippingAddress = `${checkoutName} | ${checkoutStreet}${aptString}, ${checkoutCity}, ${checkoutState} ${checkoutZip}`;
+    const token = localStorage.getItem('pidrop_token');
+
+    try {
+      const response = await fetch(`${API_BASE}/checkout/streetcoin`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          items: cart.map(item => ({ sku: item.sku, quantity: item.cart_quantity || 1 })),
+          promo_code: appliedPromo ? appliedPromo.code : null,
+          customer_email: checkoutEmail,
+          shipping_address: fullShippingAddress
+        })
+      });
+      
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'StreetCoin checkout failed');
+      
+      toast.success('Escrow secured! Order placed successfully.');
+      
+      // Optimistically update wallet balance in UI
+      setCurrentUser(prev => ({
+        ...prev,
+        wallet_balance: prev.wallet_balance - finalTotal
+      }));
+      
+      clearCart();
+      setIsCartOpen(false);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <>
       <header className="sticky top-0 z-[9999] bg-slate-950 text-white shadow-2xl border-b border-slate-800">
@@ -489,6 +532,36 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
               <div>
                 <h3 className="text-xs font-mono font-bold text-blue-400 mb-3 uppercase tracking-widest">SECURE PAYMENT</h3>
+                
+                {/* --- STREETCOIN ESCROW BUTTON --- */}
+                {currentUser && (
+                  <div className="mb-6 bg-slate-900 border border-orange-500/30 rounded-xl p-4 shadow-lg">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Wallet Balance</span>
+                      <span className="text-sm font-black text-orange-500 font-mono">{currentUser.wallet_balance?.toFixed(2) || '0.00'} SC</span>
+                    </div>
+                    <button
+                      onClick={handleStreetCoinCheckout}
+                      disabled={isSubmitting || (currentUser.wallet_balance || 0) < finalTotal}
+                      className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-slate-700 disabled:text-slate-500 text-slate-950 font-black py-4 rounded-xl transition-all active:scale-[0.98] uppercase tracking-wider flex items-center justify-center gap-2"
+                    >
+                      <i className="fa-solid fa-coins"></i> 
+                      {isSubmitting ? 'PROCESSING...' : 'PAY WITH STREETCOIN'}
+                    </button>
+                    {(currentUser.wallet_balance || 0) < finalTotal && (
+                      <div className="text-[10px] text-red-400 font-bold mt-2 text-center uppercase tracking-widest">
+                        INSUFFICIENT BALANCE. TOP UP PROFILE.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="flex-1 h-px bg-slate-800"></div>
+                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">OR PAY WITH CARD</div>
+                  <div className="flex-1 h-px bg-slate-800"></div>
+                </div>
+
                 {clientSecret ? (
                   <Elements stripe={stripePromise} options={{ 
                     clientSecret, 

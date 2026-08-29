@@ -453,7 +453,7 @@ def create_payment_intent(
 
 @router.post("/api/checkout")
 def submit_order(order_data: Order, session: Session = Depends(get_session)):
-    """Saves a new customer order to the database."""
+    """Saves a new customer order to the database (Stripe/Card Checkout)."""
     product = session.get(Product, order_data.sku)
     if not product or not product.in_stock:
         raise HTTPException(status_code=400, detail="Product unavailable")
@@ -462,7 +462,6 @@ def submit_order(order_data: Order, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(order_data)
     
-    # --- SEND AUTOMATED CONFIRMATION EMAIL ---
     email_body = (
         f"Thanks for dropping with us!\n\n"
         f"We've successfully received your order for '{product.title}' (SKU: {order_data.sku}).\n"
@@ -482,6 +481,82 @@ def submit_order(order_data: Order, session: Session = Depends(get_session)):
         "status": order_data.status,
         "message": "Order saved securely to database!"
     }
+
+class StreetCoinCheckoutRequest(BaseModel):
+    items: List[CartItemMinimal]
+    promo_code: str | None = None
+    customer_email: str
+    shipping_address: str
+
+@router.post("/api/checkout/streetcoin")
+def checkout_with_streetcoin(req: StreetCoinCheckoutRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Processes a cart checkout using StreetCoins and locks funds in Escrow."""
+    username = token.get("sub")
+    user = session.exec(select(User).where(User.username == username)).first()
+    admin = session.exec(select(User).where(User.username == "admin")).first()
+    
+    if not user or not admin:
+        raise HTTPException(status_code=404, detail="System routing error.")
+        
+    # 1. Calculate final exact total (including promos/vault discounts)
+    base_total = 0.0
+    for item in req.items:
+        product = session.get(Product, item.sku)
+        if not product or not product.in_stock:
+            raise HTTPException(status_code=400, detail=f"Product {item.sku} unavailable")
+        base_total += product.price * item.quantity
+
+    total_discount = getattr(user, "discount_percent", 0.0)
+    if req.promo_code:
+        promo = session.exec(select(PromoCode).where(PromoCode.code == req.promo_code.upper(), PromoCode.is_active == True)).first()
+        if promo:
+            total_discount += promo.discount_percent
+            
+    final_total = base_total * (1 - (total_discount / 100))
+    
+    # 2. Verify Wallet Balance
+    if getattr(user, "wallet_balance", 0) < final_total:
+        raise HTTPException(status_code=400, detail="Insufficient StreetCoin balance. Please top up your wallet.")
+        
+    # 3. Deduct from Buyer & Hold in Admin Escrow
+    user.wallet_balance -= final_total
+    admin.wallet_balance += final_total
+    
+    # 4. Log Immutable Escrow Transaction
+    from models import Transaction
+    tx = Transaction(
+        sender_username=user.username,
+        receiver_username="admin",
+        amount=final_total,
+        transaction_type="escrow_lock",
+        status="completed"
+    )
+    
+    session.add(user)
+    session.add(admin)
+    session.add(tx)
+    
+    # 5. Generate the Physical Orders
+    for item in req.items:
+        new_order = Order(
+            sku=item.sku,
+            quantity=item.quantity,
+            customer_email=req.customer_email,
+            shipping_address=req.shipping_address,
+            status="processing"
+        )
+        session.add(new_order)
+        
+    session.commit()
+    
+    # 6. Dispatch Escrow Receipt
+    send_automated_email(
+        to_email=req.customer_email,
+        subject="StreetCoin Escrow Locked - Order Confirmed",
+        body=f"Yo @{user.username},\n\nYour order has been paid securely using {final_total:.2f} StreetCoins. The funds are currently locked in the Master Escrow Vault until the vendor ships your drop.\n\nShipping to:\n{req.shipping_address}\n\nStay tuned for tracking info."
+    )
+    
+    return {"message": "Escrow secured and order placed."}
 
 @router.post("/api/wallet/topup")
 def create_wallet_topup(req: TopUpRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
