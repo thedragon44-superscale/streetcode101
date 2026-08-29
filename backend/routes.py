@@ -1980,12 +1980,102 @@ def get_vendor_dashboard(session: Session = Depends(get_session), token: dict = 
         "orders": formatted_orders
     }
 
+def verify_tracking_live(tracking_number: str) -> tuple[bool, str]:
+    """Auto-detects the carrier and pings the live network to verify the label exists."""
+    tracking = tracking_number.strip().upper()
+    
+    # 1. Regex Carrier Auto-Detection
+    carrier = "usps"
+    if re.match(r"^1Z[0-9A-Z]{16}$", tracking):
+        carrier = "ups"
+    elif re.match(r"^[0-9]{12,15}$", tracking):
+        carrier = "fedex"
+    elif re.match(r"^9[0-9]{19,21}$", tracking):
+        carrier = "usps"
+    else:
+        return False, "Unrecognized tracking format. Must be a valid UPS, USPS, or FedEx number."
+        
+    # 2. Live API Ping (Shippo)
+    shippo_api_key = os.getenv("SHIPPO_API_KEY")
+    if not shippo_api_key:
+        # Fallback: If you haven't added your API key yet, it passes the Regex check so your app doesn't crash during development
+        return True, "Valid Regex Format (Live Verification Bypassed - Missing API Key)"
+        
+    try:
+        url = f"https://api.goshippo.com/tracks/{carrier}/{tracking}"
+        headers = {"Authorization": f"ShippoToken {shippo_api_key}"}
+        res = requests.get(url, headers=headers, timeout=10)
+        
+        if res.status_code == 404:
+            return False, "Carrier network has no record of this tracking number."
+            
+        data = res.json()
+        tracking_status = data.get("tracking_status", {})
+        
+        if not tracking_status:
+            return False, "Tracking number format valid, but carrier status is unknown."
+            
+        # Usually status is "UNKNOWN", "PRE_TRANSIT", "TRANSIT", "DELIVERED", "RETURNED", "FAILURE"
+        # We reject "UNKNOWN" to prevent vendors from inputting dead labels that haven't registered
+        if tracking_status.get("status") == "UNKNOWN":
+            return False, "Label not yet recognized by carrier. Please wait until it updates to 'Pre-Transit' before releasing escrow."
+            
+        return True, "Tracking verified live."
+        
+    except Exception as e:
+        return False, f"Live verification failed: {str(e)}"
+
+
 @router.post("/api/vendor/orders/{order_id}/ship")
 def release_escrow(order_id: int, req: TrackingRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Logs the tracking number and instantly releases StreetCoin from Escrow to Vendor."""
+    """Logs the tracking number, verifies it against carrier networks, and releases Escrow."""
     username = token.get("sub")
     vendor = session.exec(select(User).where(User.username == username)).first()
     admin = session.exec(select(User).where(User.username == "admin")).first()
+    
+    order = session.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.status == "shipped":
+        raise HTTPException(status_code=400, detail="Escrow already released")
+        
+    # --- FIRE THE LIVE VERIFICATION ---
+    is_valid, message = verify_tracking_live(req.tracking_number)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=message)
+        
+    order.status = "shipped"
+    order.tracking_number = req.tracking_number
+    
+    # Process the Escrow Release
+    product, price = resolve_product_and_price(session, order.sku)
+    payout = price * order.quantity
+    
+    if admin and vendor and admin.wallet_balance >= payout:
+        admin.wallet_balance -= payout
+        vendor.wallet_balance += payout
+        
+        from models import Transaction
+        tx = Transaction(
+            sender_username="admin",
+            receiver_username=vendor.username,
+            amount=payout,
+            transaction_type="escrow_release",
+            status="completed"
+        )
+        session.add(admin)
+        session.add(vendor)
+        session.add(tx)
+        
+    session.commit()
+    
+    send_automated_email(
+        to_email=order.customer_email,
+        subject=f"Street Code 101 - Order Shipped! #{order.id}",
+        body=f"Great news!\n\nYour drop has officially shipped.\nTracking Number: {req.tracking_number}\n\nStay street."
+    )
+    
+    return {"message": "Escrow released successfully."}
     
     order = session.get(Order, order_id)
     if not order:
