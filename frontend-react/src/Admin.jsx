@@ -5,6 +5,37 @@ import toast from 'react-hot-toast';
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
 export default function Admin() {
+  const [broadcastData, setBroadcastData] = useState({
+    subject: '',
+    image_url: 'https://images.unsplash.com/photo-1550639525-c97d455acf70?q=80&w=600&auto=format&fit=crop',
+    headline: '',
+    body_text: '',
+    promo_code: '',
+  });
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+
+  const handleBroadcastSubmit = async (e) => {
+    e.preventDefault();
+    setIsBroadcasting(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/broadcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(broadcastData)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Broadcast failed');
+      toast.success(data.message);
+      setBroadcastData({ ...broadcastData, subject: '', headline: '', body_text: '', promo_code: '' });
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsBroadcasting(false);
+    }
+  };
   const navigate = useNavigate();
   const [token, setToken] = useState(localStorage.getItem('pidrop_token'));
 
@@ -1023,6 +1054,49 @@ export default function Admin() {
           </div>
         </div>
       )}
+
+      {/* Marketing Broadcast Engine */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-8">
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-slate-900">Marketing Broadcast Engine</h2>
+          <p className="text-sm text-slate-500">Deploy high-converting HTML emails to your entire Ledger.</p>
+        </div>
+
+        <form onSubmit={handleBroadcastSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Email Subject Line</label>
+              <input type="text" required value={broadcastData.subject} onChange={(e) => setBroadcastData({...broadcastData, subject: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g., 🚨 The Midnight Vault is Open" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Hero Image URL</label>
+              <input type="url" required value={broadcastData.image_url} onChange={(e) => setBroadcastData({...broadcastData, image_url: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="https://your-minio-bucket.com/image.jpg" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Main Headline</label>
+              <input type="text" required value={broadcastData.headline} onChange={(e) => setBroadcastData({...broadcastData, headline: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g., EXCLUSIVE NEW DROP" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Promo Code (Optional)</label>
+              <input type="text" value={broadcastData.promo_code} onChange={(e) => setBroadcastData({...broadcastData, promo_code: e.target.value.toUpperCase()})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 uppercase font-mono" placeholder="e.g., MIDNIGHT20" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Body Text</label>
+            <textarea required rows="4" value={broadcastData.body_text} onChange={(e) => setBroadcastData({...broadcastData, body_text: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" placeholder="Write your email body here..." />
+          </div>
+
+          <div className="pt-2">
+            <button type="submit" disabled={isBroadcasting} className="w-full sm:w-auto px-6 py-3 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              {isBroadcasting ? 'Deploying...' : 'Launch Broadcast'}
+            </button>
+          </div>
+        </form>
+      </div>
 
     </div>
   );

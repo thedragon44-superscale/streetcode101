@@ -1496,6 +1496,120 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+class BroadcastRequest(BaseModel):
+    subject: str
+    image_url: str
+    headline: str
+    body_text: str
+    promo_code: str | None = None
+    cta_text: str = "Shop The Drop"
+    cta_link: str = "https://streetcode101.com"
+
+@router.post("/api/admin/broadcast")
+def send_marketing_broadcast(payload: BroadcastRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    # Security Check: Only admin can fire blasts
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Fetch all subscribed emails
+    subscribers = session.query(LedgerSubscriber).all()
+    if not subscribers:
+        raise HTTPException(status_code=404, detail="No subscribers found.")
+
+    # Conditionally render the Promo Code block
+    promo_html = ""
+    if payload.promo_code:
+        promo_html = f"""
+        <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom: 30px;">
+            <tr>
+                <td align="center">
+                    <div style="background-color: #1e293b; border: 2px dashed #334155; border-radius: 12px; padding: 20px; display: inline-block;">
+                        <p style="margin: 0 0 5px 0; color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Promo Code</p>
+                        <p style="margin: 0; color: #f97316; font-family: monospace; font-size: 26px; font-weight: 900; letter-spacing: 3px;">{payload.promo_code}</p>
+                    </div>
+                </td>
+            </tr>
+        </table>
+        """
+
+    # Dynamic HTML Template
+    html_template = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{payload.subject}</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #f8fafc; padding: 40px 10px;">
+            <tr>
+                <td align="center">
+                    <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px; background-color: #0f172a; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                        <tr>
+                            <td align="center" style="padding: 30px 20px; background-color: #020617; border-bottom: 1px solid #1e293b;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;">
+                                    STREET CODE <span style="color: #f97316;">101</span>
+                                </h1>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td align="center" style="background-color: #0f172a;">
+                                <img src="{payload.image_url}" alt="Promo Graphic" width="600" style="width: 100%; max-width: 600px; height: auto; display: block; border: 0;" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 40px 30px; text-align: center;">
+                                <h2 style="margin: 0 0 15px 0; color: #ffffff; font-size: 28px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px;">
+                                    {payload.headline}
+                                </h2>
+                                <p style="margin: 0 0 25px 0; color: #94a3b8; font-size: 16px; line-height: 1.6; font-weight: 500;">
+                                    {payload.body_text}
+                                </p>
+                                {promo_html}
+                                <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation">
+                                    <tr>
+                                        <td align="center">
+                                            <a href="{payload.cta_link}" style="display: inline-block; background-color: #f97316; color: #0f172a; text-decoration: none; padding: 18px 40px; font-size: 14px; font-weight: 900; border-radius: 12px; text-transform: uppercase; letter-spacing: 1px;">
+                                                {payload.cta_text}
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td align="center" style="padding: 30px; background-color: #020617; border-top: 1px solid #1e293b;">
+                                <p style="margin: 0 0 10px 0; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                                    The Peer-to-Peer Ledger
+                                </p>
+                                <p style="margin: 0; color: #475569; font-size: 11px;">
+                                    © 2026 Street Code 101. All rights reserved.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+    
+    plain_fallback = f"{payload.headline}\n\n{payload.body_text}\n\n{payload.cta_link}"
+    
+    sent_count = 0
+    for sub in subscribers:
+        send_automated_email(
+            recipient=sub.email,
+            subject=payload.subject,
+            body=plain_fallback,
+            html_body=html_template
+        )
+        sent_count += 1
+        
+    return {"message": f"Broadcast sent to {sent_count} subscribers successfully."}
+
 @router.get("/api/messages/{target_user}")
 def get_chat_history(target_user: str, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches historical messages between the logged-in user and the target user."""
@@ -1786,33 +1900,72 @@ def subscribe_newsletter(req: SubscribeRequest, session: Session = Depends(get_s
         
         html_template = f"""
         <!DOCTYPE html>
-        <html>
-        <body style="margin:0; padding:0; background-color:#f8fafc; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-            <div style="max-width:600px; margin: 40px auto; background-color:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                
-                <!-- Hero Image Placeholder -->
-                <div style="width:100%; height:200px; background-color:#0f172a; display:flex; align-items:center; justify-content:center; text-align:center;">
-                    <!-- Swap this img src out with your actual S3/MinIO bucket URL later -->
-                    <img src="https://via.placeholder.com/600x200/0f172a/ffffff?text=STREET+CODE+101+VAULT" alt="Street Code 101" style="width:100%; height:auto; display:block;" />
-                </div>
-
-                <!-- Live Text Content -->
-                <div style="padding: 40px 30px;">
-                    <h1 style="margin-top:0; color:#0f172a; font-size:24px; font-weight:900; text-transform:uppercase; letter-spacing:-0.5px;">Welcome to the Ledger</h1>
-                    <p style="color:#475569; font-size:16px; line-height:1.6; font-weight:500;">You're officially on the list. You now have exclusive access to our community drops, vendor network, and secure marketplace.</p>
-                    <p style="color:#475569; font-size:16px; line-height:1.6; font-weight:500;">Use the secure vault code below at checkout to claim your introductory drop:</p>
-
-                    <!-- Vault Code Box -->
-                    <div style="margin: 30px 0; padding: 20px; background-color:#f8fafc; border-radius:8px; text-align:center; border:2px dashed #cbd5e1;">
-                        <span style="font-family:monospace; font-size:24px; font-weight:900; color:#f97316; letter-spacing:2px;">VAULT-Q70KHNSF5G</span>
-                    </div>
-
-                    <!-- Dark CTA Button -->
-                    <div style="text-align:center; margin-top:40px; margin-bottom:10px;">
-                        <a href="https://streetcode101.com" style="display:inline-block; background-color:#0f172a; color:#ffffff; text-decoration:none; padding:16px 36px; font-size:14px; font-weight:900; border-radius:12px; text-transform:uppercase; letter-spacing:1px;">Enter The Vault</a>
-                    </div>
-                </div>
-            </div>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Welcome to Street Code 101</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+            <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #f8fafc; padding: 40px 10px;">
+                <tr>
+                    <td align="center">
+                        <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px; background-color: #0f172a; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                            <tr>
+                                <td align="center" style="padding: 30px 20px; background-color: #020617; border-bottom: 1px solid #1e293b;">
+                                    <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;">
+                                        STREET CODE <span style="color: #f97316;">101</span>
+                                    </h1>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td align="center" style="background-color: #0f172a;">
+                                    <img src="https://images.unsplash.com/photo-1550639525-c97d455acf70?q=80&w=600&auto=format&fit=crop" alt="Welcome to the Vault" width="600" style="width: 100%; max-width: 600px; height: auto; display: block; border: 0;" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 40px 30px; text-align: center;">
+                                    <h2 style="margin: 0 0 15px 0; color: #ffffff; font-size: 28px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px;">
+                                        Welcome to the Ledger
+                                    </h2>
+                                    <p style="margin: 0 0 25px 0; color: #94a3b8; font-size: 16px; line-height: 1.6; font-weight: 500;">
+                                        You're officially on the list. You now have exclusive access to our community drops, vendor network, and secure marketplace. Use the secure vault code below at checkout to claim your introductory drop:
+                                    </p>
+                                    <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom: 30px;">
+                                        <tr>
+                                            <td align="center">
+                                                <div style="background-color: #1e293b; border: 2px dashed #334155; border-radius: 12px; padding: 20px; display: inline-block;">
+                                                    <p style="margin: 0 0 5px 0; color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Introductory Code</p>
+                                                    <p style="margin: 0; color: #f97316; font-family: monospace; font-size: 26px; font-weight: 900; letter-spacing: 3px;">VAULT-Q70KHNSF5G</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation">
+                                        <tr>
+                                            <td align="center">
+                                                <a href="https://streetcode101.com" style="display: inline-block; background-color: #f97316; color: #0f172a; text-decoration: none; padding: 18px 40px; font-size: 14px; font-weight: 900; border-radius: 12px; text-transform: uppercase; letter-spacing: 1px;">
+                                                    Enter The Vault
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td align="center" style="padding: 30px; background-color: #020617; border-top: 1px solid #1e293b;">
+                                    <p style="margin: 0 0 10px 0; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                                        The Peer-to-Peer Ledger
+                                    </p>
+                                    <p style="margin: 0; color: #475569; font-size: 11px;">
+                                        © 2026 Street Code 101. All rights reserved.<br>
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
         </body>
         </html>
         """
