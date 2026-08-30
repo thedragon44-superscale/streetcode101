@@ -282,15 +282,15 @@ export default function Storefront() {
 
         {/* --- SKELETON LOADING GRID --- */}
         {loading && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
             {[...Array(10)].map((_, i) => (
               <div key={i} className="bg-white rounded-lg border border-slate-200 overflow-hidden flex flex-col animate-pulse">
-                <div className="p-4 bg-slate-200 aspect-square w-full" />
-                <div className="p-4 flex flex-col gap-3 flex-1">
-                  <div className="h-4 bg-slate-200 rounded w-3/4" />
-                  <div className="h-3 bg-slate-200 rounded w-1/2" />
-                  <div className="h-6 bg-slate-200 rounded w-1/3 mt-2" />
-                  <div className="h-8 bg-slate-200 rounded-full w-full mt-auto" />
+                <div className="p-2 sm:p-4 bg-slate-200 aspect-square w-full" />
+                <div className="p-2 sm:p-4 flex flex-col gap-2 sm:gap-3 flex-1">
+                  <div className="h-3 sm:h-4 bg-slate-200 rounded w-3/4" />
+                  <div className="h-2 sm:h-3 bg-slate-200 rounded w-1/2" />
+                  <div className="h-5 sm:h-6 bg-slate-200 rounded w-1/3 mt-1 sm:mt-2" />
+                  <div className="h-7 sm:h-8 bg-slate-200 rounded-xl w-full mt-auto" />
                 </div>
               </div>
             ))}
@@ -300,30 +300,30 @@ export default function Storefront() {
 
         {!loading && !error && (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
               {products.map((product) => (
                 <div key={product.sku} className="bg-white rounded-lg border border-slate-200 overflow-hidden flex flex-col group hover:shadow-lg transition-shadow">
-                  <Link to={`/product/${product.sku}`} className="p-4 flex items-center justify-center bg-slate-50 aspect-square cursor-pointer">
+                  <Link to={`/product/${product.sku}`} className="p-2 sm:p-4 flex items-center justify-center bg-slate-50 aspect-square cursor-pointer">
                     <img src={product.image_url} alt={product.title} className="w-full h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform" />
                   </Link>
-                  <div className="p-4 flex flex-col flex-1">
+                  <div className="p-2 sm:p-4 flex flex-col flex-1">
                     <Link to={`/product/${product.sku}`}>
-                      <h2 className="text-slate-900 font-medium line-clamp-2 leading-snug hover:text-orange-600 cursor-pointer">{product.title}</h2>
+                      <h2 className="text-xs sm:text-sm text-slate-900 font-bold line-clamp-2 leading-snug hover:text-orange-600 cursor-pointer">{product.title}</h2>
                     </Link>
-                    <div className="flex items-start mt-2">
-                      <span className="text-xs font-medium text-slate-900 mt-1">$</span>
-                      <span className="text-2xl font-black text-slate-900">{Math.floor(product.price)}</span>
-                      <span className="text-xs font-medium text-slate-900 mt-1">{(product.price % 1).toFixed(2).substring(2)}</span>
+                    <div className="flex items-start mt-1 sm:mt-2">
+                      <span className="text-[10px] sm:text-xs font-medium text-slate-900 mt-0.5 sm:mt-1">$</span>
+                      <span className="text-lg sm:text-2xl font-black text-slate-900">{Math.floor(product.price)}</span>
+                      <span className="text-[10px] sm:text-xs font-medium text-slate-900 mt-0.5 sm:mt-1">{(product.price % 1).toFixed(2).substring(2)}</span>
                     </div>
-                    <div className="text-xs text-slate-400 mt-2 font-mono uppercase tracking-wider">
+                    <div className="text-[9px] sm:text-xs text-slate-400 mt-1 sm:mt-2 font-mono uppercase tracking-wider">
                       {product.in_stock ? '🟢 Authentic Drop' : '🔴 Sold Out'}
                     </div>
-                    {!product.in_stock && <span className="text-red-600 text-xs font-bold mt-1">Currently unavailable.</span>}
-                    <div className="mt-auto pt-4">
+                    {!product.in_stock && <span className="text-red-600 text-[10px] sm:text-xs font-bold mt-1">Currently unavailable.</span>}
+                    <div className="mt-auto pt-3 sm:pt-4">
                       <button 
                         disabled={!product.in_stock}
                         onClick={() => addToCart(product)}
-                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-black uppercase tracking-wider py-3 rounded-xl shadow-sm transition-all active:scale-95"
+                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-[10px] sm:text-xs font-black uppercase tracking-wider py-2 sm:py-3 rounded-lg sm:rounded-xl shadow-sm transition-all active:scale-95"
                       >
                         {product.in_stock ? 'Add to cart' : 'Out of Stock'}
                       </button>
