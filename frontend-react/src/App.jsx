@@ -15,11 +15,13 @@ import Feed from './Feed';
 import Chat from './Chat';
 import Inbox from './Inbox';
 import VendorDashboard from './VendorDashboard';
+import ScrollToTop from './ScrollToTop';
 
 function App() {
   return (
     <CartProvider>
       <Router>
+        <ScrollToTop />
         {/* Global Toast Container styled to match your dark theme */}
         <Toaster 
           position="top-right" 
