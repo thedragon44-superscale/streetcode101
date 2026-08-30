@@ -65,7 +65,27 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
     try:
         while True:
             data = await websocket.receive_text()
-            await manager.broadcast(data)
+            payload = json.loads(data)
+            
+            with Session(engine) as session:
+                new_msg = Message(
+                    sender=token,
+                    receiver=payload.get("receiver"),
+                    text=payload.get("text")
+                )
+                session.add(new_msg)
+                session.commit()
+                session.refresh(new_msg)
+                
+                outbound_data = {
+                    "id": new_msg.id,
+                    "sender": new_msg.sender,
+                    "receiver": new_msg.receiver,
+                    "text": new_msg.text,
+                    "timestamp": new_msg.timestamp.isoformat()
+                }
+                await manager.broadcast(json.dumps(outbound_data))
+                
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
