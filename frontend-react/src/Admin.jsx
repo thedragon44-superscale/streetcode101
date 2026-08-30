@@ -421,6 +421,9 @@ export default function Admin() {
           <button onClick={() => { setActiveTab('promos'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'promos' ? 'bg-pink-500/10 text-pink-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
             <i className="fa-solid fa-ticket w-5 text-center"></i> Promos
           </button>
+          <button onClick={() => { setActiveTab('broadcast'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'broadcast' ? 'bg-red-500/10 text-red-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <i className="fa-solid fa-bullhorn w-5 text-center"></i> Broadcast
+          </button>
         </nav>
         
         <div className="p-4 bg-[#0f1115] border-t border-slate-800/50">
@@ -944,6 +947,54 @@ export default function Admin() {
             </div>
           </div>
         )}
+
+        {/* --- BROADCAST VIEW --- */}
+        {activeTab === 'broadcast' && (
+          <div className="animate-fade-in">
+            <header className="mb-8">
+              <h1 className="text-3xl font-black text-slate-900">Email Broadcast</h1>
+              <p className="text-slate-500 mt-1 font-medium">Deploy high-converting HTML emails to your entire Ledger.</p>
+            </header>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <form onSubmit={handleBroadcastSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Email Subject Line</label>
+                    <input type="text" required value={broadcastData.subject} onChange={(e) => setBroadcastData({...broadcastData, subject: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g., 🚨 The Midnight Vault is Open" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Hero Image URL</label>
+                    <input type="url" required value={broadcastData.image_url} onChange={(e) => setBroadcastData({...broadcastData, image_url: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="https://your-minio-bucket.com/image.jpg" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Main Headline</label>
+                    <input type="text" required value={broadcastData.headline} onChange={(e) => setBroadcastData({...broadcastData, headline: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g., EXCLUSIVE NEW DROP" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Promo Code (Optional)</label>
+                    <input type="text" value={broadcastData.promo_code} onChange={(e) => setBroadcastData({...broadcastData, promo_code: e.target.value.toUpperCase()})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 uppercase font-mono" placeholder="e.g., MIDNIGHT20" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Body Text</label>
+                  <textarea required rows="4" value={broadcastData.body_text} onChange={(e) => setBroadcastData({...broadcastData, body_text: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" placeholder="Write your email body here..." />
+                </div>
+
+                <div className="pt-2">
+                  <button type="submit" disabled={isBroadcasting} className="w-full sm:w-auto px-6 py-3 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    {isBroadcasting ? 'Deploying...' : 'Launch Broadcast'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         </div>
       </main>
 
@@ -1055,49 +1106,6 @@ export default function Admin() {
         </div>
       )}
 
-      {/* Marketing Broadcast Engine */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-8">
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-slate-900">Marketing Broadcast Engine</h2>
-          <p className="text-sm text-slate-500">Deploy high-converting HTML emails to your entire Ledger.</p>
-        </div>
-
-        <form onSubmit={handleBroadcastSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email Subject Line</label>
-              <input type="text" required value={broadcastData.subject} onChange={(e) => setBroadcastData({...broadcastData, subject: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g., 🚨 The Midnight Vault is Open" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Hero Image URL</label>
-              <input type="url" required value={broadcastData.image_url} onChange={(e) => setBroadcastData({...broadcastData, image_url: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="https://your-minio-bucket.com/image.jpg" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Main Headline</label>
-              <input type="text" required value={broadcastData.headline} onChange={(e) => setBroadcastData({...broadcastData, headline: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g., EXCLUSIVE NEW DROP" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Promo Code (Optional)</label>
-              <input type="text" value={broadcastData.promo_code} onChange={(e) => setBroadcastData({...broadcastData, promo_code: e.target.value.toUpperCase()})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 uppercase font-mono" placeholder="e.g., MIDNIGHT20" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Body Text</label>
-            <textarea required rows="4" value={broadcastData.body_text} onChange={(e) => setBroadcastData({...broadcastData, body_text: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" placeholder="Write your email body here..." />
-          </div>
-
-          <div className="pt-2">
-            <button type="submit" disabled={isBroadcasting} className="w-full sm:w-auto px-6 py-3 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              {isBroadcasting ? 'Deploying...' : 'Launch Broadcast'}
-            </button>
-          </div>
-        </form>
       </div>
-
-    </div>
   );
 }
