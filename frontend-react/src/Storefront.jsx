@@ -59,29 +59,68 @@ export default function Storefront() {
     }
   }, []);
 
-  // Fetch product catalog
-  useEffect(() => {
-    fetch(`${API_BASE}/products`)
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to fetch catalog');
-        return res.json();
-      })
-      .then((data) => {
-        setProducts(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, []);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          product.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Fetch product catalog with backend pagination & debounced search
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setLoading(true);
+      setPage(0);
+      
+      const params = new URLSearchParams({
+        offset: 0,
+        limit: 20,
+        category: selectedCategory,
+        search: searchQuery
+      });
+
+      fetch(`${API_BASE}/products?${params.toString()}`)
+        .then((res) => {
+          if (!res.ok) throw new Error('Failed to fetch catalog');
+          return res.json();
+        })
+        .then((data) => {
+          setProducts(data);
+          setHasMore(data.length === 20);
+          setLoading(false);
+        })
+        .catch((err) => {
+          setError(err.message);
+          setLoading(false);
+        });
+    }, 300); // 300ms debounce prevents spamming the backend
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [selectedCategory, searchQuery]);
+
+  const loadMore = async () => {
+    if (isFetchingMore || !hasMore) return;
+    setIsFetchingMore(true);
+    const nextPage = page + 1;
+    
+    const params = new URLSearchParams({
+      offset: nextPage * 20,
+      limit: 20,
+      category: selectedCategory,
+      search: searchQuery
+    });
+    
+    try {
+      const res = await fetch(`${API_BASE}/products?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to load more');
+      const data = await res.json();
+      
+      setProducts(prev => [...prev, ...data]);
+      setHasMore(data.length === 20);
+      setPage(nextPage);
+    } catch (err) {
+      toast.error('Failed to load more products');
+    } finally {
+      setIsFetchingMore(false);
+    }
+  };
 
   const handleSendSupport = async (e) => {
     e.preventDefault();
@@ -123,7 +162,7 @@ export default function Storefront() {
     <div className="min-h-screen bg-slate-100 font-sans text-slate-800">
       
       {/* Global Navbar with Search Enabled */}
-      <Navbar showSearch={true} searchQuery={searchQuery} setSearchQuery={setSearchQuery} searchResults={filteredProducts} />
+      <Navbar showSearch={true} searchQuery={searchQuery} setSearchQuery={setSearchQuery} searchResults={products} />
 
       {/* --- PROFESSIONAL SUB-HEADER / CATEGORY NAV --- */}
       <div className="bg-white border-b border-slate-200 sticky top-[65px] z-[90] shadow-sm">
@@ -171,7 +210,7 @@ export default function Storefront() {
 
           {/* Results text */}
           <div className="text-xs text-slate-500 font-medium">
-            Showing <span className="font-bold text-slate-900">{filteredProducts.length}</span> results
+            Showing <span className="font-bold text-slate-900">{products.length}</span> results
             {searchQuery && <span> for "<span className="text-slate-900 font-bold">{searchQuery}</span>"</span>}
           </div>
         </div>
@@ -260,44 +299,62 @@ export default function Storefront() {
         {error && <div className="bg-red-100 border border-red-300 text-red-700 p-4 rounded-xl font-bold text-center mb-8">⚠️ Error: {error}</div>}
 
         {!loading && !error && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {filteredProducts.map((product) => (
-              <div key={product.sku} className="bg-white rounded-lg border border-slate-200 overflow-hidden flex flex-col group hover:shadow-lg transition-shadow">
-                <Link to={`/product/${product.sku}`} className="p-4 flex items-center justify-center bg-slate-50 aspect-square cursor-pointer">
-                  <img src={product.image_url} alt={product.title} className="w-full h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform" />
-                </Link>
-                <div className="p-4 flex flex-col flex-1">
-                  <Link to={`/product/${product.sku}`}>
-                    <h2 className="text-slate-900 font-medium line-clamp-2 leading-snug hover:text-orange-600 cursor-pointer">{product.title}</h2>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {products.map((product) => (
+                <div key={product.sku} className="bg-white rounded-lg border border-slate-200 overflow-hidden flex flex-col group hover:shadow-lg transition-shadow">
+                  <Link to={`/product/${product.sku}`} className="p-4 flex items-center justify-center bg-slate-50 aspect-square cursor-pointer">
+                    <img src={product.image_url} alt={product.title} className="w-full h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform" />
                   </Link>
-                  <div className="flex items-start mt-2">
-                    <span className="text-xs font-medium text-slate-900 mt-1">$</span>
-                    <span className="text-2xl font-black text-slate-900">{Math.floor(product.price)}</span>
-                    <span className="text-xs font-medium text-slate-900 mt-1">{(product.price % 1).toFixed(2).substring(2)}</span>
-                  </div>
-                  <div className="text-xs text-slate-400 mt-2 font-mono uppercase tracking-wider">
-                    {product.in_stock ? '🟢 Authentic Drop' : '🔴 Sold Out'}
-                  </div>
-                  {!product.in_stock && <span className="text-red-600 text-xs font-bold mt-1">Currently unavailable.</span>}
-                  <div className="mt-auto pt-4">
-                    <button 
-                      disabled={!product.in_stock}
-                      onClick={() => addToCart(product)}
-                      className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-black uppercase tracking-wider py-3 rounded-xl shadow-sm transition-all active:scale-95"
-                    >
-                      {product.in_stock ? 'Add to cart' : 'Out of Stock'}
-                    </button>
+                  <div className="p-4 flex flex-col flex-1">
+                    <Link to={`/product/${product.sku}`}>
+                      <h2 className="text-slate-900 font-medium line-clamp-2 leading-snug hover:text-orange-600 cursor-pointer">{product.title}</h2>
+                    </Link>
+                    <div className="flex items-start mt-2">
+                      <span className="text-xs font-medium text-slate-900 mt-1">$</span>
+                      <span className="text-2xl font-black text-slate-900">{Math.floor(product.price)}</span>
+                      <span className="text-xs font-medium text-slate-900 mt-1">{(product.price % 1).toFixed(2).substring(2)}</span>
+                    </div>
+                    <div className="text-xs text-slate-400 mt-2 font-mono uppercase tracking-wider">
+                      {product.in_stock ? '🟢 Authentic Drop' : '🔴 Sold Out'}
+                    </div>
+                    {!product.in_stock && <span className="text-red-600 text-xs font-bold mt-1">Currently unavailable.</span>}
+                    <div className="mt-auto pt-4">
+                      <button 
+                        disabled={!product.in_stock}
+                        onClick={() => addToCart(product)}
+                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-black uppercase tracking-wider py-3 rounded-xl shadow-sm transition-all active:scale-95"
+                      >
+                        {product.in_stock ? 'Add to cart' : 'Out of Stock'}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            
-            {filteredProducts.length === 0 && (
-              <div className="col-span-full py-10 text-center text-slate-500">
-                No products found matching your search criteria.
+              ))}
+              
+              {products.length === 0 && (
+                <div className="col-span-full py-10 text-center text-slate-500">
+                  No products found matching your search criteria.
+                </div>
+              )}
+            </div>
+
+            {hasMore && products.length > 0 && (
+              <div className="flex justify-center pt-10 pb-6">
+                <button 
+                  onClick={loadMore} 
+                  disabled={isFetchingMore}
+                  className="bg-white text-slate-900 border border-slate-200 px-8 py-3 rounded-xl font-black uppercase tracking-wider text-xs shadow-sm hover:border-orange-500 hover:text-orange-500 transition-all disabled:opacity-50 active:scale-95"
+                >
+                  {isFetchingMore ? (
+                    <span><i className="fa-solid fa-circle-notch fa-spin mr-2"></i> Loading...</span>
+                  ) : (
+                    'Load More Products'
+                  )}
+                </button>
               </div>
             )}
-          </div>
+          </>
         )}
 
         {/* Floating Admin Support Button & Modal */}
