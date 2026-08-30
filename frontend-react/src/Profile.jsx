@@ -261,13 +261,18 @@ export default function Profile() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Failed to create listing');
       
-      // Instantly inject the new listing at the top of the wall
-      setListings([data, ...listings]);
+      // Extract the post data from the response. 
+      // The backend either returns the post directly, or wrapped in a 'post' key if it also returns a message.
+      const newPost = data.post ? data.post : data;
+      
+      // Instantly inject the fully formed listing from the backend
+      setListings([newPost, ...listings]);
       setShowListingForm(false);
       setListingTitle('');
       setListingDesc('');
       setListingPrice('');
       setListingFile(null);
+      setPostType('text'); // Reset form type
       toast.success('Listing posted to your wall!');
     } catch (err) {
       toast.error(err.message);
