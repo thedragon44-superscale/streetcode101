@@ -1610,6 +1610,43 @@ def send_marketing_broadcast(payload: BroadcastRequest, session: Session = Depen
         
     return {"message": f"Broadcast sent to {sent_count} subscribers successfully."}
 
+import boto3
+import uuid
+import os
+from fastapi import UploadFile, File
+
+@router.post("/api/admin/upload-image")
+async def upload_marketing_image(file: UploadFile = File(...), token: dict = Depends(verify_token)):
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Authenticate with the MinIO bucket
+    s3_client = boto3.client(
+        's3',
+        endpoint_url=os.getenv('AWS_ENDPOINT_URL', 'http://127.0.0.1:9000'),
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID', 'stars_admin'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY', '1234567890'),
+    )
+    bucket_name = os.getenv('AWS_STORAGE_BUCKET_NAME', 'dropship')
+    
+    # Generate a unique filename so old promos aren't overwritten
+    file_ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
+    unique_filename = f"marketing/{uuid.uuid4().hex}.{file_ext}"
+    
+    try:
+        # Upload directly to your local bucket
+        s3_client.upload_fileobj(
+            file.file, 
+            bucket_name, 
+            unique_filename,
+            ExtraArgs={"ContentType": file.content_type}
+        )
+        # Construct the live public URL through your domain
+        public_url = f"https://streetcode101.com/{bucket_name}/{unique_filename}"
+        return {"url": public_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload to bucket: {str(e)}")
+
 @router.get("/api/messages/{target_user}")
 def get_chat_history(target_user: str, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches historical messages between the logged-in user and the target user."""

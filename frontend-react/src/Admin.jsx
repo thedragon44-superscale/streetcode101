@@ -13,6 +13,33 @@ export default function Admin() {
     promo_code: '',
   });
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsUploadingImage(true);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/upload-image`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: formData
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Upload failed');
+      
+      setBroadcastData({ ...broadcastData, image_url: data.url });
+      toast.success("Image successfully saved to bucket!");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   const handleBroadcastSubmit = async (e) => {
     e.preventDefault();
@@ -964,8 +991,25 @@ export default function Admin() {
                     <input type="text" required value={broadcastData.subject} onChange={(e) => setBroadcastData({...broadcastData, subject: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g., 🚨 The Midnight Vault is Open" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Hero Image URL</label>
-                    <input type="url" required value={broadcastData.image_url} onChange={(e) => setBroadcastData({...broadcastData, image_url: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="https://your-minio-bucket.com/image.jpg" />
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Hero Image (Upload)</label>
+                    <div className="mt-1 flex justify-center px-4 py-4 border-2 border-slate-300 border-dashed rounded-lg hover:border-orange-500 transition-colors bg-slate-50 relative">
+                      <div className="space-y-1 text-center">
+                        {broadcastData.image_url && !broadcastData.image_url.includes('unsplash') ? (
+                          <div className="mb-2">
+                            <img src={broadcastData.image_url} alt="Preview" className="mx-auto h-20 rounded object-cover shadow-sm border border-slate-200" />
+                          </div>
+                        ) : (
+                          <i className="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 mb-1"></i>
+                        )}
+                        <div className="flex text-sm text-slate-600 justify-center">
+                          <label className="relative cursor-pointer bg-transparent rounded-md font-bold text-orange-600 hover:text-orange-500 focus-within:outline-none">
+                            <span>{isUploadingImage ? 'Uploading to Bucket...' : 'Upload a file'}</span>
+                            <input type="file" accept="image/*" className="sr-only" onChange={handleImageUpload} disabled={isUploadingImage} />
+                          </label>
+                        </div>
+                        <p className="text-xs text-slate-500">PNG or JPG up to 5MB</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
