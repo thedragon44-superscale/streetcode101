@@ -40,23 +40,50 @@ export default function Chat() {
       })
       .catch(err => console.error(err));
 
-    // 2. Establish WebSocket Connection
-    const socket = new WebSocket(`${WS_BASE}/${token}`);
-    ws.current = socket;
+    // 2. Auto-Reconnecting WebSocket Function
+    let reconnectTimeout = null;
+    let isComponentMounted = true;
 
-    socket.onmessage = (event) => {
-      const newMsg = JSON.parse(event.data);
-      if (newMsg.sender === targetUsername || newMsg.receiver === targetUsername) {
-        setMessages(prev => [...prev, newMsg]);
-      }
+    const connectWebSocket = () => {
+      if (!isComponentMounted) return;
+
+      const socket = new WebSocket(`${WS_BASE}/${token}`);
+      ws.current = socket;
+
+      socket.onmessage = (event) => {
+        const newMsg = JSON.parse(event.data);
+        if (newMsg.sender === targetUsername || newMsg.receiver === targetUsername) {
+          setMessages(prev => {
+            // Guardrail: Prevent duplicate messages during reconnection blips
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+        }
+      };
+
+      socket.onclose = () => {
+        if (isComponentMounted) {
+          console.warn('WebSocket disconnected. Attempting silent reconnect in 3s...');
+          reconnectTimeout = setTimeout(connectWebSocket, 3000);
+        }
+      };
     };
 
-    // Graceful cleanup to prevent React Strict Mode connection crashes
+    connectWebSocket();
+
+    // Graceful cleanup to prevent memory leaks and zombie connections
     return () => {
-      if (socket.readyState === WebSocket.CONNECTING) {
-        socket.onopen = () => socket.close();
-      } else if (socket.readyState === WebSocket.OPEN) {
-        socket.close();
+      isComponentMounted = false;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws.current) {
+        // Prevent the onclose auto-reconnect logic from firing during an intended unmount
+        ws.current.onclose = null; 
+        
+        if (ws.current.readyState === WebSocket.CONNECTING) {
+          ws.current.onopen = () => ws.current.close();
+        } else if (ws.current.readyState === WebSocket.OPEN) {
+          ws.current.close();
+        }
       }
     };
   }, [targetUsername, token, navigate]);
