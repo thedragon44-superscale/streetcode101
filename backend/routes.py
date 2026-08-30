@@ -695,27 +695,6 @@ def trigger_manual_sync(token: dict = Depends(verify_token)):
     task = sync_inventory_task.delay()
     return {"message": "Background sync triggered successfully", "task_id": task.id}
 
-@router.post("/api/admin/upload-image")
-def upload_product_image(file: UploadFile = File(...), token: dict = Depends(verify_token)):
-    """Uploads an image to MinIO/S3 and returns the public URL (SECURED)."""
-    try:
-        file_extension = file.filename.split(".")[-1]
-        unique_filename = f"{uuid.uuid4().hex}.{file_extension}"
-        
-        s3_client.upload_fileobj(
-            file.file,
-            BUCKET_NAME,
-            unique_filename,
-            ExtraArgs={"ContentType": file.content_type}
-        )
-        
-        file_url = f"https://streetcode101.com/{BUCKET_NAME}/{unique_filename}"
-        
-        return {"message": "Upload successful", "image_url": file_url}
-        
-    except Exception as e:
-        print(f"\n❌ UPLOAD CRASHED: {str(e)}\n")
-        raise HTTPException(status_code=500, detail=f"Failed to upload to cloud storage: {str(e)}")
 
 @router.patch("/api/admin/products/{sku}/image")
 def update_product_image(sku: str, payload: ImageUpdate, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
