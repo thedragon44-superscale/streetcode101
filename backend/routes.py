@@ -1496,7 +1496,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-@router.get("/messages/{target_user}")
+@router.get("/api/messages/{target_user}")
 def get_chat_history(target_user: str, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches historical messages between the logged-in user and the target user."""
     username = token.get("sub")
