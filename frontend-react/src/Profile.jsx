@@ -617,7 +617,21 @@ export default function Profile() {
               {postType !== 'text' && (
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Photo Upload</label>
-                  <input required={postType === 'image'} type="file" accept="image/*" onChange={(e)=>setListingFile(e.target.files[0])} className="w-full p-2 border border-slate-300 rounded-xl text-sm font-medium bg-slate-50" />
+                  {listingFile ? (
+                    <div className="relative w-full h-48 mb-2 rounded-xl border border-slate-200 overflow-hidden bg-slate-50 group shadow-inner">
+                      <img src={URL.createObjectURL(listingFile)} alt="Upload preview" className="w-full h-full object-cover" />
+                      <button 
+                        type="button" 
+                        onClick={() => setListingFile(null)} 
+                        className="absolute top-3 right-3 bg-slate-900/70 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all shadow-md"
+                        title="Remove Image"
+                      >
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+                  ) : (
+                    <input required={postType === 'image'} type="file" accept="image/*" onChange={(e)=>setListingFile(e.target.files[0])} className="w-full p-2 border border-slate-300 rounded-xl text-sm font-medium bg-slate-50" />
+                  )}
                 </div>
               )}
 

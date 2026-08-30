@@ -947,7 +947,18 @@ def create_social_post(
                 )
     session.commit()
 
-    return new_post
+    return {
+        "id": new_post.id,
+        "username": new_post.username,
+        "post_type": new_post.post_type,
+        "title": new_post.title,
+        "description": new_post.description,
+        "price": new_post.price,
+        "image_url": new_post.image_url,
+        "created_at": new_post.created_at.isoformat() if new_post.created_at else None,
+        "likes_count": 0,
+        "comments_count": 0
+    }
 
 @router.get("/api/posts/user/{target_username}")
 def get_user_posts(target_username: str, session: Session = Depends(get_session)):
