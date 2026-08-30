@@ -26,7 +26,7 @@ export default function Admin() {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/upload-image`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('pidrop_token')}` },
         body: formData
       });
       const data = await response.json();
@@ -49,7 +49,7 @@ export default function Admin() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('pidrop_token')}`
         },
         body: JSON.stringify(broadcastData)
       });
