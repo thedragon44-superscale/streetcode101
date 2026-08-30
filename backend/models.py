@@ -84,6 +84,7 @@ class LedgerSubscriber(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
     subscribed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    is_subscribed: bool = Field(default=True)
 
 class Notification(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

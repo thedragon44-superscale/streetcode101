@@ -1107,6 +1107,36 @@ def edit_post(id: int, payload: PostEditRequest, session: Session = Depends(get_
     session.refresh(post)
     return {"message": "Post updated successfully", "post": post}
 
+from fastapi.responses import HTMLResponse
+
+@router.get("/api/unsubscribe/{email}", response_class=HTMLResponse)
+def unsubscribe_user(email: str, session: Session = Depends(get_session)):
+    # 1. Update the marketing list
+    subscriber = session.query(LedgerSubscriber).filter(LedgerSubscriber.email == email).first()
+    if subscriber:
+        subscriber.is_subscribed = False
+        
+    # 2. Update the main User table opt-in flag for maximum coverage
+    user = session.query(User).filter(User.email == email).first()
+    if user:
+        user.email_opt_in = False
+        
+    session.commit()
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="margin: 0; background-color: #0f172a; color: #f8fafc; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh;">
+        <div style="text-align: center; padding: 40px; border: 1px solid #1e293b; border-radius: 12px; background-color: #020617;">
+            <h2 style="margin-top: 0;">Unsubscribed Successfully</h2>
+            <p style="color: #94a3b8;"><b>{email}</b> has been removed from our marketing ledger.</p>
+            <p style="color: #94a3b8;">You will still receive critical alerts (receipts, password resets).</p>
+            <a href="https://streetcode101.com" style="color: #f97316; text-decoration: none; font-weight: bold; margin-top: 20px; display: inline-block;">Return to Store</a>
+        </div>
+    </body>
+    </html>
+    """
+
 # --- NEW ENGAGEMENT ENDPOINTS ---
 
 @router.get("/api/notifications")
@@ -1490,8 +1520,8 @@ def send_marketing_broadcast(payload: BroadcastRequest, session: Session = Depen
     if token.get("sub") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    # Fetch all subscribed emails
-    subscribers = session.query(LedgerSubscriber).all()
+    # Fetch all subscribed emails who haven't opted out
+    subscribers = session.query(LedgerSubscriber).filter(LedgerSubscriber.is_subscribed == True).all()
     if not subscribers:
         raise HTTPException(status_code=404, detail="No subscribers found.")
 
