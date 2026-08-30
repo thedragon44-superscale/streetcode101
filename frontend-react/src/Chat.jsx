@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import Navbar from './Navbar';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 const API_BASE = `${API_URL}/api`;
@@ -91,8 +92,9 @@ export default function Chat() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+      <Navbar />
       {/* Chat Header */}
-      <header className="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+      <header className="bg-slate-900 text-white shadow-md z-40">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-4">
           <button onClick={() => navigate(-1)} className="text-slate-400 hover:text-white transition">
             <i className="fa-solid fa-arrow-left text-xl"></i>
@@ -136,7 +138,7 @@ export default function Chat() {
       </main>
 
       {/* Input Area */}
-      <footer className="bg-white border-t border-slate-200 p-4 sticky bottom-0">
+      <footer className="bg-white border-t border-slate-200 p-4 sticky bottom-16 sm:bottom-0 z-40">
         <form onSubmit={sendMessage} className="max-w-3xl mx-auto flex gap-3">
           <input
             type="text"
