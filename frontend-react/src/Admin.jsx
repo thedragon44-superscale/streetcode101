@@ -990,13 +990,15 @@ export default function Admin() {
                     <label className="block text-sm font-medium text-slate-700 mb-1">Email Subject Line</label>
                     <input type="text" required value={broadcastData.subject} onChange={(e) => setBroadcastData({...broadcastData, subject: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g., 🚨 The Midnight Vault is Open" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Hero Image (Upload)</label>
-                    <div className="mt-1 flex justify-center px-4 py-4 border-2 border-slate-300 border-dashed rounded-lg hover:border-orange-500 transition-colors bg-slate-50 relative">
-                      <div className="space-y-1 text-center">
+                  <div className="flex flex-col gap-2">
+                    <label className="block text-sm font-medium text-slate-700">Hero Image URL</label>
+                    <input type="url" required value={broadcastData.image_url} onChange={(e) => setBroadcastData({...broadcastData, image_url: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm" placeholder="https://..." />
+                    
+                    <div className="flex justify-center px-4 py-4 border-2 border-slate-300 border-dashed rounded-lg hover:border-orange-500 transition-colors bg-slate-50 relative">
+                      <div className="space-y-1 text-center w-full">
                         {broadcastData.image_url && !broadcastData.image_url.includes('unsplash') ? (
-                          <div className="mb-2">
-                            <img src={broadcastData.image_url} alt="Preview" className="mx-auto h-20 rounded object-cover shadow-sm border border-slate-200" />
+                          <div className="mb-3">
+                            <img src={broadcastData.image_url} alt="Preview" className="mx-auto max-h-24 rounded object-cover shadow-sm border border-slate-200" onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/600x200?text=Image+Not+Found+-+Check+URL'; }} />
                           </div>
                         ) : (
                           <i className="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 mb-1"></i>
@@ -1007,7 +1009,6 @@ export default function Admin() {
                             <input type="file" accept="image/*" className="sr-only" onChange={handleImageUpload} disabled={isUploadingImage} />
                           </label>
                         </div>
-                        <p className="text-xs text-slate-500">PNG or JPG up to 5MB</p>
                       </div>
                     </div>
                   </div>
