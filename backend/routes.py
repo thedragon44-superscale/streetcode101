@@ -989,10 +989,12 @@ def get_user_posts(target_username: str, session: Session = Depends(get_session)
 @router.get("/api/posts/feed")
 def get_global_feed(
     filter: str = "global",
+    offset: int = 0,
+    limit: int = 10,
     session: Session = Depends(get_session),
     credentials: HTTPAuthorizationCredentials | None = Depends(optional_security)
 ):
-    """Fetches the timeline, supporting both Global and Following modes."""
+    """Fetches the timeline, supporting both Global and Following modes with pagination."""
     if filter == "following":
         if not credentials:
             raise HTTPException(status_code=401, detail="Log in to view your following feed.")
@@ -1002,16 +1004,15 @@ def get_global_feed(
         except:
             raise HTTPException(status_code=401, detail="Invalid token.")
             
-        # Get users they follow
         following_records = session.exec(select(Follow).where(Follow.follower_username == username)).all()
         following_usernames = [f.following_username for f in following_records]
-        following_usernames.append(username) # Always include their own posts
+        following_usernames.append(username) 
         
         posts = session.exec(
-            select(Post).where(Post.username.in_(following_usernames)).order_by(Post.id.desc())
+            select(Post).where(Post.username.in_(following_usernames)).order_by(Post.id.desc()).offset(offset).limit(limit)
         ).all()
     else:
-        posts = session.exec(select(Post).order_by(Post.id.desc())).all()
+        posts = session.exec(select(Post).order_by(Post.id.desc()).offset(offset).limit(limit)).all()
         
     feed = []
     for p in posts:

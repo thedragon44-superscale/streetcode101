@@ -117,19 +117,24 @@ export default function Feed() {
   };
 
   const [feedType, setFeedType] = useState('global'); // 'global' or 'following'
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
 
   useEffect(() => {
     setLoading(true);
+    setPage(0); // Reset pagination when switching tabs
     const token = localStorage.getItem('pidrop_token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
     
-    fetch(`${API_BASE}/posts/feed?filter=${feedType}`, { headers })
+    fetch(`${API_BASE}/posts/feed?filter=${feedType}&offset=0&limit=10`, { headers })
       .then(res => {
         if (!res.ok) throw new Error('Failed to load feed');
         return res.json();
       })
       .then(data => {
         setFeed(data);
+        setHasMore(data.length === 10);
         setLoading(false);
       })
       .catch(err => {
@@ -137,6 +142,30 @@ export default function Feed() {
         setLoading(false);
       });
   }, [feedType]);
+
+  const loadMore = async () => {
+    if (isFetchingMore || !hasMore) return;
+    setIsFetchingMore(true);
+    const nextPage = page + 1;
+    const offset = nextPage * 10;
+    
+    const token = localStorage.getItem('pidrop_token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    try {
+      const res = await fetch(`${API_BASE}/posts/feed?filter=${feedType}&offset=${offset}&limit=10`, { headers });
+      if (!res.ok) throw new Error('Failed to load more');
+      const data = await res.json();
+      
+      setFeed(prev => [...prev, ...data]);
+      setHasMore(data.length === 10);
+      setPage(nextPage);
+    } catch (err) {
+      toast.error('Failed to load more posts');
+    } finally {
+      setIsFetchingMore(false);
+    }
+  };
 
   const handleLike = async (postId) => {
     const token = localStorage.getItem('pidrop_token');
@@ -344,6 +373,23 @@ export default function Feed() {
             </div>
           ))}
         </div>
+
+        {hasMore && !loading && feed.length > 0 && (
+          <div className="flex justify-center pt-6 pb-10">
+            <button 
+              onClick={loadMore} 
+              disabled={isFetchingMore}
+              className="bg-white text-slate-900 border border-slate-200 px-8 py-3 rounded-xl font-black uppercase tracking-wider text-xs shadow-sm hover:border-orange-500 hover:text-orange-500 transition-all disabled:opacity-50 active:scale-95"
+            >
+              {isFetchingMore ? (
+                <span><i className="fa-solid fa-circle-notch fa-spin mr-2"></i> Loading...</span>
+              ) : (
+                'Load More Drops'
+              )}
+            </button>
+          </div>
+        )}
+
       </main>
     </div>
   );
