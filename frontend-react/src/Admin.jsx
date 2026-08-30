@@ -41,6 +41,32 @@ export default function Admin() {
     }
   };
 
+const handleProductImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsUploadingImage(true);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/upload-image`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('pidrop_token')}` },
+        body: formData
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Upload failed');
+      
+      setEditingProduct({ ...editingProduct, image_url: data.url });
+      toast.success("Product image saved to bucket!");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   const handleBroadcastSubmit = async (e) => {
     e.preventDefault();
     setIsBroadcasting(true);
@@ -1064,9 +1090,27 @@ export default function Admin() {
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Title</label>
                 <input required type="text" value={editingProduct.title} onChange={e => setEditingProduct({...editingProduct, title: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium" />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Cover Image URL</label>
-                <input required type="text" value={editingProduct.image_url || ''} onChange={e => setEditingProduct({...editingProduct, image_url: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium text-blue-500" />
+              <div className="flex flex-col gap-2">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Cover Image URL</label>
+                <input required type="url" value={editingProduct.image_url || ''} onChange={e => setEditingProduct({...editingProduct, image_url: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-medium text-blue-500" />
+                
+                <div className="flex justify-center px-4 py-4 border-2 border-slate-300 border-dashed rounded-xl hover:border-orange-500 transition-colors bg-white relative">
+                  <div className="space-y-1 text-center w-full">
+                    {editingProduct.image_url ? (
+                      <div className="mb-3">
+                        <img src={editingProduct.image_url} alt="Preview" className="mx-auto max-h-24 rounded object-cover shadow-sm border border-slate-200" />
+                      </div>
+                    ) : (
+                      <i className="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 mb-1"></i>
+                    )}
+                    <div className="flex text-sm text-slate-600 justify-center">
+                      <label className="relative cursor-pointer bg-transparent rounded-md font-bold text-orange-600 hover:text-orange-500 focus-within:outline-none">
+                        <span>{isUploadingImage ? 'Uploading to Bucket...' : 'Upload new cover'}</span>
+                        <input type="file" accept="image/*" className="sr-only" onChange={handleProductImageUpload} disabled={isUploadingImage} />
+                      </label>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
