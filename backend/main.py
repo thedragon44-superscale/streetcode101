@@ -18,28 +18,6 @@ from models import Product, Order, User, Post, Message
 from routes import router
 import json
 
-# --- WEBSOCKET CONNECTION MANAGER ---
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            try:
-                await connection.send_text(message)
-            except:
-                pass
-
-manager = ConnectionManager()
-
 app = FastAPI(title="Dropshipping API with Postgres", version="0.3.0")
 
 app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
@@ -51,43 +29,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
-
-# Ensure WebSockets are evaluated BEFORE any HTTP catch-all routes in routes.py
-@app.websocket("/api/ws/chat/{token:path}")
-@app.websocket("/ws/chat/{token:path}")
-@app.websocket("/chat/{token:path}")
-async def websocket_endpoint(websocket: WebSocket, token: str):
-    if not token or token == "null":
-        await websocket.close(code=1008)
-        return
-
-    await manager.connect(websocket)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            payload = json.loads(data)
-            
-            with Session(engine) as session:
-                new_msg = Message(
-                    sender=token,
-                    receiver=payload.get("receiver"),
-                    text=payload.get("text")
-                )
-                session.add(new_msg)
-                session.commit()
-                session.refresh(new_msg)
-                
-                outbound_data = {
-                    "id": new_msg.id,
-                    "sender": new_msg.sender,
-                    "receiver": new_msg.receiver,
-                    "text": new_msg.text,
-                    "timestamp": new_msg.timestamp.isoformat()
-                }
-                await manager.broadcast(json.dumps(outbound_data))
-                
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
 
 # Bring in all the endpoints defined in routes.py
 app.include_router(router)
