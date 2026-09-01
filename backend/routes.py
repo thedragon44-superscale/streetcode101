@@ -168,11 +168,67 @@ def register_user(request: RegisterRequest, session: Session = Depends(get_sessi
     session.add(new_user)
     session.commit()
     
-    # Send a Welcome Email automatically!
+    # Define the graphical HTML welcome email
+    welcome_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="background-color: #0f1115; color: #cbd5e1; font-family: Arial, sans-serif; margin: 0; padding: 20px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0f1115;">
+            <tr>
+                <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #1e222a; border-radius: 12px; overflow: hidden; border: 1px solid #334155; margin-top: 20px; margin-bottom: 20px; max-width: 600px;">
+                        <!-- Header Image -->
+                        <tr>
+                            <td>
+                                <img src="https://streetcode101.com/welcome-email.png" alt="Access Granted - Street Code 101" style="width: 100%; max-width: 600px; display: block; border: none;" />
+                            </td>
+                        </tr>
+                        
+                        <!-- Email Body -->
+                        <tr>
+                            <td style="padding: 40px 30px;">
+                                <h2 style="color: #ffffff; margin-top: 0; font-size: 24px; letter-spacing: 1px;">WELCOME TO THE VAULT.</h2>
+                                <p style="font-size: 15px; line-height: 1.6; margin-bottom: 30px;">Your access to Street Code 101 has been officially granted. You are now integrated into a closed-loop P2P dropshipping and virtual economy platform. Here is your operational briefing:</p>
+                                
+                                <!-- Feature 1: Storefront -->
+                                <h3 style="color: #38bdf8; font-size: 16px; margin-bottom: 8px; text-transform: uppercase;">🛍️ The Storefront</h3>
+                                <p style="font-size: 14px; line-height: 1.5; margin-top: 0; margin-bottom: 20px;">Gain direct access to exclusive drops spanning apparel, jewelry, and electronics, all backed by automated supply-chain fulfillment.</p>
+                                
+                                <!-- Feature 2: Social Feed -->
+                                <h3 style="color: #f97316; font-size: 16px; margin-bottom: 8px; text-transform: uppercase;">🌐 P2P Social Timeline</h3>
+                                <p style="font-size: 14px; line-height: 1.5; margin-top: 0; margin-bottom: 20px;">We are a ledger, not just a store. Post your own drops, share images, interact with other verified members, and build your community reputation.</p>
+                                
+                                <!-- Feature 3: Economy & Escrow -->
+                                <h3 style="color: #10b981; font-size: 16px; margin-bottom: 8px; text-transform: uppercase;">💰 StreetCoin (SC) & Escrow</h3>
+                                <p style="font-size: 14px; line-height: 1.5; margin-top: 0; margin-bottom: 20px;">Engage with our native digital economy. Hold StreetCoin in your wallet, lock funds securely in Escrow for P2P trades, and initiate fiat offramps directly to USD via Zelle.</p>
+                                
+                                <!-- Feature 4: Promos -->
+                                <h3 style="color: #ec4899; font-size: 16px; margin-bottom: 8px; text-transform: uppercase;">🎟️ Encrypted Promos</h3>
+                                <p style="font-size: 14px; line-height: 1.5; margin-top: 0; margin-bottom: 30px;">Monitor the network for admin broadcasts. VIP discount codes and limited-time vault access keys will be dispersed directly to registered users.</p>
+                                
+                                <!-- CTA Button -->
+                                <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
+                                    <a href="https://streetcode101.com" style="background-color: #0ea5e9; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; display: inline-block;">Initialize Session</a>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
     send_automated_email(
         to_email=new_user.email,
-        subject="Welcome to Street Code 101",
-        body=f"Yo @{new_user.username},\n\nWelcome to the ledger. Your account has been created."
+        subject="Access Granted: Welcome to Street Code 101",
+        body="Welcome to Street Code 101. Please enable HTML to view this message.",
+        html_body=welcome_html
     )
     
     return {"message": "Registration successful. Check your email."}
