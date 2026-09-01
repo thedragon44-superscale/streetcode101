@@ -83,3 +83,50 @@ def process_fulfillment_task(self, order_id: int):
             session.commit()
             
     return f"Order {order_id} fulfilled! Tracking: {mock_tracking}"
+
+@celery_app.task(name="send_second_drip_email", bind=True)
+def send_second_drip_email_task(self, email: str, username: str):
+    """Dispatches the second onboarding email exactly 24 hours after registration."""
+    from routes import send_automated_email
+    
+    subject = "Day 1: Status Active"
+    body = f"Yo @{username},\n\nIt's been exactly 24 hours since your vault access was granted."
+    
+    html_template = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="background-color: #0f1115; color: #cbd5e1; font-family: Arial, sans-serif; margin: 0; padding: 20px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0f1115;">
+            <tr>
+                <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #1e222a; border-radius: 12px; overflow: hidden; border: 1px solid #334155; margin-top: 20px; margin-bottom: 20px; max-width: 600px;">
+                        <tr>
+                            <td>
+                                <img src="https://streetcode101.com/second-email.png" alt="Status Active - Street Code 101" style="width: 100%; max-width: 600px; display: block; border: none;" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 40px 30px;">
+                                <h2 style="color: #ffffff; margin-top: 0; font-size: 24px; letter-spacing: 1px;">STATUS: ACTIVE</h2>
+                                <p style="font-size: 15px; line-height: 1.6; margin-bottom: 30px;">Yo @{username}, it has been exactly 24 hours since your vault access was granted. The ledger is waiting for your first move.</p>
+                                <h3 style="color: #f97316; font-size: 16px; margin-bottom: 8px; text-transform: uppercase;">🔥 Secure Your First Drop</h3>
+                                <p style="font-size: 14px; line-height: 1.5; margin-top: 0; margin-bottom: 30px;">Don't forget to use your introductory code <strong>VAULT-Q70KHNSF5G</strong> at checkout to initiate your first P2P transaction.</p>
+                                <div style="text-align: center; margin-bottom: 20px;">
+                                    <a href="https://streetcode101.com" style="background-color: #0ea5e9; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; display: inline-block;">Browse The Catalog</a>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+    
+    send_automated_email(to_email=email, subject=subject, body=body, html_body=html_template)
+    return f"Second drip email sent to {email}"

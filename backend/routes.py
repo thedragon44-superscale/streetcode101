@@ -231,6 +231,10 @@ def register_user(request: RegisterRequest, session: Session = Depends(get_sessi
         html_body=welcome_html
     )
     
+    # Trigger the 24-hour drip campaign email via Celery worker
+    from tasks import send_second_drip_email_task
+    send_second_drip_email_task.apply_async(args=[new_user.email, new_user.username], countdown=86400)
+    
     return {"message": "Registration successful. Check your email."}
 
 @router.post("/api/admin/login")
