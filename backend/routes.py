@@ -1640,7 +1640,7 @@ def send_marketing_broadcast(payload: BroadcastRequest, session: Session = Depen
     sent_count = 0
     for sub in subscribers:
         send_automated_email(
-            recipient=sub.email,
+            to_email=sub.email,
             subject=payload.subject,
             body=plain_fallback,
             html_body=html_template
