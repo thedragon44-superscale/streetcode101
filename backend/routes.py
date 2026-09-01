@@ -214,6 +214,14 @@ def register_user(request: RegisterRequest, session: Session = Depends(get_sessi
                                 <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
                                     <a href="https://streetcode101.com" style="background-color: #0ea5e9; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; display: inline-block;">Initialize Session</a>
                                 </div>
+                                
+                                <!-- Compliance Opt-Out -->
+                                <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #334155;">
+                                    <p style="font-size: 11px; color: #64748b; line-height: 1.5; margin: 0;">
+                                        You are receiving this email because you registered at Street Code 101.<br>
+                                        <a href="https://streetcode101.com/api/unsubscribe/{new_user.email}" style="color: #64748b; text-decoration: underline;">Opt-out of marketing communications</a>
+                                    </p>
+                                </div>
                             </td>
                         </tr>
                     </table>
