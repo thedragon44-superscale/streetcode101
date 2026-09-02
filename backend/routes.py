@@ -269,7 +269,7 @@ def login(request: AuthRequest, session: Session = Depends(get_session)):
 
 @router.get("/api/profile/me")
 def get_my_profile(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Fetches the profile of the currently logged-in user (now supports Wallets)."""
+    """Fetches the profile of the currently logged-in user (now supports Wallets & Roles)."""
     username = token.get("sub")
     
     user = session.exec(select(User).where(User.username == username)).first()
@@ -282,54 +282,15 @@ def get_my_profile(session: Session = Depends(get_session), token: dict = Depend
         
     return {
         "username": user.username,
+        "role": user.role,
+        "primary_trade": getattr(user, "primary_trade", None),
         "bio": user.bio,
         "profile_image_url": user.profile_image_url,
         "email_opt_in": getattr(user, "email_opt_in", False),
         "followers_count": followers_count,
         "following_count": following_count,
-        "wallet_balance": getattr(user, "wallet_balance", 0.0) # Expose the new wallet to the frontend!
+        "wallet_balance": getattr(user, "wallet_balance", 0.0) 
     }
-
-@router.patch("/api/profile/me")
-def update_my_profile(payload: ProfileUpdate, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Updates the user's profile settings."""
-    username = token.get("sub")
-    if username == "admin":
-        raise HTTPException(status_code=400, detail="Admin profile cannot be updated here")
-        
-    user = session.exec(select(User).where(User.username == username)).first()
-    
-    if payload.bio is not None:
-        user.bio = payload.bio
-    if payload.email_opt_in is not None:
-        user.email_opt_in = payload.email_opt_in
-        
-    session.add(user)
-    session.commit()
-    return {"message": "Profile updated successfully"}
-
-@router.get("/api/products", response_model=List[Product])
-def get_catalog(
-    offset: int = 0,
-    limit: int = 20,
-    category: str = "All",
-    search: str = "",
-    session: Session = Depends(get_session)
-):
-    """Fetches the catalog with pagination and optional filtering."""
-    query = select(Product)
-    
-    if category and category != "All":
-        query = query.where(Product.category == category)
-        
-    if search and search.strip():
-        search_term = f"%{search.strip().lower()}%"
-        query = query.where(Product.title.ilike(search_term) | Product.description.ilike(search_term))
-        
-    # Order by SKU to ensure stable pagination
-    query = query.order_by(Product.sku).offset(offset).limit(limit)
-    
-    return session.exec(query).all()
 
 @router.get("/api/search")
 def global_search(q: str, session: Session = Depends(get_session)):
