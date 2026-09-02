@@ -2671,3 +2671,99 @@ def appointment_check_in(id: int, payload: CheckInRequest, session: Session = De
         )
         
     return {"message": "Check-in verified securely.", "distance_miles": distance_miles}
+
+class JobCompleteRequest(BaseModel):
+    proof_of_delivery_url: str | None = None
+
+@router.post("/api/appointments/{id}/complete")
+def provider_complete_job(id: int, payload: JobCompleteRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Provider marks the job as finished and submits optional proof of delivery."""
+    from models import Appointment
+    
+    username = token.get("sub")
+    appt = session.get(Appointment, id)
+    
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+        
+    if appt.provider_username != username:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    # Remote jobs might skip check-in, physical jobs require it
+    valid_statuses = ["locked", "checked_in"]
+    if appt.status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Cannot complete from status: {appt.status}")
+
+    appt.provider_completed_at = datetime.utcnow()
+    appt.proof_of_delivery_url = payload.proof_of_delivery_url
+    appt.status = "pending_confirmation"
+    
+    session.add(appt)
+    session.commit()
+    
+    # Notify the client to release funds
+    client = session.exec(select(User).where(User.username == appt.client_username)).first()
+    if client:
+        send_automated_email(
+            to_email=client.email,
+            subject="Job Completed - Final Sign-Off Required",
+            body=f"Yo @{client.username},\n\n@{username} has marked your service appointment as complete.\n\nPlease log in to your dashboard to confirm the work and release the {appt.escrow_amount:.2f} SC from Escrow."
+        )
+        
+    return {"message": "Job marked complete. Client notified for final sign-off."}
+
+@router.post("/api/appointments/{id}/confirm")
+def client_confirm_job(id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Client confirms the job is done. Escrow releases the StreetCoin to the Provider."""
+    from models import Appointment, Transaction
+    
+    username = token.get("sub")
+    appt = session.get(Appointment, id)
+    
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+        
+    if appt.client_username != username:
+        raise HTTPException(status_code=403, detail="Only the client can confirm completion.")
+        
+    if appt.status != "pending_confirmation":
+        raise HTTPException(status_code=400, detail="Job is not awaiting confirmation.")
+        
+    admin = session.exec(select(User).where(User.username == "admin")).first()
+    provider = session.exec(select(User).where(User.username == appt.provider_username)).first()
+    
+    if not admin or not provider:
+        raise HTTPException(status_code=500, detail="Critical routing error.")
+        
+    # ESCROW RELEASE LOGIC
+    if admin.wallet_balance >= appt.escrow_amount:
+        admin.wallet_balance -= appt.escrow_amount
+        provider.wallet_balance += appt.escrow_amount
+        
+        tx = Transaction(
+            sender_username="admin",
+            receiver_username=provider.username,
+            amount=appt.escrow_amount,
+            transaction_type="service_escrow_release",
+            status="completed"
+        )
+        
+        appt.client_confirmed_at = datetime.utcnow()
+        appt.status = "released"
+        
+        session.add(admin)
+        session.add(provider)
+        session.add(tx)
+        session.add(appt)
+        session.commit()
+        
+        # Notify Provider of the payday
+        send_automated_email(
+            to_email=provider.email,
+            subject="Escrow Released!",
+            body=f"Yo @{provider.username},\n\n@{username} has confirmed the job. {appt.escrow_amount:.2f} SC has been transferred to your wallet."
+        )
+        
+        return {"message": "Escrow released successfully."}
+    else:
+        raise HTTPException(status_code=500, detail="Master Escrow vault error.")
