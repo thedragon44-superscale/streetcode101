@@ -101,6 +101,7 @@ const handleProductImageUpload = async (e) => {
   const [promos, setPromos] = useState([]);
   const [users, setUsers] = useState([]);
   const [orderFilter, setOrderFilter] = useState('all');
+  const [disputes, setDisputes] = useState([]);
 
   // --- PROMO GENERATION STATE ---
   const [baseWord, setBaseWord] = useState('');
@@ -135,13 +136,14 @@ const handleProductImageUpload = async (e) => {
   // ==========================================
   const fetchData = async () => {
     try {
-      const [ordersRes, productsRes, feedRes, promosRes, usersRes, analyticsRes] = await Promise.all([
+      const [ordersRes, productsRes, feedRes, promosRes, usersRes, analyticsRes, disputesRes] = await Promise.all([
         fetch(`${API_BASE}/orders`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${API_BASE}/products?limit=100`),
         fetch(`${API_BASE}/posts/feed`),
         fetch(`${API_BASE}/admin/promos`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${API_BASE}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE}/admin/analytics`, { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(`${API_BASE}/admin/analytics`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE}/admin/disputes`, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
 
       if (ordersRes.status === 401) return handleLogout();
@@ -152,6 +154,7 @@ const handleProductImageUpload = async (e) => {
       setPromos(promosRes.ok ? await promosRes.json() : []);
       setUsers(usersRes.ok ? await usersRes.json() : []);
       setAnalytics(analyticsRes.ok ? await analyticsRes.json() : { total_circulation: 0, escrow_liability: 0, total_revenue_usd: 0 });
+      setDisputes(disputesRes.ok ? await disputesRes.json() : []);
       
       const cashoutsRes = await fetch(`${API_BASE}/admin/cashouts`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -282,6 +285,23 @@ const handleProductImageUpload = async (e) => {
     localStorage.removeItem('pidrop_token');
     setToken(null);
     navigate('/login');
+  };
+
+const handleResolveDispute = async (id, resolution) => {
+    if (!window.confirm(`Are you sure you want to ${resolution === 'refund_client' ? 'refund the client' : 'release to the provider'}? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/admin/disputes/${id}/resolve`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolution })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to resolve dispute');
+      toast.success(data.message);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
   const handleEditProduct = async (e) => {
@@ -461,7 +481,10 @@ const handleProductImageUpload = async (e) => {
             <div className="flex items-center gap-3"><i className="fa-solid fa-money-bill-transfer w-5 text-center"></i> Cashouts</div>
             {cashouts.filter(c => c.status === 'pending').length > 0 && <span className="bg-emerald-500 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-full">{cashouts.filter(c => c.status === 'pending').length}</span>}
           </button>
-
+<button onClick={() => { setActiveTab('disputes'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex justify-between items-center text-sm ${activeTab === 'disputes' ? 'bg-red-500/10 text-red-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <div className="flex items-center gap-3"><i className="fa-solid fa-gavel w-5 text-center"></i> Disputes</div>
+            {disputes.length > 0 && <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{disputes.length}</span>}
+          </button>
           <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 mb-2 mt-6">Community</div>
           <button onClick={() => { setActiveTab('social'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'social' ? 'bg-purple-500/10 text-purple-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
             <i className="fa-solid fa-users-viewfinder w-5 text-center"></i> Social Feed
@@ -942,6 +965,60 @@ const handleProductImageUpload = async (e) => {
               </table>
               {users.length === 0 && (
                 <div className="text-center py-20 text-slate-400 font-medium">No community members registered yet.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+{/* --- DISPUTES VIEW --- */}
+        {activeTab === 'disputes' && (
+          <div className="animate-fade-in">
+            <header className="mb-8">
+              <h1 className="text-3xl font-black text-slate-900">Escrow Tribunal</h1>
+              <p className="text-slate-500 mt-1 font-medium">Review and resolve service economy disputes.</p>
+            </header>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden p-6">
+              {disputes.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 font-medium">No active disputes. The ecosystem is at peace.</div>
+              ) : (
+                <div className="space-y-4">
+                  {disputes.map(appt => (
+                    <div key={appt.id} className="bg-slate-50 p-5 rounded-xl border border-red-200 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="bg-red-100 text-red-700 text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md">Frozen Escrow</span>
+                          <span className="text-slate-400 text-xs font-bold">Appt #{appt.id}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 mt-2">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Client</span>
+                            <span className="font-bold text-slate-900">@{appt.client_username}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Provider</span>
+                            <span className="font-bold text-slate-900">@{appt.provider_username}</span>
+                          </div>
+                        </div>
+                        <div className="text-orange-600 font-black text-xl mt-3">{appt.escrow_amount.toFixed(2)} SC</div>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                        <button 
+                          onClick={() => handleResolveDispute(appt.id, 'refund_client')}
+                          className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-colors shadow-sm"
+                        >
+                          Refund Client
+                        </button>
+                        <button 
+                          onClick={() => handleResolveDispute(appt.id, 'release_provider')}
+                          className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-sm"
+                        >
+                          Pay Provider
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>

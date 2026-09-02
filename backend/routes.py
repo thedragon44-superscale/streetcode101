@@ -2869,3 +2869,80 @@ def upgrade_account(request: UpgradeRequest, session: Session = Depends(get_sess
     session.refresh(user)
     
     return {"message": f"Successfully upgraded to {request.new_role.replace('_', ' ')}", "role": user.role}
+
+class DisputeResolutionRequest(BaseModel):
+    resolution: str  # 'refund_client' or 'release_provider'
+
+@router.get("/api/admin/disputes")
+def get_admin_disputes(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Fetches all frozen/disputed appointments for Master Admin review."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Master Admin only.")
+        
+    from models import Appointment
+    disputes = session.exec(
+        select(Appointment)
+        .where(Appointment.status == "disputed")
+        .order_by(Appointment.id.desc())
+    ).all()
+    
+    return disputes
+
+@router.post("/api/admin/disputes/{id}/resolve")
+def resolve_dispute(id: int, req: DisputeResolutionRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Forces the release of frozen escrow to either the client or the provider."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Master Admin only.")
+        
+    from models import Appointment, User, Transaction
+    appt = session.get(Appointment, id)
+    
+    if not appt or appt.status != "disputed":
+        raise HTTPException(status_code=400, detail="Valid disputed appointment not found.")
+        
+    admin = session.exec(select(User).where(User.username == "admin")).first()
+    if admin.wallet_balance < appt.escrow_amount:
+        raise HTTPException(status_code=500, detail="Master Escrow vault lacks funds for this resolution.")
+        
+    admin.wallet_balance -= appt.escrow_amount
+    
+    if req.resolution == "refund_client":
+        client = session.exec(select(User).where(User.username == appt.client_username)).first()
+        client.wallet_balance += appt.escrow_amount
+        appt.status = "refunded"
+        receiver = client.username
+        
+        send_automated_email(
+            to_email=client.email,
+            subject="Dispute Resolved: Escrow Refunded",
+            body=f"Yo @{client.username},\n\nThe Master Admin has ruled in your favor regarding appointment #{appt.id}. {appt.escrow_amount:.2f} SC has been refunded to your wallet."
+        )
+        
+    elif req.resolution == "release_provider":
+        provider = session.exec(select(User).where(User.username == appt.provider_username)).first()
+        provider.wallet_balance += appt.escrow_amount
+        appt.status = "released"
+        receiver = provider.username
+        
+        send_automated_email(
+            to_email=provider.email,
+            subject="Dispute Resolved: Escrow Released",
+            body=f"Yo @{provider.username},\n\nThe Master Admin has ruled in your favor regarding the dispute on appointment #{appt.id}. {appt.escrow_amount:.2f} SC has been released to your wallet."
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Invalid resolution action.")
+        
+    tx = Transaction(
+        sender_username="admin",
+        receiver_username=receiver,
+        amount=appt.escrow_amount,
+        transaction_type="dispute_resolution",
+        status="completed"
+    )
+    
+    session.add(admin)
+    session.add(appt)
+    session.add(tx)
+    session.commit()
+    
+    return {"message": f"Dispute resolved. Escrow transferred to @{receiver}."}
