@@ -3,11 +3,6 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Navbar from './Navbar';
 import { useCart } from './CartContext';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
-import CheckoutForm from './CheckoutForm';
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -20,46 +15,41 @@ const SERVICE_COMPLIANCE = {
 };
 
 export default function Profile() {
-  const { username } = useParams(); // 'me' or an actual username
+  const { username } = useParams();
   const navigate = useNavigate();
   const { clearCart } = useCart();
   
+  // --- CORE STATE ---
   const [profile, setProfile] = useState(null);
   const [listings, setListings] = useState([]);
+  const [clientAppointments, setClientAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Profile Settings State
+  // --- PROFILE SETTINGS STATE ---
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [newBio, setNewBio] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [emailOptIn, setEmailOptIn] = useState(false);
 
-  // New Post State
+  // --- NEW POST STATE ---
   const [showListingForm, setShowListingForm] = useState(false);
-  const [postType, setPostType] = useState('text'); // 'text', 'image', 'vendor_drop'
+  const [postType, setPostType] = useState('text');
   const [listingTitle, setListingTitle] = useState('');
   const [listingDesc, setListingDesc] = useState('');
   const [listingPrice, setListingPrice] = useState('');
   const [listingFile, setListingFile] = useState(null);
   const [isSubmittingListing, setIsSubmittingListing] = useState(false);
 
-  // Comment Section State
+  // --- COMMENT & EDIT STATE ---
   const [activeCommentPostId, setActiveCommentPostId] = useState(null);
   const [postComments, setPostComments] = useState([]);
   const [commentInput, setCommentInput] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-
-  // Edit Post State
   const [editingPostId, setEditingPostId] = useState(null);
   const [editPayload, setEditPayload] = useState({ title: '', description: '', price: '' });
 
-  // Wallet State
-  const [topUpAmount, setTopUpAmount] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
-  const [showTopUpModal, setShowTopUpModal] = useState(false);
-
-  // Onboarding Modal State
+  // --- ONBOARDING MODAL STATE ---
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeRole, setUpgradeRole] = useState(''); 
   const [onboardingData, setOnboardingData] = useState({
@@ -70,7 +60,51 @@ export default function Profile() {
   });
   const [isLookingUpZip, setIsLookingUpZip] = useState(false);
 
-  // Zero-overhead external ZIP lookup
+  const token = localStorage.getItem('pidrop_token');
+  const isMyProfile = username === 'me';
+
+  // --- USE EFFECTS (Must remain at top level) ---
+  useEffect(() => {
+    if (isMyProfile && !token) {
+      navigate('/login');
+      return;
+    }
+
+    const endpoint = isMyProfile ? '/profile/me' : `/profile/${username}`;
+    const headers = isMyProfile ? { 'Authorization': `Bearer ${token}` } : {};
+
+    fetch(`${API_BASE}${endpoint}`, { headers })
+      .then((res) => {
+        if (!res.ok) throw new Error('Profile not found or unauthorized');
+        return res.json();
+      })
+      .then((data) => {
+        setProfile(data);
+        setNewBio(data.bio || '');
+        setEmailOptIn(data.email_opt_in || false);
+        return fetch(`${API_BASE}/posts/user/${data.username}`);
+      })
+      .then((res) => res.json())
+      .then((listingsData) => {
+        setListings(listingsData);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [username, token, navigate, isMyProfile]);
+
+  useEffect(() => {
+    if (isMyProfile && token) {
+      fetch(`${API_BASE}/client/appointments`, { headers: { 'Authorization': `Bearer ${token}` } })
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setClientAppointments(data))
+        .catch(err => console.error('Failed to load appointments', err));
+    }
+  }, [isMyProfile, token]);
+
+  // --- HANDLER FUNCTIONS ---
   const handleZipLookup = async (zip) => {
     setOnboardingData(prev => ({ ...prev, zipCode: zip }));
     if (zip.length === 5) {
@@ -96,45 +130,21 @@ export default function Profile() {
       setOnboardingData(prev => ({ ...prev, city: '', state: '' }));
     }
   };
-  const [clientAppointments, setClientAppointments] = useState([]);
-  const token = localStorage.getItem('pidrop_token');
-  const isMyProfile = username === 'me';
 
-  const handleTopUp = async () => {
-    const targetCoins = parseInt(topUpAmount);
-    if (!targetCoins || targetCoins < 1) return toast.error('Enter a valid amount');
-    
+  const handleConfirmJob = async (appointmentId) => {
     try {
-      const res = await fetch(`${API_BASE}/wallet/topup`, {
+      const res = await fetch(`${API_BASE}/appointments/${appointmentId}/confirm`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ coins: targetCoins })
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to release funds');
       
-      if (!res.ok) throw new Error(data.detail || 'Top-up failed');
-      
-      // Native flow: save client secret and open the embedded modal
-      setClientSecret(data.clientSecret);
-      setShowTopUpModal(true);
+      toast.success("Job Confirmed! Escrow released to provider.");
+      setClientAppointments(prev => prev.map(a => a.id === appointmentId ? { ...a, status: 'released' } : a));
     } catch (err) {
       toast.error(err.message);
     }
-  };
-
-  const handleTopUpSuccess = () => {
-    setShowTopUpModal(false);
-    setClientSecret('');
-    
-    // Optimistically update the UI balance so it feels instant
-    setProfile(prev => ({
-      ...prev,
-      wallet_balance: (prev.wallet_balance || 0) + parseInt(topUpAmount)
-    }));
-    setTopUpAmount('');
   };
 
   const handleToggleComments = async (postId) => {
@@ -183,67 +193,6 @@ export default function Profile() {
     }
   };
 
-  useEffect(() => {
-    if (isMyProfile && !token) {
-      navigate('/login');
-      return;
-    }
-
-// Fetch Client Bookings
-  useEffect(() => {
-    if (isMyProfile && token) {
-      fetch(`${API_BASE}/client/appointments`, { headers: { 'Authorization': `Bearer ${token}` } })
-        .then(res => res.ok ? res.json() : [])
-        .then(data => setClientAppointments(data))
-        .catch(err => console.error('Failed to load appointments', err));
-    }
-  }, [isMyProfile, token]);
-
-  // Client Escrow Release Action
-  const handleConfirmJob = async (appointmentId) => {
-    try {
-      const res = await fetch(`${API_BASE}/appointments/${appointmentId}/confirm`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to release funds');
-      
-      toast.success("Job Confirmed! Escrow released to provider.");
-      // Optimistically update UI
-      setClientAppointments(prev => prev.map(a => a.id === appointmentId ? { ...a, status: 'released' } : a));
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-    const endpoint = isMyProfile ? '/profile/me' : `/profile/${username}`;
-    const headers = isMyProfile ? { 'Authorization': `Bearer ${token}` } : {};
-
-    fetch(`${API_BASE}${endpoint}`, { headers })
-      .then((res) => {
-        if (!res.ok) throw new Error('Profile not found or unauthorized');
-        return res.json();
-      })
-      .then((data) => {
-        setProfile(data);
-        setNewBio(data.bio || '');
-        setEmailOptIn(data.email_opt_in || false);
-        
-        // Once we know the actual username, fetch their wall listings!
-        return fetch(`${API_BASE}/posts/user/${data.username}`);
-      })
-      .then((res) => res.json())
-      .then((listingsData) => {
-        setListings(listingsData);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, [username, token, navigate, isMyProfile]);
-
   const handleAvatarUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -274,10 +223,7 @@ export default function Profile() {
     try {
       const response = await fetch(`${API_BASE}/profile/me`, {
         method: 'PATCH',
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json' 
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ bio: newBio })
       });
       if (!response.ok) throw new Error('Failed to update bio');
@@ -292,7 +238,7 @@ export default function Profile() {
 
   const handleToggleEmail = async () => {
     const newValue = !emailOptIn;
-    setEmailOptIn(newValue); // Optimistic UI update
+    setEmailOptIn(newValue);
     try {
       const res = await fetch(`${API_BASE}/profile/me`, {
         method: 'PATCH',
@@ -309,7 +255,7 @@ export default function Profile() {
     }
   };
 
-const handleUpgradeAccount = async (e) => {
+  const handleUpgradeAccount = async (e) => {
     e.preventDefault();
     if (!onboardingData.complianceAgreed) return toast.error("You must agree to the compliance terms.");
     if (upgradeRole === 'service_provider' && !onboardingData.primaryTrade) return toast.error("Please select a primary trade.");
@@ -318,10 +264,7 @@ const handleUpgradeAccount = async (e) => {
       const res = await fetch(`${API_BASE}/profile/upgrade`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          new_role: upgradeRole,
-          onboarding_data: onboardingData 
-        })
+        body: JSON.stringify({ new_role: upgradeRole, onboarding_data: onboardingData })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to upgrade account');
@@ -361,18 +304,14 @@ const handleUpgradeAccount = async (e) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Failed to create listing');
       
-      // Extract the post data from the response. 
-      // The backend either returns the post directly, or wrapped in a 'post' key if it also returns a message.
       const newPost = data.post ? data.post : data;
-      
-      // Instantly inject the fully formed listing from the backend
       setListings([newPost, ...listings]);
       setShowListingForm(false);
       setListingTitle('');
       setListingDesc('');
       setListingPrice('');
       setListingFile(null);
-      setPostType('text'); // Reset form type
+      setPostType('text');
       toast.success('Listing posted to your wall!');
     } catch (err) {
       toast.error(err.message);
@@ -391,7 +330,6 @@ const handleUpgradeAccount = async (e) => {
       if (!res.ok) throw new Error('Failed to toggle follow status');
       const data = await res.json();
       
-      // Instantly update the UI without reloading
       setProfile(prev => ({
         ...prev,
         is_following: data.is_following,
@@ -473,7 +411,7 @@ const handleUpgradeAccount = async (e) => {
     }
   };
 
-  // --- SKELETON LOADER ---
+  // --- RENDERING CONDITIONS ---
   if (loading) return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
       <Navbar />
@@ -489,34 +427,21 @@ const handleUpgradeAccount = async (e) => {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-20 flex flex-col">
-      
-      {/* Global Navbar */}
       <Navbar />
 
-      {/* Profile Card */}
       <main className="max-w-2xl mx-auto px-4 py-10 w-full">
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mb-8 relative">
-          
-          {/* Header Banner & Sign Out Button */}
           <div className="h-32 bg-gradient-to-r from-cyan-600 to-blue-700 relative">
             {isMyProfile && (
-              <button 
-                onClick={handleLogout} 
-                className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white font-bold py-2 px-4 rounded-xl transition-all backdrop-blur-sm text-sm shadow-sm border border-white/20 flex items-center gap-2"
-              >
+              <button onClick={handleLogout} className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white font-bold py-2 px-4 rounded-xl transition-all backdrop-blur-sm text-sm shadow-sm border border-white/20 flex items-center gap-2">
                 <i className="fa-solid fa-right-from-bracket"></i> Sign Out
               </button>
             )}
           </div>
           
           <div className="px-8 pb-8 relative">
-            {/* Avatar */}
             <div className="relative -mt-16 mb-4 w-32 h-32 mx-auto sm:mx-0">
-              <img 
-                src={profile.profile_image_url} 
-                alt={profile.username} 
-                className="w-full h-full rounded-full object-cover border-4 border-white shadow-lg bg-white"
-              />
+              <img src={profile.profile_image_url} alt={profile.username} className="w-full h-full rounded-full object-cover border-4 border-white shadow-lg bg-white" />
               {isMyProfile && profile.username !== 'admin' && (
                 <label className="absolute bottom-0 right-0 bg-slate-900 text-white p-2 rounded-full cursor-pointer shadow-md hover:bg-orange-500 transition-colors">
                   <i className="fa-solid fa-camera"></i>
@@ -525,16 +450,11 @@ const handleUpgradeAccount = async (e) => {
               )}
             </div>
 
-            {/* Info */}
             <div className="text-center sm:text-left flex-1">
               <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
                 <div>
                   <h1 className="text-3xl font-black text-slate-900">@{profile.username}</h1>
-                  <p className={`text-sm font-bold mt-1 uppercase tracking-widest ${
-                    profile.username === 'admin' ? 'text-orange-500' :
-                    profile.role?.includes('vendor') || profile.role?.includes('service_provider') ? 'text-cyan-500' :
-                    'text-slate-500'
-                  }`}>
+                  <p className={`text-sm font-bold mt-1 uppercase tracking-widest ${profile.username === 'admin' ? 'text-orange-500' : profile.role?.includes('vendor') || profile.role?.includes('service_provider') ? 'text-cyan-500' : 'text-slate-500'}`}>
                     {profile.username === 'admin' ? 'Master Admin' : 
                      [
                        profile.role?.includes('vendor') ? 'Verified Vendor' : null,
@@ -543,21 +463,12 @@ const handleUpgradeAccount = async (e) => {
                   </p>
                 </div>
                 
-                {/* Follow Button (Hidden on your own profile) */}
                 {!isMyProfile && (
-                  <button 
-                    onClick={handleToggleFollow}
-                    className={`px-6 py-2 rounded-xl text-sm font-bold shadow-sm transition active:scale-95 uppercase tracking-wider ${
-                      profile.is_following 
-                        ? 'bg-slate-200 text-slate-700 hover:bg-red-100 hover:text-red-600' 
-                        : 'bg-slate-900 text-white hover:bg-orange-500'
-                    }`}
-                  >
+                  <button onClick={handleToggleFollow} className={`px-6 py-2 rounded-xl text-sm font-bold shadow-sm transition active:scale-95 uppercase tracking-wider ${profile.is_following ? 'bg-slate-200 text-slate-700 hover:bg-red-100 hover:text-red-600' : 'bg-slate-900 text-white hover:bg-orange-500'}`}>
                     {profile.is_following ? 'Unfollow' : 'Follow'}
                   </button>
                 )}
                 
-                {/* Role-Specific Dashboard Buttons (Only on your own profile) */}
                 <div className="flex flex-col gap-2 mt-4 sm:mt-0">
                   {isMyProfile && profile.role?.includes('vendor') && (
                     <Link to="/vendor" className="px-6 py-2 bg-slate-900 hover:bg-purple-500 text-white rounded-xl text-sm font-bold shadow-sm transition active:scale-95 uppercase tracking-wider flex items-center gap-2">
@@ -572,7 +483,6 @@ const handleUpgradeAccount = async (e) => {
                 </div>
               </div>
 
-              {/* Network Stats */}
               <div className="flex items-center justify-center sm:justify-start gap-6 mt-4 pb-4 border-b border-slate-100">
                 <div className="text-center sm:text-left">
                   <span className="block text-xl font-black text-slate-900">{profile.followers_count || 0}</span>
@@ -584,7 +494,6 @@ const handleUpgradeAccount = async (e) => {
                 </div>
               </div>
 
-              {/* --- ACCOUNT UPGRADE SECTION --- */}
               {isMyProfile && profile.username !== 'admin' && (!profile.role?.includes('vendor') || !profile.role?.includes('service_provider')) && (
                 <div className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm mt-6 mb-6">
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Level Up Your Account</h3>
@@ -609,15 +518,9 @@ const handleUpgradeAccount = async (e) => {
 
               <div className="mt-6">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Bio / Manifesto</h3>
-                
                 {isMyProfile && isEditingBio && profile.username !== 'admin' ? (
                   <div className="space-y-3">
-                    <textarea 
-                      value={newBio}
-                      onChange={(e) => setNewBio(e.target.value)}
-                      className="w-full p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-orange-500 text-sm"
-                      rows="3"
-                    />
+                    <textarea value={newBio} onChange={(e) => setNewBio(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-orange-500 text-sm" rows="3" />
                     <div className="flex gap-2">
                       <button onClick={handleBioSave} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition active:scale-95">Save</button>
                       <button onClick={() => { setIsEditingBio(false); setNewBio(profile.bio); }} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold transition">Cancel</button>
@@ -634,13 +537,9 @@ const handleUpgradeAccount = async (e) => {
                   </div>
                 )}
 
-                {/* Email Alert Toggle */}
                 {isMyProfile && profile.username !== 'admin' && (
                   <div className="mt-5 pt-5 border-t border-slate-100 flex items-center gap-3 justify-center sm:justify-start">
-                    <button 
-                      onClick={handleToggleEmail}
-                      className={`w-10 h-5 rounded-full flex items-center p-1 transition-colors ${emailOptIn ? 'bg-emerald-500 justify-end' : 'bg-slate-300 justify-start'}`}
-                    >
+                    <button onClick={handleToggleEmail} className={`w-10 h-5 rounded-full flex items-center p-1 transition-colors ${emailOptIn ? 'bg-emerald-500 justify-end' : 'bg-slate-300 justify-start'}`}>
                       <div className="w-3.5 h-3.5 bg-white rounded-full shadow-sm"></div>
                     </button>
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -648,13 +547,12 @@ const handleUpgradeAccount = async (e) => {
                     </span>
                   </div>
                 )}
-
               </div>
             </div>
           </div>
         </div>
 
-{/* --- CLIENT ACTIVE BOOKINGS --- */}
+        {/* --- CLIENT ACTIVE BOOKINGS --- */}
         {isMyProfile && clientAppointments.length > 0 && (
           <div className="mb-10">
             <h2 className="text-xl font-black text-slate-900 uppercase tracking-wide mb-6">My Service Bookings</h2>
@@ -671,10 +569,7 @@ const handleUpgradeAccount = async (e) => {
                   </div>
                   
                   {appt.status === 'pending_confirmation' && (
-                    <button 
-                      onClick={() => handleConfirmJob(appt.id)}
-                      className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-sm active:scale-95 uppercase tracking-wider text-sm"
-                    >
+                    <button onClick={() => handleConfirmJob(appt.id)} className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-sm active:scale-95 uppercase tracking-wider text-sm">
                       Confirm & Release Funds
                     </button>
                   )}
@@ -689,19 +584,14 @@ const handleUpgradeAccount = async (e) => {
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-black text-slate-900 uppercase tracking-wide">Timeline</h2>
             {isMyProfile && profile.username !== 'admin' && (
-              <button 
-                onClick={() => setShowListingForm(!showListingForm)}
-                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition active:scale-95"
-              >
+              <button onClick={() => setShowListingForm(!showListingForm)} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition active:scale-95">
                 {showListingForm ? 'Cancel' : '+ New Post'}
               </button>
             )}
           </div>
 
-          {/* New Post Form */}
           {showListingForm && (
             <form onSubmit={handleCreateListing} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 mb-8 space-y-4">
-              
               <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-xl">
                 <button type="button" onClick={() => setPostType('text')} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${postType === 'text' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Text</button>
                 <button type="button" onClick={() => setPostType('image')} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${postType === 'image' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Image</button>
@@ -712,18 +602,18 @@ const handleUpgradeAccount = async (e) => {
                 <>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Item Title</label>
-                    <input required type="text" value={listingTitle} onChange={(e)=>setListingTitle(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium" placeholder="e.g. Mechanical Keyboard" />
+                    <input required type="text" value={listingTitle} onChange={(e)=>setListingTitle(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Price ($)</label>
-                    <input required type="number" min="1" step="0.01" value={listingPrice} onChange={(e)=>setListingPrice(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium" placeholder="45.00" />
+                    <input required type="number" min="1" step="0.01" value={listingPrice} onChange={(e)=>setListingPrice(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium" />
                   </div>
                 </>
               )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{postType === 'text' ? 'What\'s on your mind?' : 'Description'}</label>
-                <textarea required value={listingDesc} onChange={(e)=>setListingDesc(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium" rows="3" placeholder="..." />
+                <textarea required value={listingDesc} onChange={(e)=>setListingDesc(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium" rows="3" />
               </div>
 
               {postType !== 'text' && (
@@ -732,12 +622,7 @@ const handleUpgradeAccount = async (e) => {
                   {listingFile ? (
                     <div className="relative w-full h-48 mb-2 rounded-xl border border-slate-200 overflow-hidden bg-slate-50 group shadow-inner">
                       <img src={URL.createObjectURL(listingFile)} alt="Upload preview" className="w-full h-full object-cover" />
-                      <button 
-                        type="button" 
-                        onClick={() => setListingFile(null)} 
-                        className="absolute top-3 right-3 bg-slate-900/70 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all shadow-md"
-                        title="Remove Image"
-                      >
+                      <button type="button" onClick={() => setListingFile(null)} className="absolute top-3 right-3 bg-slate-900/70 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all shadow-md">
                         <i className="fa-solid fa-xmark"></i>
                       </button>
                     </div>
@@ -753,28 +638,16 @@ const handleUpgradeAccount = async (e) => {
             </form>
           )}
 
-          {/* User's Timeline */}
           <div className="space-y-4">
             {listings.length === 0 ? (
-              <div className="text-center p-10 bg-white rounded-3xl border border-slate-200 border-dashed text-slate-500 font-medium shadow-sm">
-                No posts yet.
-              </div>
+              <div className="text-center p-10 bg-white rounded-3xl border border-slate-200 border-dashed text-slate-500 font-medium shadow-sm">No posts yet.</div>
             ) : (
               listings.map(item => (
                 <div key={item.id} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 hover:shadow-md transition group relative">
-                  
-                  {/* Floating Action Menu (Only visible on your own profile) */}
                   {isMyProfile && profile?.username !== 'admin' && (
                     <div className="absolute top-4 right-4 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-white p-1 rounded-lg shadow-sm border border-slate-100 z-10">
-                      <button onClick={() => {
-                        setEditingPostId(item.id);
-                        setEditPayload({ title: item.title || '', description: item.description || '', price: item.price || '' });
-                      }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-md transition-colors" title="Edit Post">
-                        <i className="fa-solid fa-pen"></i>
-                      </button>
-                      <button onClick={() => handleDeleteMyPost(item.id)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors" title="Delete Post">
-                        <i className="fa-solid fa-trash"></i>
-                      </button>
+                      <button onClick={() => { setEditingPostId(item.id); setEditPayload({ title: item.title || '', description: item.description || '', price: item.price || '' }); }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-md transition-colors" title="Edit Post"><i className="fa-solid fa-pen"></i></button>
+                      <button onClick={() => handleDeleteMyPost(item.id)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors" title="Delete Post"><i className="fa-solid fa-trash"></i></button>
                     </div>
                   )}
 
@@ -783,14 +656,12 @@ const handleUpgradeAccount = async (e) => {
                       <img src={item.image_url} alt="Post media" className="w-full sm:w-32 h-32 object-cover rounded-2xl bg-slate-50 border border-slate-100 flex-shrink-0" />
                     )}
                     <div className="flex flex-col flex-1 min-w-0">
-                      
-                      {/* Editing View vs Normal View */}
                       {editingPostId === item.id ? (
                         <form onSubmit={(e) => handleEditSubmit(e, item.id)} className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-2">
                           {item.post_type === 'vendor_drop' && (
                             <div className="flex gap-2">
-                              <input type="text" value={editPayload.title} onChange={e => setEditPayload({...editPayload, title: e.target.value})} className="flex-1 p-2 rounded-xl text-sm border border-slate-300 focus:ring-2 focus:ring-cyan-500" placeholder="Title" required />
-                              <input type="number" step="0.01" value={editPayload.price} onChange={e => setEditPayload({...editPayload, price: e.target.value})} className="w-24 p-2 rounded-xl text-sm border border-slate-300 focus:ring-2 focus:ring-cyan-500" placeholder="Price" required />
+                              <input type="text" value={editPayload.title} onChange={e => setEditPayload({...editPayload, title: e.target.value})} className="flex-1 p-2 rounded-xl text-sm border border-slate-300 focus:ring-2 focus:ring-cyan-500" required />
+                              <input type="number" step="0.01" value={editPayload.price} onChange={e => setEditPayload({...editPayload, price: e.target.value})} className="w-24 p-2 rounded-xl text-sm border border-slate-300 focus:ring-2 focus:ring-cyan-500" required />
                             </div>
                           )}
                           <textarea value={editPayload.description} onChange={e => setEditPayload({...editPayload, description: e.target.value})} className="w-full p-3 rounded-xl text-sm border border-slate-300 focus:ring-2 focus:ring-cyan-500" rows="3" required></textarea>
@@ -815,12 +686,8 @@ const handleUpgradeAccount = async (e) => {
 
                       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                         <div className="flex gap-4">
-                          <button onClick={() => handleLike(item.id)} className="flex items-center gap-1.5 text-slate-500 hover:text-orange-500 transition-colors text-sm font-bold active:scale-90">
-                            <i className="fa-solid fa-heart"></i> {item.likes_count || 0}
-                          </button>
-                          <button onClick={() => handleToggleComments(item.id)} className={`flex items-center gap-1.5 transition-colors text-sm font-bold ${activeCommentPostId === item.id ? 'text-cyan-600' : 'text-slate-500 hover:text-cyan-600'}`}>
-                            <i className="fa-solid fa-comment"></i> {item.comments_count || 0}
-                          </button>
+                          <button onClick={() => handleLike(item.id)} className="flex items-center gap-1.5 text-slate-500 hover:text-orange-500 transition-colors text-sm font-bold active:scale-90"><i className="fa-solid fa-heart"></i> {item.likes_count || 0}</button>
+                          <button onClick={() => handleToggleComments(item.id)} className={`flex items-center gap-1.5 transition-colors text-sm font-bold ${activeCommentPostId === item.id ? 'text-cyan-600' : 'text-slate-500 hover:text-cyan-600'}`}><i className="fa-solid fa-comment"></i> {item.comments_count || 0}</button>
                         </div>
                         <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-2">
                           <span>{new Date(item.created_at).toLocaleDateString()}</span>
@@ -828,7 +695,6 @@ const handleUpgradeAccount = async (e) => {
                         </div>
                       </div>
                       
-                      {/* Expandable Comment Section */}
                       {activeCommentPostId === item.id && (
                         <div className="mt-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                           <div className="max-h-40 overflow-y-auto space-y-2 mb-3 pr-2">
@@ -847,21 +713,11 @@ const handleUpgradeAccount = async (e) => {
                             )}
                           </div>
                           <form onSubmit={(e) => handlePostComment(e, item.id)} className="flex gap-2">
-                            <input 
-                              type="text" 
-                              placeholder="Reply..." 
-                              value={commentInput} 
-                              onChange={(e) => setCommentInput(e.target.value)}
-                              className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 font-medium"
-                              required
-                            />
-                            <button disabled={isSubmittingComment} type="submit" className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-800 disabled:opacity-50 transition-all shadow-sm">
-                              Post
-                            </button>
+                            <input type="text" placeholder="Reply..." value={commentInput} onChange={(e) => setCommentInput(e.target.value)} className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 font-medium" required />
+                            <button disabled={isSubmittingComment} type="submit" className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-800 disabled:opacity-50 transition-all shadow-sm">Post</button>
                           </form>
                         </div>
                       )}
-
                     </div>
                   </div>
                 </div>
@@ -984,6 +840,6 @@ const handleUpgradeAccount = async (e) => {
           </div>
         </div>
       )}
-      </div>
+    </div>
   );
 }
