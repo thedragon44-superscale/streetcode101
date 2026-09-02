@@ -224,18 +224,21 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
       <header className="sticky top-0 z-[9000] bg-slate-950 text-white shadow-2xl border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 sm:gap-4">
           
-          {/* HAMBURGER & LOGO */}
-          <div className="flex items-center gap-4 flex-shrink-0">
-            <button onClick={() => setIsSidebarOpen(true)} className="text-slate-300 hover:text-orange-500 text-2xl transition-colors">
-              <i className="fa-solid fa-bars"></i>
-            </button>
-            
-            <Link to="/" className="flex items-center gap-2 hover:text-orange-500 transition-colors">
-              <img src="/streetbook_logo.png" alt="Street Code 101" className="h-9 w-9 sm:h-10 sm:w-10 object-cover rounded-md shadow-sm border border-slate-800" />
-              <span className="text-lg sm:text-xl font-black tracking-tight hidden sm:block uppercase font-heading">
+          {/* HAMBURGER & LOGO (COMBINED NAV TRIGGER) */}
+          <div className="flex items-center flex-shrink-0">
+            <button 
+              onClick={() => setIsSidebarOpen(true)} 
+              className="flex items-center gap-3 group focus:outline-none"
+              title="Open Menu"
+            >
+              <div className="relative flex items-center justify-center bg-slate-900 border border-slate-700 group-hover:border-orange-500 rounded-xl p-1.5 sm:p-2 transition-all shadow-[0_4px_10px_rgba(0,0,0,0.5)] group-hover:shadow-[0_0_20px_rgba(249,115,22,0.3)]">
+                <i className="fa-solid fa-bars text-xl sm:text-2xl text-slate-400 group-hover:text-orange-500 mr-2 ml-1 transition-colors"></i>
+                <img src="/streetbook_logo.png" alt="Menu" className="h-9 w-9 sm:h-11 sm:w-11 object-cover rounded-md shadow-sm border border-slate-800" />
+              </div>
+              <span className="text-lg sm:text-xl font-black tracking-tight hidden md:block uppercase font-heading text-slate-100 group-hover:text-orange-500 transition-colors">
                 STREET CODE <span className="text-orange-500">101</span>
               </span>
-            </Link>
+            </button>
           </div>
 
           {/* DYNAMIC SEARCH BAR */}

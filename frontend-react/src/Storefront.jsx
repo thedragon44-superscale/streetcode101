@@ -174,7 +174,6 @@ export default function Storefront() {
               onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
               className="flex items-center gap-2 text-slate-800 font-black hover:text-orange-500 transition-colors py-1 focus:outline-none"
             >
-              <i className="fa-solid fa-bars text-lg"></i>
               <span className="uppercase tracking-widest text-sm">
                 {categories.find(c => c.id === selectedCategory)?.label || 'All Drops'}
               </span>
