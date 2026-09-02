@@ -413,6 +413,11 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
             <span className="font-bold tracking-widest uppercase text-sm">Storefront</span>
           </Link>
 
+          <Link to="/services" onClick={() => setIsSidebarOpen(false)} className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${isActive('/services') ? 'bg-slate-800 text-orange-500' : 'text-slate-300 hover:bg-slate-900 hover:text-orange-400'}`}>
+            <i className="fa-solid fa-screwdriver-wrench w-6 text-center text-lg"></i>
+            <span className="font-bold tracking-widest uppercase text-sm">Service Catalog</span>
+          </Link>
+
           <Link to="/feed" onClick={() => setIsSidebarOpen(false)} className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${isActive('/feed') ? 'bg-slate-800 text-orange-500' : 'text-slate-300 hover:bg-slate-900 hover:text-orange-400'}`}>
             <i className="fa-solid fa-layer-group w-6 text-center text-lg"></i>
             <span className="font-bold tracking-widest uppercase text-sm">Social Feed</span>

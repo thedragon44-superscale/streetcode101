@@ -2819,6 +2819,10 @@ def upgrade_account(request: UpgradeRequest, session: Session = Depends(get_sess
         
     user.role = ','.join(current_roles)
     
+    # Save the provider's specific trade
+    if request.new_role == 'service_provider' and request.onboarding_data and request.onboarding_data.get('primaryTrade'):
+        user.primary_trade = request.onboarding_data.get('primaryTrade')
+    
     session.add(user)
     session.commit()
     session.refresh(user)

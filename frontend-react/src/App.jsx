@@ -1,3 +1,4 @@
+import Services from './Services';
 import Post from './Post';
 import EmailCaptureModal from './EmailCaptureModal';
 import Legal from './Legal';
@@ -54,6 +55,7 @@ function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/provider-dashboard" element={<ProviderDashboard />} />
           <Route path="/wallet" element={<Wallet />} />
+          <Route path="/services" element={<Services />} />
         </Routes>
       </Router>
     </CartProvider>
