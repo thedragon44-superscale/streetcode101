@@ -147,6 +147,24 @@ export default function Profile() {
     }
   };
 
+const handleDisputeJob = async (appointmentId) => {
+    if (!window.confirm("Are you sure you want to dispute this job? This will freeze the escrow and alert the Master Admin.")) return;
+    
+    try {
+      const res = await fetch(`${API_BASE}/appointments/${appointmentId}/dispute`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to file dispute');
+      
+      toast.error("Dispute filed. Escrow frozen.");
+      setClientAppointments(prev => prev.map(a => a.id === appointmentId ? { ...a, status: 'disputed' } : a));
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   const handleToggleComments = async (postId) => {
     if (activeCommentPostId === postId) {
       setActiveCommentPostId(null);
@@ -568,10 +586,17 @@ export default function Profile() {
                     <p className="text-xs font-bold text-slate-700 mt-1">Escrow: {appt.escrow_amount.toFixed(2)} SC</p>
                   </div>
                   
-                  {appt.status === 'pending_confirmation' && (
-                    <button onClick={() => handleConfirmJob(appt.id)} className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-sm active:scale-95 uppercase tracking-wider text-sm">
-                      Confirm & Release Funds
-                    </button>
+                  {(appt.status === 'pending_confirmation' || appt.status === 'checked_in') && (
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-4 sm:mt-0">
+                      {appt.status === 'pending_confirmation' && (
+                        <button onClick={() => handleConfirmJob(appt.id)} className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-sm active:scale-95 uppercase tracking-wider text-sm">
+                          Confirm & Release
+                        </button>
+                      )}
+                      <button onClick={() => handleDisputeJob(appt.id)} className="w-full sm:w-auto bg-red-50 hover:bg-red-500 text-red-600 hover:text-white font-bold py-3 px-6 rounded-xl transition-all shadow-sm active:scale-95 uppercase tracking-wider text-sm border border-red-200 hover:border-red-500">
+                        Dispute
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}

@@ -2767,6 +2767,48 @@ def client_confirm_job(id: int, session: Session = Depends(get_session), token: 
     else:
         raise HTTPException(status_code=500, detail="Master Escrow vault error.")
 
+@router.post("/api/appointments/{id}/dispute")
+def client_dispute_job(id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Client flags a job as disputed, freezing escrow and alerting Master Admin."""
+    from models import Appointment, User
+    
+    username = token.get("sub")
+    appt = session.get(Appointment, id)
+    
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+        
+    if appt.client_username != username:
+        raise HTTPException(status_code=403, detail="Only the client can file a dispute.")
+        
+    # Prevent disputing already released or refunded jobs
+    if appt.status not in ["pending_confirmation", "checked_in", "locked"]:
+        raise HTTPException(status_code=400, detail="Job cannot be disputed from its current status.")
+        
+    appt.status = "disputed"
+    session.add(appt)
+    session.commit()
+    
+    # Alert Provider
+    provider = session.exec(select(User).where(User.username == appt.provider_username)).first()
+    if provider:
+        send_automated_email(
+            to_email=provider.email,
+            subject="🚨 Job Disputed by Client",
+            body=f"Yo @{provider.username},\n\n@{username} has filed a dispute for your recent job. The {appt.escrow_amount:.2f} SC in Escrow is currently frozen pending Master Admin review."
+        )
+        
+    # Alert Master Admin
+    admin = session.exec(select(User).where(User.username == "admin")).first()
+    if admin:
+        send_automated_email(
+            to_email=admin.email,
+            subject="🚨 NEW ESCROW DISPUTE",
+            body=f"Admin Alert:\n\nClient @{username} disputed a job by @{appt.provider_username}.\nAppointment ID: {appt.id}\nEscrow Amount: {appt.escrow_amount:.2f} SC\n\nPlease review the incident."
+        )
+        
+    return {"message": "Dispute filed. Escrow frozen."}
+
 @router.get("/api/provider/appointments")
 def get_provider_schedule(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches all upcoming and active appointments for the logged-in service provider."""
