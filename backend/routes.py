@@ -2477,6 +2477,21 @@ def create_service_listing(payload: ServiceCreateRequest, session: Session = Dep
     
     return {"message": "Service listing published successfully!", "service": new_service}
 
+@router.get("/api/client/appointments")
+def get_client_appointments(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Fetches all service appointments booked by the client."""
+    from models import Appointment
+    username = token.get("sub")
+    
+    # Fetch all appointments where this user is the client
+    appointments = session.exec(
+        select(Appointment)
+        .where(Appointment.client_username == username)
+        .order_by(Appointment.scheduled_start.desc())
+    ).all()
+    
+    return appointments
+
 @router.get("/api/services")
 def get_service_catalog(session: Session = Depends(get_session)):
     """Fetches all active service listings for the public storefront."""

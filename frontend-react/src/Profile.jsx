@@ -96,7 +96,7 @@ export default function Profile() {
       setOnboardingData(prev => ({ ...prev, city: '', state: '' }));
     }
   };
-
+  const [clientAppointments, setClientAppointments] = useState([]);
   const token = localStorage.getItem('pidrop_token');
   const isMyProfile = username === 'me';
 
@@ -188,6 +188,34 @@ export default function Profile() {
       navigate('/login');
       return;
     }
+
+// Fetch Client Bookings
+  useEffect(() => {
+    if (isMyProfile && token) {
+      fetch(`${API_BASE}/client/appointments`, { headers: { 'Authorization': `Bearer ${token}` } })
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setClientAppointments(data))
+        .catch(err => console.error('Failed to load appointments', err));
+    }
+  }, [isMyProfile, token]);
+
+  // Client Escrow Release Action
+  const handleConfirmJob = async (appointmentId) => {
+    try {
+      const res = await fetch(`${API_BASE}/appointments/${appointmentId}/confirm`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to release funds');
+      
+      toast.success("Job Confirmed! Escrow released to provider.");
+      // Optimistically update UI
+      setClientAppointments(prev => prev.map(a => a.id === appointmentId ? { ...a, status: 'released' } : a));
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
 
     const endpoint = isMyProfile ? '/profile/me' : `/profile/${username}`;
     const headers = isMyProfile ? { 'Authorization': `Bearer ${token}` } : {};
@@ -625,6 +653,36 @@ const handleUpgradeAccount = async (e) => {
             </div>
           </div>
         </div>
+
+{/* --- CLIENT ACTIVE BOOKINGS --- */}
+        {isMyProfile && clientAppointments.length > 0 && (
+          <div className="mb-10">
+            <h2 className="text-xl font-black text-slate-900 uppercase tracking-wide mb-6">My Service Bookings</h2>
+            <div className="space-y-4">
+              {clientAppointments.map(appt => (
+                <div key={appt.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md mb-2 inline-block ${appt.status === 'released' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
+                      {appt.status.replace('_', ' ')}
+                    </span>
+                    <h4 className="font-bold text-slate-900">Provider: @{appt.provider_username}</h4>
+                    <p className="text-xs text-slate-500 font-medium mt-1">Date: {new Date(appt.scheduled_start).toLocaleString()}</p>
+                    <p className="text-xs font-bold text-slate-700 mt-1">Escrow: {appt.escrow_amount.toFixed(2)} SC</p>
+                  </div>
+                  
+                  {appt.status === 'pending_confirmation' && (
+                    <button 
+                      onClick={() => handleConfirmJob(appt.id)}
+                      className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-sm active:scale-95 uppercase tracking-wider text-sm"
+                    >
+                      Confirm & Release Funds
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* User Timeline */}
         <div>
