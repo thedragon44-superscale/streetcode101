@@ -14,6 +14,9 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
   const [currentUser, setCurrentUser] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Sidebar State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   // Notification State
   const [notifications, setNotifications] = useState([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -34,7 +37,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
     }
   }, [searchQuery]);
   
-  // To highlight the active tab on the mobile bottom nav
+  // To highlight the active tab on the sidebar
   const location = useLocation();
   const isActive = (path) => location.pathname === path;
 
@@ -53,7 +56,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
 
-  // Dynamic Discount Calculation (Forces UI to reflect math instantly)
+  // Dynamic Discount Calculation
   const vaultDiscount = currentUser?.discount_percent || 0;
   const activePromoDiscount = appliedPromo ? appliedPromo.discount_percent : 0;
   const totalDiscountPercent = vaultDiscount + activePromoDiscount;
@@ -217,29 +220,36 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
 
   return (
     <>
-      <header className="sticky top-0 z-[9999] bg-slate-950 text-white shadow-2xl border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+      {/* --- TOP HEADER --- */}
+      <header className="sticky top-0 z-[9000] bg-slate-950 text-white shadow-2xl border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 sm:gap-4">
           
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 flex-shrink-0 hover:text-orange-500 transition-colors">
-            <img src="/streetbook_logo.png" alt="Street Code 101" className="h-10 w-10 object-cover rounded-md shadow-sm border border-slate-800" />
-            <span className="text-xl font-black tracking-tight hidden md:block uppercase font-heading">
-              STREET CODE <span className="text-orange-500">101</span>
-            </span>
-          </Link>
+          {/* HAMBURGER & LOGO */}
+          <div className="flex items-center gap-4 flex-shrink-0">
+            <button onClick={() => setIsSidebarOpen(true)} className="text-slate-300 hover:text-orange-500 text-2xl transition-colors">
+              <i className="fa-solid fa-bars"></i>
+            </button>
+            
+            <Link to="/" className="flex items-center gap-2 hover:text-orange-500 transition-colors">
+              <img src="/streetbook_logo.png" alt="Street Code 101" className="h-9 w-9 sm:h-10 sm:w-10 object-cover rounded-md shadow-sm border border-slate-800" />
+              <span className="text-lg sm:text-xl font-black tracking-tight hidden sm:block uppercase font-heading">
+                STREET CODE <span className="text-orange-500">101</span>
+              </span>
+            </Link>
+          </div>
 
-          {/* Enhanced Search Bar */}
-          <div className="flex-1 w-full flex justify-center px-6 sm:px-10">
+          {/* DYNAMIC SEARCH BAR */}
+          <div className="flex-1 w-full flex justify-center px-1 sm:px-6">
             {showSearch && (
-              <div className="flex w-full max-w-3xl relative group">
+              <div className="flex w-full max-w-2xl relative group">
                 <input 
                   type="text" 
                   placeholder="SEARCH VAULT..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-5 py-2.5 bg-slate-900/80 text-blue-400 placeholder-slate-500 border border-slate-700 rounded-l-xl focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm font-mono font-bold transition-all uppercase tracking-wider group-hover:bg-slate-900 shadow-inner"
+                  className="w-full px-3 sm:px-5 py-2 bg-slate-900/80 text-blue-400 placeholder-slate-500 border border-slate-700 rounded-l-xl focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-xs sm:text-sm font-mono font-bold transition-all uppercase tracking-wider group-hover:bg-slate-900 shadow-inner"
                 />
-                <button className="bg-slate-800 hover:bg-slate-700 px-6 py-2.5 rounded-r-xl text-orange-500 transition-colors flex items-center justify-center border border-slate-700 border-l-0 shadow-sm">
+                <button className="bg-slate-800 hover:bg-slate-700 px-3 sm:px-6 py-2 rounded-r-xl text-orange-500 transition-colors flex items-center justify-center border border-slate-700 border-l-0 shadow-sm">
                   <i className="fa-solid fa-magnifying-glass"></i>
                 </button>
 
@@ -247,7 +257,6 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
                 {searchQuery.trim().length > 0 && (
                   <div className="absolute top-[110%] left-0 right-0 bg-slate-950 rounded-xl shadow-[0_30px_60px_rgba(0,0,0,0.9)] border border-slate-700 overflow-hidden z-[99999] flex flex-col max-h-[70vh] overflow-y-auto">
                     
-                    {/* Community Members Section */}
                     {globalResults.users.length > 0 && (
                       <div className="border-b border-slate-800/50">
                         <div className="px-4 py-2 bg-slate-900 text-[10px] font-black text-cyan-500 uppercase tracking-widest">Community Members</div>
@@ -267,7 +276,6 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
                       </div>
                     )}
 
-                    {/* Vault Drops Section */}
                     {globalResults.products.length > 0 && (
                       <div>
                         <div className="px-4 py-2 bg-slate-900 text-[10px] font-black text-orange-500 uppercase tracking-widest">Vault Drops</div>
@@ -288,7 +296,6 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
                       </div>
                     )}
 
-                    {/* No Results Fallback */}
                     {globalResults.users.length === 0 && globalResults.products.length === 0 && (
                       <div className="p-4 bg-slate-950 text-center text-slate-500 font-mono text-xs">NO RESULTS FOUND</div>
                     )}
@@ -297,80 +304,53 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
               </div>
             )}
           </div>
-          
-          {/* Right Navigation */}
-          <div className="hidden sm:flex items-center gap-6 flex-shrink-0">
-            <Link to="/feed" className="text-xs font-mono font-bold text-slate-400 hover:text-orange-500 transition-colors uppercase tracking-widest">
-              FEED
-            </Link>
 
-            {currentUser ? (
-              <>
-                <Link to="/inbox" className="text-xs font-mono font-bold text-slate-400 hover:text-orange-500 transition-colors uppercase tracking-widest">
-                  INBOX
-                </Link>
-
-                {/* Notification Bell Dropdown */}
-                <div className="relative flex items-center h-full">
-                  <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="relative text-slate-400 hover:text-orange-500 transition-colors px-2 flex items-center h-full">
-                    <i className="fa-solid fa-bell text-xl"></i>
-                    {unreadCount > 0 && (
-                      <span className="absolute top-[-5px] right-[-5px] bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black font-mono shadow-md border-2 border-slate-950 box-content">
-                        {unreadCount}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Dropdown Panel */}
-                  {isNotificationsOpen && (
-                    <div className="absolute top-full mt-5 right-0 w-80 bg-slate-950 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-slate-700 overflow-hidden flex flex-col max-h-[60vh] z-[99999]">
-                      <div className="px-5 py-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
-                        <span className="text-xs font-black text-cyan-500 uppercase tracking-widest leading-none block pt-1">Notifications</span>
-                      </div>
-                      <div className="overflow-y-auto">
-                        {notifications.length === 0 ? (
-                          <div className="p-8 text-center text-slate-500 font-mono text-xs">NO NEW ALERTS</div>
-                        ) : (
-                          notifications.map(n => (
-                            <Link key={n.id} to={`/post/${n.post_id}`} onClick={() => setIsNotificationsOpen(false)} className={`p-4 border-b border-slate-800/50 flex gap-3 items-start hover:bg-slate-800 transition-colors ${n.is_read ? 'opacity-50' : 'bg-slate-900/30'}`}>
-                              <div className="text-orange-500 mt-0.5 text-sm">
-                                <i className={`fa-solid ${(n.action || '').includes('liked') ? 'fa-heart' : 'fa-comment'}`}></i>
-                              </div>
-                              <div>
-                                <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                                  <span className="font-bold text-white">@{n.actor_username}</span> {n.action || 'interacted with your post'}
-                                </p>
-                                <span className="text-[9px] text-slate-500 font-bold uppercase mt-1 block">{n.created_at ? new Date(n.created_at).toLocaleDateString() : 'Just now'}</span>
-                              </div>
-                            </Link>
-                          ))
-                        )}
-                      </div>
-                    </div>
+          {/* ICONS (Bell & Cart) */}
+          <div className="flex items-center gap-4 sm:gap-5 flex-shrink-0">
+            {currentUser && (
+              <div className="relative flex items-center h-full">
+                <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="relative text-slate-400 hover:text-orange-500 transition-colors flex items-center h-full">
+                  <i className="fa-solid fa-bell text-xl"></i>
+                  {unreadCount > 0 && (
+                    <span className="absolute top-[-5px] right-[-5px] bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black font-mono shadow-md border-2 border-slate-950 box-content">
+                      {unreadCount}
+                    </span>
                   )}
-                </div>
+                </button>
 
-                {currentUser.username === 'admin' && (
-                  <Link to="/admin" className="text-xs font-mono font-bold text-orange-500 hover:text-orange-400 transition-colors uppercase tracking-widest border border-orange-500/30 px-3 py-1.5 rounded-md bg-orange-500/10">
-                    ADMIN
-                  </Link>
-                )}
-                <Link to="/profile/me" className="flex items-center gap-2 hover:text-orange-500 transition-colors ml-2 pl-2 border-l border-slate-800">
-                  <img src={currentUser.profile_image_url} alt="Avatar" className="w-8 h-8 rounded-full border border-slate-700 object-cover" />
-                  <div className="text-xs font-mono font-bold uppercase tracking-wider text-left">
-                    @{currentUser.username}
+                {/* Notifications Dropdown */}
+                {isNotificationsOpen && (
+                  <div className="absolute top-full mt-5 right-0 w-80 bg-slate-950 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-slate-700 overflow-hidden flex flex-col max-h-[60vh] z-[99999]">
+                    <div className="px-5 py-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
+                      <span className="text-xs font-black text-cyan-500 uppercase tracking-widest leading-none block pt-1">Notifications</span>
+                    </div>
+                    <div className="overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-slate-500 font-mono text-xs">NO NEW ALERTS</div>
+                      ) : (
+                        notifications.map(n => (
+                          <Link key={n.id} to={`/post/${n.post_id}`} onClick={() => setIsNotificationsOpen(false)} className={`p-4 border-b border-slate-800/50 flex gap-3 items-start hover:bg-slate-800 transition-colors ${n.is_read ? 'opacity-50' : 'bg-slate-900/30'}`}>
+                            <div className="text-orange-500 mt-0.5 text-sm">
+                              <i className={`fa-solid ${(n.action || '').includes('liked') ? 'fa-heart' : 'fa-comment'}`}></i>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                                <span className="font-bold text-white">@{n.actor_username}</span> {n.action || 'interacted with your post'}
+                              </p>
+                              <span className="text-[9px] text-slate-500 font-bold uppercase mt-1 block">{n.created_at ? new Date(n.created_at).toLocaleDateString() : 'Just now'}</span>
+                            </div>
+                          </Link>
+                        ))
+                      )}
+                    </div>
                   </div>
-                </Link>
-              </>
-            ) : (
-              <Link to="/login" className="text-xs font-mono font-bold text-slate-950 bg-orange-500 hover:bg-orange-400 transition-colors uppercase tracking-widest px-4 py-2 rounded-md shadow-sm ml-2">
-                LOG IN
-              </Link>
+                )}
+              </div>
             )}
             
-            <button onClick={() => setIsCartOpen(true)} className="flex items-center gap-1 hover:text-orange-500 transition-colors px-2">
+            <button onClick={() => setIsCartOpen(true)} className="flex items-center hover:text-orange-500 transition-colors">
               <div className="relative">
-                <i className="fa-solid fa-cart-shopping text-xl text-slate-300 transition-colors hover:text-orange-500"></i>
+                <i className="fa-solid fa-cart-shopping text-xl text-slate-300 hover:text-orange-500 transition-colors"></i>
                 {cartItemCount > 0 && (
                   <span className="absolute -top-2 -right-3 bg-orange-500 text-slate-950 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black font-mono shadow-md">
                     {cartItemCount}
@@ -382,56 +362,103 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
         </div>
       </header>
 
-      {/* --- MOBILE BOTTOM NAVIGATION BAR --- */}
-      <div className="sm:hidden fixed bottom-0 left-0 w-full bg-slate-950 border-t border-slate-800 z-50 flex items-center justify-around h-16 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.5)]">
-        <Link to="/" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/') ? 'text-orange-500' : 'text-slate-500 hover:text-blue-400'}`}>
-          <i className="fa-solid fa-house text-xl"></i>
-          <span className="text-[10px] font-bold tracking-wide font-mono uppercase">Home</span>
-        </Link>
+      {/* --- LEFT SIDEBAR NAV DRAWER --- */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[9998] transition-opacity" onClick={() => setIsSidebarOpen(false)} />
+      )}
+      <div className={`fixed top-0 left-0 h-[100dvh] w-64 sm:w-80 bg-slate-950 z-[9999] shadow-[10px_0_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ease-in-out flex flex-col border-r border-slate-800 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+          <h2 className="text-xl font-black text-white uppercase tracking-widest font-heading">
+            MENU
+          </h2>
+          <button onClick={() => setIsSidebarOpen(false)} className="text-slate-500 hover:text-orange-500 font-bold text-2xl transition-colors">✕</button>
+        </div>
         
-        <Link to="/feed" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/feed') ? 'text-orange-500' : 'text-slate-500 hover:text-blue-400'}`}>
-          <i className="fa-solid fa-layer-group text-xl"></i>
-          <span className="text-[10px] font-bold tracking-wide font-mono uppercase">Feed</span>
-        </Link>
-
-        {currentUser && (
-          <Link to="/inbox" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/inbox') || location.pathname.startsWith('/chat') ? 'text-orange-500' : 'text-slate-500 hover:text-blue-400'}`}>
-            <i className="fa-solid fa-envelope text-xl"></i>
-            <span className="text-[10px] font-bold tracking-wide font-mono uppercase">Inbox</span>
-          </Link>
-        )}
-        
-        <button onClick={() => setIsCartOpen(true)} className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isCartOpen ? 'text-orange-500' : 'text-slate-500 hover:text-blue-400'}`}>
-          <div className="relative">
-            <i className="fa-solid fa-cart-shopping text-xl"></i>
-            {cartItemCount > 0 && (
-              <span className="absolute -top-1.5 -right-2 bg-orange-500 text-slate-950 rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-black font-mono border-2 border-slate-950 box-content">
-                {cartItemCount}
-              </span>
-            )}
-          </div>
-          <span className="text-[10px] font-bold tracking-wide font-mono uppercase">Cart</span>
-        </button>
-
-        <Link to={currentUser ? "/profile/me" : "/login"} className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/profile/me') ? 'text-orange-500' : 'text-slate-500 hover:text-blue-400'}`}>
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
           {currentUser ? (
-             <img src={currentUser.profile_image_url} alt="Profile" className={`w-6 h-6 rounded-full object-cover border-2 ${isActive('/profile/me') ? 'border-orange-500' : 'border-transparent'}`} />
+            <div className="mb-6 p-4 bg-slate-900 rounded-xl border border-slate-800 flex items-center gap-4">
+              <img src={currentUser.profile_image_url} alt="Profile" className="w-12 h-12 rounded-full object-cover border-2 border-slate-700" />
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-white uppercase tracking-widest">@{currentUser.username}</span>
+                <span className="text-xs font-mono text-orange-500">{currentUser.wallet_balance?.toFixed(2) || '0.00'} SC</span>
+              </div>
+            </div>
           ) : (
-            <i className="fa-solid fa-user-astronaut text-xl"></i>
+            <Link to="/login" onClick={() => setIsSidebarOpen(false)} className="mb-6 w-full bg-orange-500 hover:bg-orange-400 text-slate-950 font-black py-3 rounded-xl text-center uppercase tracking-widest transition-colors flex justify-center items-center gap-2">
+              <i className="fa-solid fa-user-astronaut text-lg"></i> LOG IN / REGISTER
+            </Link>
           )}
-          <span className="text-[10px] font-bold tracking-wide font-mono uppercase">{currentUser ? 'Profile' : 'Log In'}</span>
-        </Link>
-        
-        {/* Mobile Admin Link (Only visible if Master Admin) */}
-        {currentUser?.username === 'admin' && (
-          <Link to="/admin" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/admin') ? 'text-orange-500' : 'text-orange-500/50 hover:text-orange-400'}`}>
-            <i className="fa-solid fa-screwdriver-wrench text-xl"></i>
-            <span className="text-[10px] font-bold tracking-wide font-mono uppercase">Admin</span>
-          </Link>
-        )}
-      </div>
 
-      <div className="h-16 sm:hidden bg-slate-950"></div>
+          {/* Standard Navigation Links */}
+          <Link to="/" onClick={() => setIsSidebarOpen(false)} className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${isActive('/') ? 'bg-slate-800 text-orange-500' : 'text-slate-300 hover:bg-slate-900 hover:text-orange-400'}`}>
+            <i className="fa-solid fa-house w-6 text-center text-lg"></i>
+            <span className="font-bold tracking-widest uppercase text-sm">Storefront</span>
+          </Link>
+
+          <Link to="/feed" onClick={() => setIsSidebarOpen(false)} className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${isActive('/feed') ? 'bg-slate-800 text-orange-500' : 'text-slate-300 hover:bg-slate-900 hover:text-orange-400'}`}>
+            <i className="fa-solid fa-layer-group w-6 text-center text-lg"></i>
+            <span className="font-bold tracking-widest uppercase text-sm">Social Feed</span>
+          </Link>
+
+          {currentUser && (
+            <>
+              <Link to="/inbox" onClick={() => setIsSidebarOpen(false)} className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${isActive('/inbox') || location.pathname.startsWith('/chat') ? 'bg-slate-800 text-orange-500' : 'text-slate-300 hover:bg-slate-900 hover:text-orange-400'}`}>
+                <i className="fa-solid fa-envelope w-6 text-center text-lg"></i>
+                <span className="font-bold tracking-widest uppercase text-sm">Inbox</span>
+              </Link>
+
+              <Link to="/profile/me" onClick={() => setIsSidebarOpen(false)} className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${isActive('/profile/me') ? 'bg-slate-800 text-orange-500' : 'text-slate-300 hover:bg-slate-900 hover:text-orange-400'}`}>
+                <i className="fa-solid fa-user w-6 text-center text-lg"></i>
+                <span className="font-bold tracking-widest uppercase text-sm">My Profile</span>
+              </Link>
+              
+              <Link to="/wallet" onClick={() => setIsSidebarOpen(false)} className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${isActive('/wallet') ? 'bg-slate-800 text-orange-500' : 'text-slate-300 hover:bg-slate-900 hover:text-orange-400'}`}>
+                <i className="fa-solid fa-wallet w-6 text-center text-lg"></i>
+                <span className="font-bold tracking-widest uppercase text-sm">Wallet</span>
+              </Link>
+            </>
+          )}
+
+          {/* Special Role Navigation Links */}
+          {currentUser?.role === 'service_provider' && (
+            <Link to="/provider-dashboard" onClick={() => setIsSidebarOpen(false)} className={`flex items-center gap-4 p-3 rounded-xl mt-4 border ${isActive('/provider-dashboard') ? 'bg-cyan-900/30 border-cyan-500 text-cyan-400' : 'bg-cyan-950/10 border-cyan-900/50 text-cyan-500 hover:bg-cyan-900/40 hover:text-cyan-300'}`}>
+              <i className="fa-solid fa-briefcase w-6 text-center text-lg"></i>
+              <span className="font-bold tracking-widest uppercase text-sm">Service Jobs</span>
+            </Link>
+          )}
+
+          {currentUser?.role === 'vendor' && (
+            <Link to="/vendor" onClick={() => setIsSidebarOpen(false)} className={`flex items-center gap-4 p-3 rounded-xl mt-4 border ${isActive('/vendor') ? 'bg-purple-900/30 border-purple-500 text-purple-400' : 'bg-purple-950/10 border-purple-900/50 text-purple-500 hover:bg-purple-900/40 hover:text-purple-300'}`}>
+              <i className="fa-solid fa-box-open w-6 text-center text-lg"></i>
+              <span className="font-bold tracking-widest uppercase text-sm">Vendor Dash</span>
+            </Link>
+          )}
+
+          {currentUser?.username === 'admin' && (
+            <Link to="/admin" onClick={() => setIsSidebarOpen(false)} className={`flex items-center gap-4 p-3 rounded-xl mt-4 border ${isActive('/admin') ? 'bg-orange-900/30 border-orange-500 text-orange-500' : 'bg-orange-950/10 border-orange-900/50 text-orange-500/70 hover:bg-orange-900/40 hover:text-orange-400'}`}>
+              <i className="fa-solid fa-screwdriver-wrench w-6 text-center text-lg"></i>
+              <span className="font-bold tracking-widest uppercase text-sm">Master Admin</span>
+            </Link>
+          )}
+          
+        </div>
+
+        {/* Disconnect / Logout Button */}
+        <div className="p-6 border-t border-slate-800 text-center">
+          {currentUser && (
+             <button 
+               onClick={() => {
+                 localStorage.removeItem('pidrop_token');
+                 window.location.href = '/';
+               }}
+               className="text-slate-500 hover:text-red-500 text-xs font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 w-full"
+             >
+               <i className="fa-solid fa-right-from-bracket"></i> Disconnect
+             </button>
+          )}
+          <p className="text-[9px] text-slate-700 mt-4 uppercase tracking-widest">STREET CODE 101 © 2026</p>
+        </div>
+      </div>
 
       {/* --- CART SLIDE-OUT MODAL --- */}
       {isCartOpen && (

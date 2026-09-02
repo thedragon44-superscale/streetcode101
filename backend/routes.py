@@ -2767,3 +2767,18 @@ def client_confirm_job(id: int, session: Session = Depends(get_session), token: 
         return {"message": "Escrow released successfully."}
     else:
         raise HTTPException(status_code=500, detail="Master Escrow vault error.")
+
+@router.get("/api/provider/appointments")
+def get_provider_schedule(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Fetches all upcoming and active appointments for the logged-in service provider."""
+    from models import Appointment
+    username = token.get("sub")
+    
+    # Fetch appointments assigned to this provider, ordered by start time
+    appointments = session.exec(
+        select(Appointment)
+        .where(Appointment.provider_username == username)
+        .order_by(Appointment.scheduled_start.asc())
+    ).all()
+    
+    return appointments

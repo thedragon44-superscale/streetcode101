@@ -15,6 +15,8 @@ import Feed from './Feed';
 import Chat from './Chat';
 import Inbox from './Inbox';
 import VendorDashboard from './VendorDashboard';
+import ProviderDashboard from './ProviderDashboard';
+import Wallet from './Wallet';
 import ScrollToTop from './ScrollToTop';
 
 function App() {
@@ -50,6 +52,8 @@ function App() {
           <Route path="/admin" element={<Admin />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/provider-dashboard" element={<ProviderDashboard />} />
+          <Route path="/wallet" element={<Wallet />} />
         </Routes>
       </Router>
     </CartProvider>
