@@ -165,22 +165,30 @@ export default function ProviderDashboard() {
         {activeTab === 'create' && (
           <div className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm">
             <form onSubmit={handleCreateListing} className="space-y-6">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Hustle Category</label>
-                <select 
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  disabled={!!profile?.primary_trade}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-cyan-500 font-bold text-slate-900 disabled:opacity-70"
-                  required
-                >
-                  <option value="" disabled>-- Choose a curated service type --</option>
-                  {Object.entries(CURATED_SERVICES).map(([key, data]) => (
-                    <option key={key} value={key}>{data.label}</option>
-                  ))}
-                </select>
-                {profile?.primary_trade && <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold">Locked to your onboarded trade.</p>}
-              </div>
+              {profile?.primary_trade ? (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Your Registered Trade</label>
+                  <div className="w-full px-4 py-3 bg-cyan-50 border border-cyan-200 rounded-xl text-cyan-900 font-black flex items-center justify-between shadow-sm">
+                    <span className="uppercase tracking-wide">{CURATED_SERVICES[profile.primary_trade]?.label || profile.primary_trade}</span>
+                    <i className="fa-solid fa-lock text-cyan-600/50"></i>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Hustle Category</label>
+                  <select 
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-cyan-500 font-bold text-slate-900"
+                    required
+                  >
+                    <option value="" disabled>-- Choose a curated service type --</option>
+                    {Object.entries(CURATED_SERVICES).map(([key, data]) => (
+                      <option key={key} value={key}>{data.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {selectedCategory && (
                 <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl space-y-3">
