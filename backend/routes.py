@@ -2523,3 +2523,93 @@ def get_service_catalog(session: Session = Depends(get_session)):
     # Fetch active services and order them newest first
     services = session.exec(select(ServiceListing).where(ServiceListing.is_active == True).order_by(ServiceListing.id.desc())).all()
     return services
+
+class BookingRequest(BaseModel):
+    service_id: int
+    scheduled_start: str  # ISO 8601 string from the frontend date picker
+    job_address: str | None = None
+    target_lat: float | None = None
+    target_long: float | None = None
+
+@router.post("/api/appointments/book")
+def book_service(payload: BookingRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Locks StreetCoin in Escrow and schedules a service appointment."""
+    from models import ServiceListing, Appointment, Transaction
+    from dateutil import parser
+    
+    username = token.get("sub")
+    client = session.exec(select(User).where(User.username == username)).first()
+    admin = session.exec(select(User).where(User.username == "admin")).first()
+    
+    if not client or not admin:
+        raise HTTPException(status_code=404, detail="System routing error.")
+
+    # 1. Validate the Service
+    service = session.get(ServiceListing, payload.service_id)
+    if not service or not service.is_active:
+        raise HTTPException(status_code=404, detail="Service not found or inactive.")
+        
+    if service.provider_username == username:
+        raise HTTPException(status_code=400, detail="You cannot book your own service.")
+
+    # 2. Verify Wallet Balance
+    if getattr(client, "wallet_balance", 0) < service.price:
+        raise HTTPException(status_code=400, detail="Insufficient StreetCoin balance. Please top up your wallet.")
+
+    # 3. Deduct from Buyer & Hold in Admin Escrow
+    client.wallet_balance -= service.price
+    admin.wallet_balance += service.price
+    
+    # 4. Log Immutable Escrow Transaction
+    tx = Transaction(
+        sender_username=client.username,
+        receiver_username="admin",
+        amount=service.price,
+        transaction_type="service_escrow_lock",
+        status="completed"
+    )
+    
+    # 5. Parse time and generate the Appointment
+    try:
+        start_time = parser.isoparse(payload.scheduled_start)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid date format provided.")
+
+    new_appt = Appointment(
+        service_id=service.id,
+        provider_username=service.provider_username,
+        client_username=client.username,
+        scheduled_start=start_time,
+        job_address=payload.job_address,
+        target_lat=payload.target_lat,
+        target_long=payload.target_long,
+        escrow_amount=service.price,
+        status="locked"
+    )
+
+    session.add(client)
+    session.add(admin)
+    session.add(tx)
+    session.add(new_appt)
+    session.commit()
+    session.refresh(new_appt)
+    
+    # 6. Dispatch Dual Notifications
+    provider = session.exec(select(User).where(User.username == service.provider_username)).first()
+    
+    # Alert Client
+    send_automated_email(
+        to_email=client.email,
+        subject="Service Booked & Escrow Locked",
+        body=f"Yo @{client.username},\n\nYour appointment for '{service.title}' is confirmed for {start_time.strftime('%b %d, %Y at %I:%M %p')}.\n\n{service.price:.2f} SC has been securely locked in the Master Escrow Vault. It will not be released to @{service.provider_username} until the job is completed and verified."
+    )
+    
+    # Alert Provider
+    if provider:
+        send_automated_email(
+            to_email=provider.email,
+            subject="New Booking Secured!",
+            body=f"Yo @{provider.username},\n\n@{client.username} just booked you for '{service.title}' on {start_time.strftime('%b %d, %Y at %I:%M %p')}.\n\nThe funds ({service.price:.2f} SC) are already secured in Escrow. Check your Service Dashboard for address and check-in details."
+        )
+
+    return {"message": "Booking confirmed and funds secured in Escrow.", "appointment_id": new_appt.id}
