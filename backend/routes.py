@@ -2454,11 +2454,50 @@ def get_admin_analytics(session: Session = Depends(get_session), token: dict = D
     completed_cashouts = session.exec(select(CashoutRequest).where(CashoutRequest.status == "approved")).all()
     total_revenue_usd = sum(c.amount_coins - c.usd_payout for c in completed_cashouts)
     
+    # 4. Admin Treasury Reserve (Unissued Fiat-Backed Coins)
+    admin = session.exec(select(User).where(User.username == "admin")).first()
+    treasury_reserve = getattr(admin, "wallet_balance", 0.0)
+    
     return {
         "total_circulation": total_circulation,
         "escrow_liability": escrow_liability,
-        "total_revenue_usd": total_revenue_usd
+        "total_revenue_usd": total_revenue_usd,
+        "treasury_reserve": treasury_reserve
     }
+
+class AdminMintRequest(BaseModel):
+    amount: float
+
+@router.post("/api/admin/mint")
+def mint_fiat_backed_coins(req: AdminMintRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Mints new SC into the Admin Treasury (represents real fiat deposited)."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Master Admin only.")
+        
+    from models import User, Transaction
+    admin = session.exec(select(User).where(User.username == "admin")).first()
+    
+    if not admin:
+        raise HTTPException(status_code=404, detail="Admin vault not found.")
+        
+    admin.wallet_balance += req.amount
+    
+    tx = Transaction(
+        sender_username="master_vault",
+        receiver_username="admin",
+        amount=req.amount,
+        transaction_type="treasury_mint",
+        status="completed"
+    )
+    
+    session.add(admin)
+    session.add(tx)
+    session.commit()
+    
+    return {"message": f"Minted {req.amount:.2f} SC into the Admin Treasury."}
+
+# ==========================================
+# SERVICE ECONOMY ENDPOINTS
 
 # ==========================================
 # SERVICE ECONOMY ENDPOINTS

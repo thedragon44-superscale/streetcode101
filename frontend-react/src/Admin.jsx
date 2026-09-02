@@ -121,6 +121,11 @@ const handleProductImageUpload = async (e) => {
   const [fundAmount, setFundAmount] = useState('');
   const [isFunding, setIsFunding] = useState(false);
 
+  // --- MINT MODAL STATE ---
+  const [isMintModalOpen, setIsMintModalOpen] = useState(false);
+  const [mintAmount, setMintAmount] = useState('');
+  const [isMinting, setIsMinting] = useState(false);
+
   // --- MODAL STATE ---
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -309,6 +314,31 @@ const handleProductImageUpload = async (e) => {
       toast.error(err.message);
     } finally {
       setIsFunding(false);
+    }
+  };
+
+  const handleMintFunds = async (e) => {
+    e.preventDefault();
+    if (!mintAmount || isNaN(mintAmount) || Number(mintAmount) <= 0) return toast.error("Enter a valid amount.");
+    
+    setIsMinting(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/mint`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: parseFloat(mintAmount) })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to mint funds');
+      
+      toast.success(data.message);
+      setIsMintModalOpen(false);
+      setMintAmount('');
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsMinting(false);
     }
   };
 
@@ -600,6 +630,15 @@ const handleResolveDispute = async (id, resolution) => {
               <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-200 shadow-sm flex flex-col justify-center">
                 <div className="text-emerald-700 text-sm font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><i className="fa-solid fa-sack-dollar"></i> Platform Tax Revenue (5%)</div>
                 <div className="text-4xl font-black text-emerald-600">${analytics.total_revenue_usd.toFixed(2)} <span className="text-lg text-emerald-400">USD</span></div>
+              </div>
+              <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div className="text-blue-700 text-sm font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><i className="fa-solid fa-vault"></i> Admin Treasury Reserve</div>
+                    <div className="text-4xl font-black text-blue-600">{analytics.treasury_reserve?.toFixed(2) || '0.00'} <span className="text-lg text-blue-400">SC</span></div>
+                </div>
+                <button onClick={() => setIsMintModalOpen(true)} className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg text-xs uppercase tracking-widest shadow-sm transition-colors">
+                    Mint Fiat-Backed SC
+                </button>
               </div>
             </div>
           </div>
@@ -1336,6 +1375,39 @@ const handleResolveDispute = async (id, resolution) => {
               </div>
               <button type="submit" disabled={isFunding} className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-black py-3 rounded-xl shadow-lg transition-all active:scale-[0.98] uppercase tracking-wider">
                 {isFunding ? 'Processing...' : 'Confirm Transfer'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+{/* --- MINT FIAT-BACKED SC MODAL --- */}
+      {isMintModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h2 className="text-xl font-black text-slate-900">Mint Treasury SC</h2>
+              <button onClick={() => setIsMintModalOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-xl p-2">✕</button>
+            </div>
+            <form onSubmit={handleMintFunds} className="p-6 space-y-4">
+              <div className="bg-blue-50 text-blue-700 p-3 rounded-xl text-xs font-bold border border-blue-100 mb-4">
+                Acknowledge that you have deposited the equivalent fiat into your real-world bank account before minting this StreetCoin into your Treasury Reserve.
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Fiat Deposit Amount ($)</label>
+                <input 
+                  required 
+                  type="number" 
+                  step="0.01"
+                  min="0.01"
+                  value={mintAmount} 
+                  onChange={e => setMintAmount(e.target.value)} 
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-lg font-black text-slate-900" 
+                  placeholder="0.00"
+                />
+              </div>
+              <button type="submit" disabled={isMinting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black py-3 rounded-xl shadow-lg transition-all active:scale-[0.98] uppercase tracking-wider">
+                {isMinting ? 'Minting...' : 'Mint SC to Treasury'}
               </button>
             </form>
           </div>
