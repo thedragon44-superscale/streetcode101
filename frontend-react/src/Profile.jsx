@@ -430,8 +430,16 @@ export default function Profile() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
                 <div>
                   <h1 className="text-3xl font-black text-slate-900">@{profile.username}</h1>
-                  <p className="text-sm font-bold text-cyan-600 mt-1 uppercase tracking-widest">
-                    {profile.username === 'admin' ? 'Master Admin' : 'Verified Vendor'}
+                  <p className={`text-sm font-bold mt-1 uppercase tracking-widest ${
+                    profile.username === 'admin' ? 'text-orange-500' :
+                    profile.role === 'vendor' ? 'text-purple-500' :
+                    profile.role === 'service_provider' ? 'text-cyan-500' :
+                    'text-slate-500'
+                  }`}>
+                    {profile.username === 'admin' ? 'Master Admin' : 
+                     profile.role === 'vendor' ? 'Verified Vendor' :
+                     profile.role === 'service_provider' ? 'Service Provider' : 
+                     'Community Member'}
                   </p>
                 </div>
                 
@@ -449,13 +457,21 @@ export default function Profile() {
                   </button>
                 )}
                 
-                {/* Vendor Dashboard Button (Only on your own profile) */}
-                {isMyProfile && profile.username !== 'admin' && (
+                {/* Role-Specific Dashboard Buttons (Only on your own profile) */}
+                {isMyProfile && profile.role === 'vendor' && (
                   <Link 
                     to="/vendor"
-                    className="mt-4 sm:mt-0 px-6 py-2 bg-slate-900 hover:bg-orange-500 text-white rounded-xl text-sm font-bold shadow-sm transition active:scale-95 uppercase tracking-wider flex items-center gap-2"
+                    className="mt-4 sm:mt-0 px-6 py-2 bg-slate-900 hover:bg-purple-500 text-white rounded-xl text-sm font-bold shadow-sm transition active:scale-95 uppercase tracking-wider flex items-center gap-2"
                   >
                     <i className="fa-solid fa-shop"></i> Vendor Console
+                  </Link>
+                )}
+                {isMyProfile && profile.role === 'service_provider' && (
+                  <Link 
+                    to="/provider-dashboard"
+                    className="mt-4 sm:mt-0 px-6 py-2 bg-slate-900 hover:bg-cyan-500 text-white rounded-xl text-sm font-bold shadow-sm transition active:scale-95 uppercase tracking-wider flex items-center gap-2"
+                  >
+                    <i className="fa-solid fa-briefcase"></i> Service Dash
                   </Link>
                 )}
               </div>
