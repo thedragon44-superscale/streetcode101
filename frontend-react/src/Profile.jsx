@@ -934,7 +934,8 @@ const handleUpgradeAccount = async (e) => {
                         <option value="graphic_design">Graphic Design & Digital Art</option>
                       </select>
                     </div>
-                    <div className="space-y-4">
+                    
+                    <div className="space-y-4 mt-4">
                       <div className="flex gap-4">
                         <div className="w-1/2">
                           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Operating Hours</label>
@@ -954,11 +955,6 @@ const handleUpgradeAccount = async (e) => {
                           Service Region: {onboardingData.city}, {onboardingData.state}
                         </div>
                       )}
-                    </div>
-                        <select value={onboardingData.operatingHours} onChange={e => setOnboardingData({...onboardingData, operatingHours: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-cyan-500 font-medium text-sm">
-                          <option>Standard 9-5</option><option>Weekends Only</option><option>Evenings</option><option>24/7 Emergency</option>
-                        </select>
-                      </div>
                     </div>
                     
                     {onboardingData.primaryTrade && (
@@ -983,7 +979,6 @@ const handleUpgradeAccount = async (e) => {
           </div>
         </div>
       )}
-
       {/* --- NATIVE STRIPE TOP-UP MODAL --- */}
       {showTopUpModal && clientSecret && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in">
