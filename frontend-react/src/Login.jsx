@@ -10,6 +10,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [role, setRole] = useState('customer'); // New state for role selection
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ export default function Login() {
     setLoading(true);
 
     const endpoint = isRegistering ? '/auth/register' : '/admin/login';
-    const requestBody = isRegistering ? { username, email, password } : { username, password };
+    const requestBody = isRegistering ? { username, email, password, role } : { username, password };
 
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -93,6 +94,21 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
               />
+            </div>
+          )}
+
+          {isRegistering && (
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">How do you want to hustle?</label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+              >
+                <option value="customer">I'm just here to cop drops (Customer)</option>
+                <option value="vendor">I want to sell physical gear (Vendor)</option>
+                <option value="service_provider">I want to book appointments (Service Provider)</option>
+              </select>
             </div>
           )}
 

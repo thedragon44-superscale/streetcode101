@@ -97,6 +97,7 @@ class RegisterRequest(BaseModel):
     username: str
     email: str
     password: str
+    role: str = "customer"
 
 class ProfileUpdate(BaseModel):
     bio: str | None = None
@@ -163,7 +164,8 @@ def register_user(request: RegisterRequest, session: Session = Depends(get_sessi
     new_user = User(
         username=request.username,
         email=request.email,
-        password_hash=get_password_hash(request.password)
+        password_hash=get_password_hash(request.password),
+        role=request.role
     )
     session.add(new_user)
     session.commit()
