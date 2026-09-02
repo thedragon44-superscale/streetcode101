@@ -328,6 +328,29 @@ def global_search(q: str, session: Session = Depends(get_session)):
         "users": safe_users
     }
 
+@router.get("/api/products", response_model=List[Product])
+def get_catalog(
+    offset: int = 0,
+    limit: int = 20,
+    category: str = "All",
+    search: str = "",
+    session: Session = Depends(get_session)
+):
+    """Fetches the catalog with pagination and optional filtering."""
+    query = select(Product)
+    
+    if category and category != "All":
+        query = query.where(Product.category == category)
+        
+    if search and search.strip():
+        search_term = f"%{search.strip().lower()}%"
+        query = query.where(Product.title.ilike(search_term) | Product.description.ilike(search_term))
+        
+    # Order by SKU to ensure stable pagination
+    query = query.order_by(Product.sku).offset(offset).limit(limit)
+    
+    return session.exec(query).all()
+
 @router.post("/api/products")
 def create_product(
     sku: str = Form(...),
