@@ -63,10 +63,39 @@ export default function Profile() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeRole, setUpgradeRole] = useState(''); 
   const [onboardingData, setOnboardingData] = useState({
-    primaryTrade: '', serviceBoundary: '', operatingHours: 'Standard 9-5',
+    primaryTrade: '', operatingHours: 'Standard 9-5',
     vendorName: '', merchCategory: 'Apparel', fulfillmentModel: 'Direct Shipping',
+    zipCode: '', city: '', state: '',
     complianceAgreed: false
   });
+  const [isLookingUpZip, setIsLookingUpZip] = useState(false);
+
+  // Zero-overhead external ZIP lookup
+  const handleZipLookup = async (zip) => {
+    setOnboardingData(prev => ({ ...prev, zipCode: zip }));
+    if (zip.length === 5) {
+      setIsLookingUpZip(true);
+      try {
+        const res = await fetch(`https://api.zippopotam.us/us/${zip}`);
+        if (res.ok) {
+          const data = await res.json();
+          const city = data.places[0]['place name'];
+          const state = data.places[0]['state abbreviation'];
+          setOnboardingData(prev => ({ ...prev, city, state }));
+          toast.success(`Location found: ${city}, ${state}`, { id: 'zip' });
+        } else {
+          toast.error('Invalid ZIP code', { id: 'zip' });
+          setOnboardingData(prev => ({ ...prev, city: '', state: '' }));
+        }
+      } catch (err) {
+        toast.error('Location lookup failed', { id: 'zip' });
+      } finally {
+        setIsLookingUpZip(false);
+      }
+    } else {
+      setOnboardingData(prev => ({ ...prev, city: '', state: '' }));
+    }
+  };
 
   const token = localStorage.getItem('pidrop_token');
   const isMyProfile = username === 'me';
@@ -871,6 +900,19 @@ const handleUpgradeAccount = async (e) => {
                         </select>
                       </div>
                     </div>
+
+                    {/* Auto-filling Location for Local Pickup */}
+                    {onboardingData.fulfillmentModel === 'Local Pickup' && (
+                      <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
+                        <label className="block text-xs font-bold text-purple-600 uppercase tracking-widest mb-1"><i className="fa-solid fa-location-crosshairs"></i> Pickup Location</label>
+                        <div className="flex gap-2">
+                          <input type="text" maxLength="5" placeholder="ZIP Code" value={onboardingData.zipCode} onChange={(e) => handleZipLookup(e.target.value)} className="w-1/3 px-4 py-3 bg-white border border-slate-300 rounded-xl focus:outline-none focus:border-purple-500 font-medium text-sm" required />
+                          <input type="text" placeholder="City" value={onboardingData.city} readOnly className="w-1/3 px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 font-medium text-sm" required />
+                          <input type="text" placeholder="State" value={onboardingData.state} readOnly className="w-1/3 px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 font-medium text-sm" required />
+                        </div>
+                      </div>
+                    )}
+
                     <div className="bg-purple-50 border border-purple-200 p-4 rounded-xl mt-4">
                       <p className="text-xs text-purple-900 font-medium leading-relaxed mb-3">I guarantee all physical items are authentic and legally obtained. I understand that selling counterfeit, illegal, or restricted goods will result in immediate permanent account suspension and forfeiture of escrow funds.</p>
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -892,13 +934,27 @@ const handleUpgradeAccount = async (e) => {
                         <option value="graphic_design">Graphic Design & Digital Art</option>
                       </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Service Boundary</label>
-                        <input type="text" value={onboardingData.serviceBoundary} onChange={e => setOnboardingData({...onboardingData, serviceBoundary: e.target.value})} placeholder="e.g. Austin Metro or Remote" className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-cyan-500 font-medium text-sm" />
+                    <div className="space-y-4">
+                      <div className="flex gap-4">
+                        <div className="w-1/2">
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Operating Hours</label>
+                          <select value={onboardingData.operatingHours} onChange={e => setOnboardingData({...onboardingData, operatingHours: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-cyan-500 font-medium text-sm">
+                            <option>Standard 9-5</option><option>Weekends Only</option><option>Evenings</option><option>24/7 Emergency</option>
+                          </select>
+                        </div>
+                        <div className="w-1/2">
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Base ZIP Code</label>
+                          <input type="text" maxLength="5" placeholder="Enter ZIP" value={onboardingData.zipCode} onChange={(e) => handleZipLookup(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-cyan-500 font-medium text-sm" required />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Operating Hours</label>
+                      
+                      {onboardingData.city && (
+                        <div className="text-xs font-bold text-cyan-600 bg-cyan-50 p-2 rounded-lg inline-block">
+                          <i className="fa-solid fa-map-location-dot mr-2"></i>
+                          Service Region: {onboardingData.city}, {onboardingData.state}
+                        </div>
+                      )}
+                    </div>
                         <select value={onboardingData.operatingHours} onChange={e => setOnboardingData({...onboardingData, operatingHours: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-cyan-500 font-medium text-sm">
                           <option>Standard 9-5</option><option>Weekends Only</option><option>Evenings</option><option>24/7 Emergency</option>
                         </select>
