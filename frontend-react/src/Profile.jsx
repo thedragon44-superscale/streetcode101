@@ -556,60 +556,7 @@ const handleUpgradeAccount = async (e) => {
                 </div>
               </div>
 
-              {/* --- STREETCOIN WALLET SECTION (Only visible on your own profile) --- */}
-              {isMyProfile && (
-                <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm mt-6 mb-6 animate-fade-in relative overflow-hidden">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
-                      <i className="fa-solid fa-coins text-orange-500"></i>
-                    </div>
-                    <h2 className="text-xl font-black text-slate-900">StreetCoin Wallet</h2>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 mb-6">
-                    <span className="text-5xl font-black text-slate-900">
-                      {profile.wallet_balance?.toFixed(2) || '0.00'}
-                    </span>
-                    <span className="text-slate-400 font-bold uppercase tracking-wider mt-3">SC</span>
-                  </div>
-
-                  <div className="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                      Purchase Coins (1 SC = $1 USD)
-                    </label>
-                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                      <div className="w-full sm:flex-1 relative">
-                        <span className="absolute left-4 top-3.5 text-slate-400 font-black">SC</span>
-                        <input
-                          type="number"
-                          min="1"
-                          value={topUpAmount}
-                          onChange={(e) => setTopUpAmount(e.target.value)}
-                          placeholder="0"
-                          className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-500 font-black text-lg bg-white shadow-inner"
-                        />
-                        
-                        {/* Dynamic Surcharge Math Display */}
-                        {topUpAmount > 0 && (
-                          <div className="absolute -bottom-6 left-1 text-[11px] font-bold text-slate-500 tracking-wide truncate w-[120%]">
-                            + ${(((parseInt(topUpAmount) + 0.30) / 0.971) - parseInt(topUpAmount)).toFixed(2)} Fee = <span className="text-slate-900">${((parseInt(topUpAmount) + 0.30) / 0.971).toFixed(2)} Total</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <button
-                        onClick={handleTopUp}
-                        disabled={!topUpAmount || topUpAmount < 1}
-                        className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black py-3 px-8 rounded-xl shadow-md transition-all active:scale-[0.98] uppercase tracking-wider whitespace-nowrap"
-                      >
-                        Checkout
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-{/* --- ACCOUNT UPGRADE SECTION --- */}
+              {/* --- ACCOUNT UPGRADE SECTION --- */}
               {isMyProfile && profile.username !== 'admin' && (!profile.role?.includes('vendor') || !profile.role?.includes('service_provider')) && (
                 <div className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm mt-6 mb-6">
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Level Up Your Account</h3>
@@ -901,17 +848,17 @@ const handleUpgradeAccount = async (e) => {
                       </div>
                     </div>
 
-                    {/* Auto-filling Location for Local Pickup */}
-                    {onboardingData.fulfillmentModel === 'Local Pickup' && (
-                      <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
-                        <label className="block text-xs font-bold text-purple-600 uppercase tracking-widest mb-1"><i className="fa-solid fa-location-crosshairs"></i> Pickup Location</label>
-                        <div className="flex gap-2">
-                          <input type="text" maxLength="5" placeholder="ZIP Code" value={onboardingData.zipCode} onChange={(e) => handleZipLookup(e.target.value)} className="w-1/3 px-4 py-3 bg-white border border-slate-300 rounded-xl focus:outline-none focus:border-purple-500 font-medium text-sm" required />
-                          <input type="text" placeholder="City" value={onboardingData.city} readOnly className="w-1/3 px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 font-medium text-sm" required />
-                          <input type="text" placeholder="State" value={onboardingData.state} readOnly className="w-1/3 px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 font-medium text-sm" required />
+                    <div className="mt-4">
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Base ZIP Code / Origin</label>
+                      <input type="text" maxLength="5" placeholder="Enter ZIP" value={onboardingData.zipCode} onChange={(e) => handleZipLookup(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-purple-500 font-medium text-sm" required />
+                      
+                      {onboardingData.city && (
+                        <div className="text-xs font-bold text-purple-600 bg-purple-50 p-2 rounded-lg mt-2 inline-block">
+                          <i className="fa-solid fa-map-location-dot mr-2"></i>
+                          Operations Based In: {onboardingData.city}, {onboardingData.state}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     <div className="bg-purple-50 border border-purple-200 p-4 rounded-xl mt-4">
                       <p className="text-xs text-purple-900 font-medium leading-relaxed mb-3">I guarantee all physical items are authentic and legally obtained. I understand that selling counterfeit, illegal, or restricted goods will result in immediate permanent account suspension and forfeiture of escrow funds.</p>
@@ -979,33 +926,6 @@ const handleUpgradeAccount = async (e) => {
           </div>
         </div>
       )}
-      {/* --- NATIVE STRIPE TOP-UP MODAL --- */}
-      {showTopUpModal && clientSecret && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col relative border border-slate-200">
-            {/* Header (Pinned to top) */}
-            <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-3xl shrink-0">
-              <h3 className="font-black text-slate-900 text-lg flex items-center gap-2">
-                <i className="fa-solid fa-coins text-orange-500"></i> Secure Top-Up
-              </h3>
-              <button 
-                onClick={() => { setShowTopUpModal(false); setClientSecret(''); }}
-                className="text-slate-400 hover:text-slate-700 font-bold p-1 transition"
-              >
-                ✕
-              </button>
-            </div>
-            
-            {/* Body (Scrollable) */}
-            <div className="p-6 overflow-y-auto">
-              <Elements stripe={stripePromise} options={{ clientSecret }}>
-                <CheckoutForm onSuccess={handleTopUpSuccess} />
-              </Elements>
-            </div>
-          </div>
-        </div>
-      )}
-
-    </div>
+      </div>
   );
 }
