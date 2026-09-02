@@ -15,6 +15,7 @@ class User(SQLModel, table=True):
     discount_percent: float = Field(default=0.0)
     email_opt_in: bool = Field(default=False)
     wallet_balance: float = Field(default=0.0) # The StreetCoin Wallet
+    role: str = Field(default="customer")  # Options: "customer", "vendor", "service_provider"
 
 class Product(SQLModel, table=True):
     sku: str = Field(primary_key=True, index=True)
@@ -135,3 +136,46 @@ class CashoutRequest(SQLModel, table=True):
     zelle_contact: str # Email or Phone number for Zelle
     status: str = Field(default="pending") # 'pending', 'approved', 'rejected'
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+from typing import Optional
+from datetime import datetime
+
+class ServiceListing(SQLModel, table=True):
+    """Catalog of available services (mechanics, dev work, haircuts)."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    provider_username: str
+    title: str
+    description: str
+    price: float  # Base rate or flat fee
+    service_type: str  # 'in_person' or 'remote'
+    image_url: str = Field(default="/default_service.png")
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Appointment(SQLModel, table=True):
+    """The Service equivalent of an Order, handling time and geolocation."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    service_id: int
+    provider_username: str
+    client_username: str
+    status: str = Field(default="locked") # locked, checked_in, completed, disputed, released
+    
+    # Time & Location Constraints
+    scheduled_start: datetime
+    job_address: Optional[str] = None
+    
+    # Layer 1: GPS Verification (In-Person Services)
+    target_lat: Optional[float] = None
+    target_long: Optional[float] = None
+    actual_lat: Optional[float] = None
+    actual_long: Optional[float] = None
+    checked_in_at: Optional[datetime] = None
+    
+    # Layer 2: Handshake & Proof (Remote & In-Person)
+    proof_of_delivery_url: Optional[str] = None
+    provider_completed_at: Optional[datetime] = None
+    client_confirmed_at: Optional[datetime] = None
+    
+    # Financials
+    escrow_amount: float
+    created_at: datetime = Field(default_factory=datetime.utcnow)
