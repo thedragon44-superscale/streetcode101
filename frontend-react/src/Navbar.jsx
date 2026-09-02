@@ -423,14 +423,14 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
           )}
 
           {/* Special Role Navigation Links */}
-          {currentUser?.role === 'service_provider' && (
+          {currentUser?.role?.includes('service_provider') && (
             <Link to="/provider-dashboard" onClick={() => setIsSidebarOpen(false)} className={`flex items-center gap-4 p-3 rounded-xl mt-4 border ${isActive('/provider-dashboard') ? 'bg-cyan-900/30 border-cyan-500 text-cyan-400' : 'bg-cyan-950/10 border-cyan-900/50 text-cyan-500 hover:bg-cyan-900/40 hover:text-cyan-300'}`}>
               <i className="fa-solid fa-briefcase w-6 text-center text-lg"></i>
               <span className="font-bold tracking-widest uppercase text-sm">Service Jobs</span>
             </Link>
           )}
 
-          {currentUser?.role === 'vendor' && (
+          {currentUser?.role?.includes('vendor') && (
             <Link to="/vendor" onClick={() => setIsSidebarOpen(false)} className={`flex items-center gap-4 p-3 rounded-xl mt-4 border ${isActive('/vendor') ? 'bg-purple-900/30 border-purple-500 text-purple-400' : 'bg-purple-950/10 border-purple-900/50 text-purple-500 hover:bg-purple-900/40 hover:text-purple-300'}`}>
               <i className="fa-solid fa-box-open w-6 text-center text-lg"></i>
               <span className="font-bold tracking-widest uppercase text-sm">Vendor Dash</span>

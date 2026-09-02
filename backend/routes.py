@@ -2782,3 +2782,42 @@ def get_provider_schedule(session: Session = Depends(get_session), token: dict =
     ).all()
     
     return appointments
+
+from pydantic import BaseModel
+
+class UpgradeRequest(BaseModel):
+    new_role: str
+
+@router.post("/api/profile/upgrade")
+def upgrade_account(request: UpgradeRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Upgrades a user to a vendor or service provider, allowing multiple roles."""
+    from models import User
+    
+    if request.new_role not in ['vendor', 'service_provider']:
+        raise HTTPException(status_code=400, detail="Invalid role requested.")
+        
+    username = token.get("sub")
+    user = session.exec(select(User).where(User.username == username)).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Parse current roles, defaulting to customer
+    current_roles = user.role.split(',') if user.role else ['customer']
+    
+    if request.new_role in current_roles:
+        return {"message": "Role already active", "role": user.role}
+
+    # If they are just a customer, replace it. Otherwise, append the new role.
+    if 'customer' in current_roles and len(current_roles) == 1:
+        current_roles = [request.new_role]
+    else:
+        current_roles.append(request.new_role)
+        
+    user.role = ','.join(current_roles)
+    
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    
+    return {"message": f"Successfully upgraded to {request.new_role.replace('_', ' ')}", "role": user.role}

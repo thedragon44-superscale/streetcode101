@@ -235,6 +235,23 @@ export default function Profile() {
     }
   };
 
+const handleUpgradeAccount = async (newRole) => {
+    try {
+      const res = await fetch(`${API_BASE}/profile/upgrade`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_role: newRole })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to upgrade account');
+      
+      setProfile(prev => ({ ...prev, role: data.role }));
+      toast.success(data.message);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   const handleCreateListing = async (e) => {
     e.preventDefault();
     setIsSubmittingListing(true);
@@ -432,14 +449,14 @@ export default function Profile() {
                   <h1 className="text-3xl font-black text-slate-900">@{profile.username}</h1>
                   <p className={`text-sm font-bold mt-1 uppercase tracking-widest ${
                     profile.username === 'admin' ? 'text-orange-500' :
-                    profile.role === 'vendor' ? 'text-purple-500' :
-                    profile.role === 'service_provider' ? 'text-cyan-500' :
+                    profile.role?.includes('vendor') || profile.role?.includes('service_provider') ? 'text-cyan-500' :
                     'text-slate-500'
                   }`}>
                     {profile.username === 'admin' ? 'Master Admin' : 
-                     profile.role === 'vendor' ? 'Verified Vendor' :
-                     profile.role === 'service_provider' ? 'Service Provider' : 
-                     'Community Member'}
+                     [
+                       profile.role?.includes('vendor') ? 'Verified Vendor' : null,
+                       profile.role?.includes('service_provider') ? 'Service Provider' : null
+                     ].filter(Boolean).join(' & ') || 'Community Member'}
                   </p>
                 </div>
                 
@@ -458,22 +475,18 @@ export default function Profile() {
                 )}
                 
                 {/* Role-Specific Dashboard Buttons (Only on your own profile) */}
-                {isMyProfile && profile.role === 'vendor' && (
-                  <Link 
-                    to="/vendor"
-                    className="mt-4 sm:mt-0 px-6 py-2 bg-slate-900 hover:bg-purple-500 text-white rounded-xl text-sm font-bold shadow-sm transition active:scale-95 uppercase tracking-wider flex items-center gap-2"
-                  >
-                    <i className="fa-solid fa-shop"></i> Vendor Console
-                  </Link>
-                )}
-                {isMyProfile && profile.role === 'service_provider' && (
-                  <Link 
-                    to="/provider-dashboard"
-                    className="mt-4 sm:mt-0 px-6 py-2 bg-slate-900 hover:bg-cyan-500 text-white rounded-xl text-sm font-bold shadow-sm transition active:scale-95 uppercase tracking-wider flex items-center gap-2"
-                  >
-                    <i className="fa-solid fa-briefcase"></i> Service Dash
-                  </Link>
-                )}
+                <div className="flex flex-col gap-2 mt-4 sm:mt-0">
+                  {isMyProfile && profile.role?.includes('vendor') && (
+                    <Link to="/vendor" className="px-6 py-2 bg-slate-900 hover:bg-purple-500 text-white rounded-xl text-sm font-bold shadow-sm transition active:scale-95 uppercase tracking-wider flex items-center gap-2">
+                      <i className="fa-solid fa-shop"></i> Vendor Console
+                    </Link>
+                  )}
+                  {isMyProfile && profile.role?.includes('service_provider') && (
+                    <Link to="/provider-dashboard" className="px-6 py-2 bg-slate-900 hover:bg-cyan-500 text-white rounded-xl text-sm font-bold shadow-sm transition active:scale-95 uppercase tracking-wider flex items-center gap-2">
+                      <i className="fa-solid fa-briefcase"></i> Service Dash
+                    </Link>
+                  )}
+                </div>
               </div>
 
               {/* Network Stats */}
@@ -537,6 +550,29 @@ export default function Profile() {
                         Checkout
                       </button>
                     </div>
+                  </div>
+                </div>
+              )}
+
+{/* --- ACCOUNT UPGRADE SECTION --- */}
+              {isMyProfile && profile.username !== 'admin' && (!profile.role?.includes('vendor') || !profile.role?.includes('service_provider')) && (
+                <div className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm mt-6 mb-6">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Level Up Your Account</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {!profile.role?.includes('vendor') && (
+                      <button onClick={() => handleUpgradeAccount('vendor')} className="bg-white border border-purple-200 hover:border-purple-500 hover:shadow-md p-4 rounded-xl flex flex-col items-center justify-center text-center transition-all group">
+                        <i className="fa-solid fa-box-open text-2xl text-purple-300 group-hover:text-purple-500 mb-2 transition-colors"></i>
+                        <span className="text-xs font-black text-slate-900 uppercase tracking-widest">Become a Vendor</span>
+                        <span className="text-[10px] text-slate-500 font-medium mt-1">Sell physical drops</span>
+                      </button>
+                    )}
+                    {!profile.role?.includes('service_provider') && (
+                      <button onClick={() => handleUpgradeAccount('service_provider')} className="bg-white border border-cyan-200 hover:border-cyan-500 hover:shadow-md p-4 rounded-xl flex flex-col items-center justify-center text-center transition-all group">
+                        <i className="fa-solid fa-briefcase text-2xl text-cyan-300 group-hover:text-cyan-500 mb-2 transition-colors"></i>
+                        <span className="text-xs font-black text-slate-900 uppercase tracking-widest">Offer Services</span>
+                        <span className="text-[10px] text-slate-500 font-medium mt-1">Join the hustle economy</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
