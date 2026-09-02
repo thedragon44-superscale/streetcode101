@@ -138,3 +138,96 @@ def send_second_drip_email_task(self, email: str, username: str):
     
     send_automated_email(to_email=email, subject=subject, body=body, html_body=html_template)
     return f"Second drip email sent to {email}"
+
+from datetime import datetime, timedelta
+from sqlmodel import Session, select
+from database import engine
+from models import Appointment, User, Transaction
+from routes import send_automated_email
+
+@celery_app.task(name="auto_release_escrow_task")
+def auto_release_escrow_task():
+    """Scans for jobs completed over 24 hours ago and auto-releases the Escrow."""
+    with Session(engine) as session:
+        # Find all jobs waiting on the client
+        pending_appts = session.exec(
+            select(Appointment).where(Appointment.status == "pending_confirmation")
+        ).all()
+        
+        admin = session.exec(select(User).where(User.username == "admin")).first()
+        if not admin:
+            return "Admin vault not found"
+            
+        released_count = 0
+        now = datetime.utcnow()
+        
+        for appt in pending_appts:
+            if appt.provider_completed_at:
+                time_elapsed = now - appt.provider_completed_at
+                
+                # THE 24-HOUR RULE
+                if time_elapsed > timedelta(hours=24):
+                    provider = session.exec(select(User).where(User.username == appt.provider_username)).first()
+                    client = session.exec(select(User).where(User.username == appt.client_username)).first()
+                    
+                    if provider and admin.wallet_balance >= appt.escrow_amount:
+                        # 1. Transfer the money
+                        admin.wallet_balance -= appt.escrow_amount
+                        provider.wallet_balance += appt.escrow_amount
+                        
+                        # 2. Log the immutable transaction
+                        tx = Transaction(
+                            sender_username="admin",
+                            receiver_username=provider.username,
+                            amount=appt.escrow_amount,
+                            transaction_type="auto_escrow_release",
+                            status="completed"
+                        )
+                        
+                        # 3. Update appointment status
+                        appt.status = "released"
+                        appt.client_confirmed_at = now
+                        
+                        session.add(admin)
+                        session.add(provider)
+                        session.add(tx)
+                        session.add(appt)
+                        
+                        # 4. Notify the Provider they got paid
+                        send_automated_email(
+                            to_email=provider.email,
+                            subject="💰 Escrow Auto-Released!",
+                            body=f"Yo @{provider.username},\n\nThe 24-hour review window passed without a client dispute. {appt.escrow_amount:.2f} SC has been automatically released to your wallet for appointment #{appt.id}.\n\nKeep grinding."
+                        )
+                        
+                        # 5. Notify the Client it was closed
+                        if client:
+                            send_automated_email(
+                                to_email=client.email,
+                                subject="Service Escrow Closed",
+                                body=f"Yo @{client.username},\n\nThe 24-hour review window for appointment #{appt.id} has expired. The escrowed funds have been automatically released to the provider. The job is now officially closed."
+                            )
+                        
+                        released_count += 1
+                        
+        session.commit()
+        return f"Auto-released {released_count} escrows."
+
+from celery.schedules import crontab
+
+# Configure Celery Beat Schedule
+celery_app.conf.beat_schedule = {
+    # Existing Sync Task
+    'sync-inventory-every-15-min': {
+        'task': 'sync_inventory',
+        'schedule': 900.0, # 15 minutes in seconds
+    },
+    
+    # New Auto-Release Task
+    'check-escrow-every-hour': {
+        'task': 'auto_release_escrow_task',
+        'schedule': crontab(minute=0), # Runs at the top of every hour
+    },
+}
+
+celery_app.conf.timezone = 'UTC'
