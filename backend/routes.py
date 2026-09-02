@@ -2613,3 +2613,61 @@ def book_service(payload: BookingRequest, session: Session = Depends(get_session
         )
 
     return {"message": "Booking confirmed and funds secured in Escrow.", "appointment_id": new_appt.id}
+
+class CheckInRequest(BaseModel):
+    actual_lat: float
+    actual_long: float
+
+@router.post("/api/appointments/{id}/check-in")
+def appointment_check_in(id: int, payload: CheckInRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Logs the provider's GPS coordinates to verify they arrived at the job site."""
+    from models import Appointment
+    import math
+    
+    username = token.get("sub")
+    appt = session.get(Appointment, id)
+    
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+        
+    if appt.provider_username != username:
+        raise HTTPException(status_code=403, detail="Only the assigned provider can check in.")
+        
+    if appt.status != "locked":
+        raise HTTPException(status_code=400, detail=f"Cannot check in. Current status: {appt.status}")
+
+    distance_miles = None
+    
+    # If it's a physical location with target coordinates, enforce the GPS geofence
+    if appt.target_lat and appt.target_long:
+        # Haversine formula to calculate true distance across the globe
+        R = 3958.8 # Radius of Earth in miles
+        dlat = math.radians(payload.actual_lat - appt.target_lat)
+        dlon = math.radians(payload.actual_long - appt.target_long)
+        a = math.sin(dlat/2)**2 + math.cos(math.radians(appt.target_lat)) * math.cos(math.radians(payload.actual_lat)) * math.sin(dlon/2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        distance_miles = R * c
+        
+        # 0.5 miles allows for large apartment complexes, big parking lots, and minor phone GPS drift
+        if distance_miles > 0.5:
+            raise HTTPException(status_code=400, detail=f"Geofence rejected: You are {distance_miles:.2f} miles away from the job site.")
+            
+    # Log the check-in
+    appt.actual_lat = payload.actual_lat
+    appt.actual_long = payload.actual_long
+    appt.checked_in_at = datetime.utcnow()
+    appt.status = "checked_in"
+    
+    session.add(appt)
+    session.commit()
+    
+    # Alert the client that the provider is on-site
+    client = session.exec(select(User).where(User.username == appt.client_username)).first()
+    if client:
+        send_automated_email(
+            to_email=client.email,
+            subject="Your Service Provider Has Arrived",
+            body=f"Yo @{client.username},\n\n@{username} has officially checked in at the job site via GPS. The service is now underway."
+        )
+        
+    return {"message": "Check-in verified securely.", "distance_miles": distance_miles}
