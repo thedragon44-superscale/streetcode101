@@ -2785,8 +2785,11 @@ def get_provider_schedule(session: Session = Depends(get_session), token: dict =
 
 from pydantic import BaseModel
 
+from typing import Optional, Dict, Any
+
 class UpgradeRequest(BaseModel):
     new_role: str
+    onboarding_data: Optional[Dict[str, Any]] = None
 
 @router.post("/api/profile/upgrade")
 def upgrade_account(request: UpgradeRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):

@@ -308,8 +308,23 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
             )}
           </div>
 
-          {/* ICONS (Bell & Cart) */}
+          {/* ICONS (Role Consoles, Bell & Cart) */}
           <div className="flex items-center gap-4 sm:gap-5 flex-shrink-0">
+            
+            {/* Quick Access Consoles (Hidden on small mobile) */}
+            <div className="hidden sm:flex items-center gap-4 border-r border-slate-800 pr-4 mr-1">
+              {currentUser?.role?.includes('vendor') && (
+                <Link to="/vendor" className="text-slate-400 hover:text-purple-500 transition-colors" title="Vendor Console">
+                  <i className="fa-solid fa-shop text-xl"></i>
+                </Link>
+              )}
+              {currentUser?.role?.includes('service_provider') && (
+                <Link to="/provider-dashboard" className="text-slate-400 hover:text-cyan-500 transition-colors" title="Service Dashboard">
+                  <i className="fa-solid fa-briefcase text-xl"></i>
+                </Link>
+              )}
+            </div>
+
             {currentUser && (
               <div className="relative flex items-center h-full">
                 <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="relative text-slate-400 hover:text-orange-500 transition-colors flex items-center h-full">

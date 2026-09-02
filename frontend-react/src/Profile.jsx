@@ -11,6 +11,14 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
+const SERVICE_COMPLIANCE = {
+  mobile_mechanic: "I agree to use the GPS check-in system, assume all liability for vehicular damage, parts, and tools while on a client's property, and accept the standard 5% escrow fee.",
+  hair_beauty: "I confirm that I maintain sanitary tools, hold local grooming certifications, agree to use GPS check-in, and accept the standard 5% escrow fee.",
+  home_service: "I agree to use the GPS check-in system, respect client property, assume full financial responsibility for on-site damage or theft, and accept the 5% escrow fee.",
+  web_development: "I agree to deliver functional code remotely, submit valid proof-of-delivery via the platform, avoid malicious exploits, and accept the 5% escrow fee.",
+  graphic_design: "I guarantee all artwork is original or properly licensed, agree to submit proof-of-delivery remotely, avoid copyright infringement, and accept the 5% escrow fee."
+};
+
 export default function Profile() {
   const { username } = useParams(); // 'me' or an actual username
   const navigate = useNavigate();
@@ -50,6 +58,15 @@ export default function Profile() {
   const [topUpAmount, setTopUpAmount] = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [showTopUpModal, setShowTopUpModal] = useState(false);
+
+  // Onboarding Modal State
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeRole, setUpgradeRole] = useState(''); 
+  const [onboardingData, setOnboardingData] = useState({
+    primaryTrade: '', serviceBoundary: '', operatingHours: 'Standard 9-5',
+    vendorName: '', merchCategory: 'Apparel', fulfillmentModel: 'Direct Shipping',
+    complianceAgreed: false
+  });
 
   const token = localStorage.getItem('pidrop_token');
   const isMyProfile = username === 'me';
@@ -235,18 +252,27 @@ export default function Profile() {
     }
   };
 
-const handleUpgradeAccount = async (newRole) => {
+const handleUpgradeAccount = async (e) => {
+    e.preventDefault();
+    if (!onboardingData.complianceAgreed) return toast.error("You must agree to the compliance terms.");
+    if (upgradeRole === 'service_provider' && !onboardingData.primaryTrade) return toast.error("Please select a primary trade.");
+    
     try {
       const res = await fetch(`${API_BASE}/profile/upgrade`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ new_role: newRole })
+        body: JSON.stringify({ 
+          new_role: upgradeRole,
+          onboarding_data: onboardingData 
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to upgrade account');
       
       setProfile(prev => ({ ...prev, role: data.role }));
-      toast.success(data.message);
+      setShowUpgradeModal(false);
+      setOnboardingData({ ...onboardingData, complianceAgreed: false });
+      toast.success(`Welcome to the ${upgradeRole === 'vendor' ? 'Vendor' : 'Service'} Economy!`);
     } catch (err) {
       toast.error(err.message);
     }
@@ -560,14 +586,14 @@ const handleUpgradeAccount = async (newRole) => {
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Level Up Your Account</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {!profile.role?.includes('vendor') && (
-                      <button onClick={() => handleUpgradeAccount('vendor')} className="bg-white border border-purple-200 hover:border-purple-500 hover:shadow-md p-4 rounded-xl flex flex-col items-center justify-center text-center transition-all group">
+                      <button onClick={() => { setUpgradeRole('vendor'); setShowUpgradeModal(true); }} className="bg-white border border-purple-200 hover:border-purple-500 hover:shadow-md p-4 rounded-xl flex flex-col items-center justify-center text-center transition-all group">
                         <i className="fa-solid fa-box-open text-2xl text-purple-300 group-hover:text-purple-500 mb-2 transition-colors"></i>
                         <span className="text-xs font-black text-slate-900 uppercase tracking-widest">Become a Vendor</span>
                         <span className="text-[10px] text-slate-500 font-medium mt-1">Sell physical drops</span>
                       </button>
                     )}
                     {!profile.role?.includes('service_provider') && (
-                      <button onClick={() => handleUpgradeAccount('service_provider')} className="bg-white border border-cyan-200 hover:border-cyan-500 hover:shadow-md p-4 rounded-xl flex flex-col items-center justify-center text-center transition-all group">
+                      <button onClick={() => { setUpgradeRole('service_provider'); setShowUpgradeModal(true); }} className="bg-white border border-cyan-200 hover:border-cyan-500 hover:shadow-md p-4 rounded-xl flex flex-col items-center justify-center text-center transition-all group">
                         <i className="fa-solid fa-briefcase text-2xl text-cyan-300 group-hover:text-cyan-500 mb-2 transition-colors"></i>
                         <span className="text-xs font-black text-slate-900 uppercase tracking-widest">Offer Services</span>
                         <span className="text-[10px] text-slate-500 font-medium mt-1">Join the hustle economy</span>
@@ -810,6 +836,97 @@ const handleUpgradeAccount = async (newRole) => {
           </div>
         </div>
       </main>
+
+      {/* --- ONBOARDING MODAL --- */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col relative overflow-hidden">
+            <div className={`px-6 py-4 flex items-center justify-between border-b ${upgradeRole === 'vendor' ? 'bg-purple-50 border-purple-100' : 'bg-cyan-50 border-cyan-100'}`}>
+              <h3 className={`font-black text-lg flex items-center gap-2 ${upgradeRole === 'vendor' ? 'text-purple-900' : 'text-cyan-900'}`}>
+                {upgradeRole === 'vendor' ? <><i className="fa-solid fa-shop"></i> Vendor Onboarding</> : <><i className="fa-solid fa-briefcase"></i> Service Provider Onboarding</>}
+              </h3>
+              <button onClick={() => { setShowUpgradeModal(false); setOnboardingData({ ...onboardingData, complianceAgreed: false }); }} className="text-slate-400 hover:text-slate-700 font-bold transition">✕</button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              <form onSubmit={handleUpgradeAccount} className="space-y-4">
+                
+                {upgradeRole === 'vendor' ? (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Store / Brand Name</label>
+                      <input type="text" value={onboardingData.vendorName} onChange={e => setOnboardingData({...onboardingData, vendorName: e.target.value})} placeholder={`e.g. ${profile.username}'s Vault`} className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-purple-500 font-medium" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Merch Category</label>
+                        <select value={onboardingData.merchCategory} onChange={e => setOnboardingData({...onboardingData, merchCategory: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-purple-500 font-medium text-sm">
+                          <option>Apparel</option><option>Auto Parts</option><option>Electronics</option><option>Digital Goods</option><option>Custom / Handmade</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Fulfillment</label>
+                        <select value={onboardingData.fulfillmentModel} onChange={e => setOnboardingData({...onboardingData, fulfillmentModel: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-purple-500 font-medium text-sm">
+                          <option>Direct Shipping</option><option>Local Pickup</option><option>Dropshipped</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="bg-purple-50 border border-purple-200 p-4 rounded-xl mt-4">
+                      <p className="text-xs text-purple-900 font-medium leading-relaxed mb-3">I guarantee all physical items are authentic and legally obtained. I understand that selling counterfeit, illegal, or restricted goods will result in immediate permanent account suspension and forfeiture of escrow funds.</p>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={onboardingData.complianceAgreed} onChange={e => setOnboardingData({...onboardingData, complianceAgreed: e.target.checked})} className="w-4 h-4 accent-purple-600 rounded cursor-pointer" />
+                        <span className="text-xs font-bold text-purple-900">I agree to these terms.</span>
+                      </label>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Primary Trade *</label>
+                      <select required value={onboardingData.primaryTrade} onChange={e => setOnboardingData({...onboardingData, primaryTrade: e.target.value, complianceAgreed: false})} className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-cyan-500 font-medium text-sm">
+                        <option value="" disabled>-- Select your hustle --</option>
+                        <option value="mobile_mechanic">Mobile Mechanic / Auto Repair</option>
+                        <option value="hair_beauty">Hair & Beauty / Barber</option>
+                        <option value="home_service">Home Services & Cleaning</option>
+                        <option value="web_development">Web & App Development</option>
+                        <option value="graphic_design">Graphic Design & Digital Art</option>
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Service Boundary</label>
+                        <input type="text" value={onboardingData.serviceBoundary} onChange={e => setOnboardingData({...onboardingData, serviceBoundary: e.target.value})} placeholder="e.g. Austin Metro or Remote" className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-cyan-500 font-medium text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Operating Hours</label>
+                        <select value={onboardingData.operatingHours} onChange={e => setOnboardingData({...onboardingData, operatingHours: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-cyan-500 font-medium text-sm">
+                          <option>Standard 9-5</option><option>Weekends Only</option><option>Evenings</option><option>24/7 Emergency</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    {onboardingData.primaryTrade && (
+                      <div className="bg-cyan-50 border border-cyan-200 p-4 rounded-xl mt-4 transition-all">
+                        <p className="text-xs text-cyan-900 font-medium leading-relaxed mb-3">
+                          {SERVICE_COMPLIANCE[onboardingData.primaryTrade]}
+                        </p>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={onboardingData.complianceAgreed} onChange={e => setOnboardingData({...onboardingData, complianceAgreed: e.target.checked})} className="w-4 h-4 accent-cyan-600 rounded cursor-pointer" />
+                          <span className="text-xs font-bold text-cyan-900">I agree to these terms.</span>
+                        </label>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <button type="submit" disabled={!onboardingData.complianceAgreed} className={`w-full text-white font-black py-4 rounded-xl transition-all uppercase tracking-wider mt-4 disabled:opacity-50 ${upgradeRole === 'vendor' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-cyan-600 hover:bg-cyan-700'}`}>
+                  Complete Onboarding
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- NATIVE STRIPE TOP-UP MODAL --- */}
       {showTopUpModal && clientSecret && (
