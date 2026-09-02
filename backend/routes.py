@@ -2475,3 +2475,51 @@ def get_admin_analytics(session: Session = Depends(get_session), token: dict = D
         "escrow_liability": escrow_liability,
         "total_revenue_usd": total_revenue_usd
     }
+
+# ==========================================
+# SERVICE ECONOMY ENDPOINTS
+# ==========================================
+
+class ServiceCreateRequest(BaseModel):
+    title: str
+    description: str
+    price: float
+    service_type: str  # 'in_person' or 'remote'
+    image_url: str = "/default_service.png"
+
+@router.post("/api/services")
+def create_service_listing(payload: ServiceCreateRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Allows a verified Service Provider to post a new service to the catalog."""
+    username = token.get("sub")
+    user = session.exec(select(User).where(User.username == username)).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Security check: Only allow users who registered as service providers (or admin) to create listings
+    if user.role != "service_provider" and username != "admin":
+        raise HTTPException(status_code=403, detail="Only registered Service Providers can create listings.")
+        
+    from models import ServiceListing
+    new_service = ServiceListing(
+        provider_username=username,
+        title=payload.title,
+        description=payload.description,
+        price=payload.price,
+        service_type=payload.service_type,
+        image_url=payload.image_url
+    )
+    
+    session.add(new_service)
+    session.commit()
+    session.refresh(new_service)
+    
+    return {"message": "Service listing published successfully!", "service": new_service}
+
+@router.get("/api/services")
+def get_service_catalog(session: Session = Depends(get_session)):
+    """Fetches all active service listings for the public storefront."""
+    from models import ServiceListing
+    # Fetch active services and order them newest first
+    services = session.exec(select(ServiceListing).where(ServiceListing.is_active == True).order_by(ServiceListing.id.desc())).all()
+    return services
