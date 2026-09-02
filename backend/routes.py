@@ -2946,3 +2946,49 @@ def resolve_dispute(id: int, req: DisputeResolutionRequest, session: Session = D
     session.commit()
     
     return {"message": f"Dispute resolved. Escrow transferred to @{receiver}."}
+
+class AdminTransferRequest(BaseModel):
+    amount: float
+
+@router.post("/api/admin/users/{username}/transfer")
+def admin_transfer_funds(username: str, req: AdminTransferRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Allows Master Admin to manually route StreetCoin to a user."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Master Admin only.")
+        
+    from models import User, Transaction
+    
+    user = session.exec(select(User).where(User.username == username)).first()
+    admin = session.exec(select(User).where(User.username == "admin")).first()
+    
+    if not user or not admin:
+        raise HTTPException(status_code=404, detail="User or Admin vault not found.")
+        
+    if req.amount <= 0:
+        raise HTTPException(status_code=400, detail="Transfer amount must be greater than 0.")
+        
+    # Route funds from Admin Master Vault to User
+    admin.wallet_balance -= req.amount
+    user.wallet_balance += req.amount
+    
+    tx = Transaction(
+        sender_username="admin",
+        receiver_username=user.username,
+        amount=req.amount,
+        transaction_type="admin_transfer",
+        status="completed"
+    )
+    
+    session.add(admin)
+    session.add(user)
+    session.add(tx)
+    session.commit()
+    
+    # Notify the user of the deposit
+    send_automated_email(
+        to_email=user.email,
+        subject="💰 StreetCoin Deposit Received",
+        body=f"Yo @{user.username},\n\nThe Master Admin has routed {req.amount:.2f} SC directly to your wallet. Log in to check your updated balance."
+    )
+    
+    return {"message": f"Successfully routed {req.amount:.2f} SC to @{username}."}

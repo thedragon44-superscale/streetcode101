@@ -115,6 +115,12 @@ const handleProductImageUpload = async (e) => {
   const [emailBody, setEmailBody] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
 
+  // --- FUND MODAL STATE ---
+  const [isFundModalOpen, setIsFundModalOpen] = useState(false);
+  const [fundTarget, setFundTarget] = useState(null);
+  const [fundAmount, setFundAmount] = useState('');
+  const [isFunding, setIsFunding] = useState(false);
+
   // --- MODAL STATE ---
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -279,6 +285,31 @@ const handleProductImageUpload = async (e) => {
       setEmailSubject('');
       setEmailBody('');
     } catch (err) { toast.error(err.message); } finally { setIsSendingEmail(false); }
+  };
+
+  const handleTransferFunds = async (e) => {
+    e.preventDefault();
+    if (!fundAmount || isNaN(fundAmount) || Number(fundAmount) <= 0) return toast.error("Enter a valid amount.");
+    
+    setIsFunding(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/users/${fundTarget.username}/transfer`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: parseFloat(fundAmount) })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to route funds');
+      
+      toast.success(data.message);
+      setIsFundModalOpen(false);
+      setFundAmount('');
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsFunding(false);
+    }
   };
 
   const handleLogout = () => {
@@ -957,6 +988,12 @@ const handleResolveDispute = async (id, resolution) => {
                           >
                             <i className="fa-solid fa-envelope md:hidden"></i> Email
                           </button>
+                          <button 
+                            onClick={() => { setFundTarget(user); setIsFundModalOpen(true); }} 
+                            className="flex-1 md:flex-none bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white px-3 py-2 md:py-1.5 rounded-lg font-bold text-xs transition-colors flex items-center justify-center gap-2"
+                          >
+                            <i className="fa-solid fa-coins md:hidden"></i> Route SC
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1266,6 +1303,39 @@ const handleResolveDispute = async (id, resolution) => {
               </div>
               <button type="submit" disabled={isDeletingPost} className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-black py-3 rounded-xl shadow-lg transition-all active:scale-[0.98]">
                 {isDeletingPost ? 'Deleting...' : 'Delete & Notify'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- FUND WALLET MODAL --- */}
+      {isFundModalOpen && fundTarget && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h2 className="text-xl font-black text-slate-900">Route SC to @{fundTarget.username}</h2>
+              <button onClick={() => setIsFundModalOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-xl p-2">✕</button>
+            </div>
+            <form onSubmit={handleTransferFunds} className="p-6 space-y-4">
+              <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-xs font-bold border border-emerald-100 mb-4">
+                This will instantly mint and transfer StreetCoin from the Master Vault to the user.
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Amount (SC)</label>
+                <input 
+                  required 
+                  type="number" 
+                  step="0.01"
+                  min="0.01"
+                  value={fundAmount} 
+                  onChange={e => setFundAmount(e.target.value)} 
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 text-lg font-black text-slate-900" 
+                  placeholder="0.00"
+                />
+              </div>
+              <button type="submit" disabled={isFunding} className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-black py-3 rounded-xl shadow-lg transition-all active:scale-[0.98] uppercase tracking-wider">
+                {isFunding ? 'Processing...' : 'Confirm Transfer'}
               </button>
             </form>
           </div>
