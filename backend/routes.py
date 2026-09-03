@@ -44,7 +44,7 @@ from sqlmodel import Session, select
 from typing import List
 
 from database import get_session, engine
-from models import Product, Order, User, Post, Like, Comment, Message, CartItem, PromoCode, LedgerSubscriber, Notification, Follow
+from models import Product, Order, User, Post, Like, Comment, Message, CartItem, PromoCode, LedgerSubscriber, Notification, Follow, Review
 
 router = APIRouter()
 security = HTTPBearer()
@@ -279,6 +279,11 @@ def get_my_profile(session: Session = Depends(get_session), token: dict = Depend
     # Calculate network metrics
     followers_count = len(session.exec(select(Follow).where(Follow.following_username == username)).all())
     following_count = len(session.exec(select(Follow).where(Follow.follower_username == username)).all())
+    
+    # Calculate Trust Score
+    reviews = session.exec(select(Review).where(Review.target_username == username)).all()
+    review_count = len(reviews)
+    trust_score = sum(r.rating for r in reviews) / review_count if review_count > 0 else 0.0
         
     return {
         "username": user.username,
@@ -289,7 +294,9 @@ def get_my_profile(session: Session = Depends(get_session), token: dict = Depend
         "email_opt_in": getattr(user, "email_opt_in", False),
         "followers_count": followers_count,
         "following_count": following_count,
-        "wallet_balance": getattr(user, "wallet_balance", 0.0) 
+        "wallet_balance": getattr(user, "wallet_balance", 0.0),
+        "trust_score": round(trust_score, 1),
+        "review_count": review_count
     }
 
 @router.get("/api/search")
@@ -830,9 +837,13 @@ def get_public_profile(
         except:
             pass
 
-    # 2. Calculate network metrics
+    # 2. Calculate network metrics & Trust Score
     followers_count = len(session.exec(select(Follow).where(Follow.following_username == username)).all())
     following_count = len(session.exec(select(Follow).where(Follow.follower_username == username)).all())
+    
+    reviews = session.exec(select(Review).where(Review.target_username == username)).all()
+    review_count = len(reviews)
+    trust_score = sum(r.rating for r in reviews) / review_count if review_count > 0 else 0.0
     
     is_following = False
     if visitor_username:
@@ -850,7 +861,9 @@ def get_public_profile(
             "profile_image_url": "/dragon_logo.png",
             "followers_count": followers_count,
             "following_count": following_count,
-            "is_following": is_following
+            "is_following": is_following,
+            "trust_score": 5.0,
+            "review_count": 999
         }
         
     # 4. Handle standard users
@@ -864,7 +877,9 @@ def get_public_profile(
         "profile_image_url": user.profile_image_url,
         "followers_count": followers_count,
         "following_count": following_count,
-        "is_following": is_following
+        "is_following": is_following,
+        "trust_score": round(trust_score, 1),
+        "review_count": review_count
     }
 
 # --- PASSWORD RECOVERY ---
@@ -3052,3 +3067,78 @@ def vault_mint_to_admin(req: VaultMintRequest, session: Session = Depends(get_se
     session.commit()
     
     return {"message": f"Minted {req.amount:.2f} SC directly to Admin Wallet."}
+
+# --- TRUST & REPUTATION ENDPOINTS ---
+
+class ReviewCreateRequest(BaseModel):
+    target_username: str
+    appointment_id: int | None = None
+    order_id: int | None = None
+    rating: int
+    text: str
+
+@router.post("/api/reviews")
+def submit_review(req: ReviewCreateRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Submits a star rating and written review for a vendor/provider."""
+    username = token.get("sub")
+    
+    if username == req.target_username:
+        raise HTTPException(status_code=400, detail="You cannot review yourself.")
+        
+    if req.rating < 1 or req.rating > 5:
+        raise HTTPException(status_code=400, detail="Rating must be between 1 and 5.")
+        
+    # Prevent duplicate reviews for the same job/order
+    if req.appointment_id:
+        existing = session.exec(select(Review).where((Review.appointment_id == req.appointment_id) & (Review.reviewer_username == username))).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="You have already reviewed this service.")
+            
+    if req.order_id:
+        existing = session.exec(select(Review).where((Review.order_id == req.order_id) & (Review.reviewer_username == username))).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="You have already reviewed this order.")
+            
+    new_review = Review(
+        reviewer_username=username,
+        target_username=req.target_username,
+        appointment_id=req.appointment_id,
+        order_id=req.order_id,
+        rating=req.rating,
+        text=req.text
+    )
+    
+    session.add(new_review)
+    session.commit()
+    
+    # Notify the target user
+    target_user = session.exec(select(User).where(User.username == req.target_username)).first()
+    if target_user and getattr(target_user, "email_opt_in", False):
+        send_automated_email(
+            to_email=target_user.email,
+            subject=f"New {req.rating}-Star Review Received!",
+            body=f"Yo @{target_user.username},\n\n@{username} just left you a {req.rating}-star review:\n\"{req.text}\"\n\nKeep building that reputation."
+        )
+        
+    return {"message": "Review submitted successfully!"}
+
+@router.get("/api/reviews/{username}")
+def get_user_reviews(username: str, session: Session = Depends(get_session)):
+    """Fetches all reviews for a specific user to display on their public profile."""
+    reviews = session.exec(
+        select(Review).where(Review.target_username == username).order_by(Review.id.desc())
+    ).all()
+    
+    formatted_reviews = []
+    for r in reviews:
+        reviewer = session.exec(select(User).where(User.username == r.reviewer_username)).first()
+        formatted_reviews.append({
+            "id": r.id,
+            "reviewer_username": r.reviewer_username,
+            "reviewer_avatar": reviewer.profile_image_url if reviewer else "/default.png",
+            "rating": r.rating,
+            "text": r.text,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        })
+        
+    return formatted_reviews

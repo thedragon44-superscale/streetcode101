@@ -180,3 +180,13 @@ class Appointment(SQLModel, table=True):
     # Financials
     escrow_amount: float
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Review(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    reviewer_username: str = Field(index=True)
+    target_username: str = Field(index=True)
+    appointment_id: int | None = Field(default=None)
+    order_id: int | None = Field(default=None)
+    rating: int = Field(ge=1, le=5)
+    text: str | None = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
