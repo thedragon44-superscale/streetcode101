@@ -121,10 +121,8 @@ const handleProductImageUpload = async (e) => {
   const [fundAmount, setFundAmount] = useState('');
   const [isFunding, setIsFunding] = useState(false);
 
-  // --- MINT MODAL STATE ---
-  const [isMintModalOpen, setIsMintModalOpen] = useState(false);
-  const [mintAmount, setMintAmount] = useState('');
-  const [isMinting, setIsMinting] = useState(false);
+  // --- VAULT STATE ---
+  const [vaultTransactions, setVaultTransactions] = useState([]);
 
   // --- MODAL STATE ---
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -154,7 +152,8 @@ const handleProductImageUpload = async (e) => {
         fetch(`${API_BASE}/admin/promos`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${API_BASE}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${API_BASE}/admin/analytics`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE}/admin/disputes`, { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(`${API_BASE}/admin/disputes`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE}/admin/vault/transactions`, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
 
       if (ordersRes.status === 401) return handleLogout();
@@ -166,6 +165,7 @@ const handleProductImageUpload = async (e) => {
       setUsers(usersRes.ok ? await usersRes.json() : []);
       setAnalytics(analyticsRes.ok ? await analyticsRes.json() : { total_circulation: 0, escrow_liability: 0, total_revenue_usd: 0 });
       setDisputes(disputesRes.ok ? await disputesRes.json() : []);
+      setVaultTransactions(vaultTransactionsRes.ok ? await vaultTransactionsRes.json() : []);
       
       const cashoutsRes = await fetch(`${API_BASE}/admin/cashouts`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -317,30 +317,7 @@ const handleProductImageUpload = async (e) => {
     }
   };
 
-  const handleMintFunds = async (e) => {
-    e.preventDefault();
-    if (!mintAmount || isNaN(mintAmount) || Number(mintAmount) <= 0) return toast.error("Enter a valid amount.");
-    
-    setIsMinting(true);
-    try {
-      const res = await fetch(`${API_BASE}/admin/mint`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: parseFloat(mintAmount) })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to mint funds');
-      
-      toast.success(data.message);
-      setIsMintModalOpen(false);
-      setMintAmount('');
-      fetchData();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setIsMinting(false);
-    }
-  };
+  
 
   const handleLogout = () => {
     localStorage.removeItem('pidrop_token');
@@ -529,6 +506,9 @@ const handleResolveDispute = async (id, resolution) => {
           <button onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'dashboard' ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
             <i className="fa-solid fa-chart-pie w-5 text-center"></i> Dashboard
           </button>
+          <button onClick={() => { setActiveTab('vault'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex items-center gap-3 text-sm ${activeTab === 'vault' ? 'bg-blue-500/10 text-blue-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
+            <i className="fa-solid fa-vault w-5 text-center"></i> Genesis Vault
+          </button>
 
           <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 mb-2 mt-6">Commerce</div>
           <button onClick={() => { setActiveTab('orders'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-full font-bold transition-all flex justify-between items-center text-sm ${activeTab === 'orders' ? 'bg-orange-500/10 text-orange-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>
@@ -631,15 +611,78 @@ const handleResolveDispute = async (id, resolution) => {
                 <div className="text-emerald-700 text-sm font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><i className="fa-solid fa-sack-dollar"></i> Platform Tax Revenue (5%)</div>
                 <div className="text-4xl font-black text-emerald-600">${analytics.total_revenue_usd.toFixed(2)} <span className="text-lg text-emerald-400">USD</span></div>
               </div>
-              <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200 shadow-sm flex flex-col justify-between">
-                <div>
-                    <div className="text-blue-700 text-sm font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><i className="fa-solid fa-vault"></i> Admin Treasury Reserve</div>
-                    <div className="text-4xl font-black text-blue-600">{analytics.treasury_reserve?.toFixed(2) || '0.00'} <span className="text-lg text-blue-400">SC</span></div>
-                </div>
-                <button onClick={() => setIsMintModalOpen(true)} className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg text-xs uppercase tracking-widest shadow-sm transition-colors">
-                    Mint Fiat-Backed SC
-                </button>
+              <div className="bg-blue-950 p-6 rounded-2xl border border-blue-900 shadow-sm flex flex-col justify-center">
+                <div className="text-blue-500 text-sm font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><i className="fa-solid fa-vault"></i> Genesis Supply (Locked)</div>
+                <div className="text-4xl font-black text-blue-400">{analytics.treasury_reserve?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'} <span className="text-lg text-blue-600">SC</span></div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- MASTER VAULT VIEW --- */}
+        {activeTab === 'vault' && (
+          <div className="animate-fade-in">
+            <header className="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+              <div>
+                <h1 className="text-3xl font-black text-slate-900">Genesis Master Vault</h1>
+                <p className="text-slate-500 mt-1 font-medium">Track the 1 Billion SC genesis supply and monitor token circulation.</p>
+              </div>
+            </header>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="bg-blue-950 p-8 rounded-3xl border border-blue-900 shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-bl-full"></div>
+                <div className="text-blue-400 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2"><i className="fa-solid fa-lock"></i> Uncirculated Supply</div>
+                <div className="text-5xl font-black text-white">{analytics.treasury_reserve?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'} <span className="text-xl text-blue-600">SC</span></div>
+                <div className="mt-6 pt-6 border-t border-blue-900/50 flex justify-between items-center">
+                    <span className="text-blue-500 text-xs font-bold uppercase tracking-widest">Total Circulating Supply</span>
+                    <span className="text-blue-100 font-bold text-lg">{analytics.total_circulation?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} SC</span>
+                </div>
+              </div>
+              <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center">
+                <i className="fa-solid fa-scale-balanced text-4xl text-slate-300 mb-4"></i>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-2">Immutable Ledger</h3>
+                <p className="text-sm text-slate-500 font-medium">Coins are strictly purchased into circulation via Stripe. When vendors initiate fiat cashouts, those coins are burned back into this Master Vault.</p>
+              </div>
+            </div>
+
+            <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Master Vault Outflow Ledger</h2>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full text-left text-sm text-slate-600 block md:table">
+                <thead className="hidden md:table-header-group bg-slate-50 border-b border-slate-200 text-slate-800 uppercase text-xs font-black tracking-wider">
+                  <tr>
+                    <th className="px-6 py-5">Transaction ID</th>
+                    <th className="px-6 py-5">Recipient</th>
+                    <th className="px-6 py-5">Type</th>
+                    <th className="px-6 py-5 text-right">Amount (SC)</th>
+                  </tr>
+                </thead>
+                <tbody className="block md:table-row-group divide-y divide-slate-100">
+                  {vaultTransactions.map((tx) => (
+                    <tr key={tx.id} className="block md:table-row hover:bg-slate-50 transition-colors p-4 md:p-0">
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4 font-mono text-xs text-slate-400">
+                        TX-{tx.id}
+                      </td>
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4 font-bold text-slate-900">
+                        @{tx.receiver_username}
+                      </td>
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4">
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${tx.transaction_type === 'onramp' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {tx.transaction_type.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="block md:table-cell px-2 md:px-6 py-2 md:py-4 md:text-right font-black text-emerald-600 text-base">
+                        {tx.amount.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                  {vaultTransactions.length === 0 && (
+                    <tr>
+                      <td colSpan="4" className="text-center py-10 text-slate-400 font-medium">No coins have left the Genesis Vault yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -1381,38 +1424,7 @@ const handleResolveDispute = async (id, resolution) => {
         </div>
       )}
 
-{/* --- MINT FIAT-BACKED SC MODAL --- */}
-      {isMintModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <h2 className="text-xl font-black text-slate-900">Mint Treasury SC</h2>
-              <button onClick={() => setIsMintModalOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-xl p-2">✕</button>
-            </div>
-            <form onSubmit={handleMintFunds} className="p-6 space-y-4">
-              <div className="bg-blue-50 text-blue-700 p-3 rounded-xl text-xs font-bold border border-blue-100 mb-4">
-                Acknowledge that you have deposited the equivalent fiat into your real-world bank account before minting this StreetCoin into your Treasury Reserve.
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Fiat Deposit Amount ($)</label>
-                <input 
-                  required 
-                  type="number" 
-                  step="0.01"
-                  min="0.01"
-                  value={mintAmount} 
-                  onChange={e => setMintAmount(e.target.value)} 
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-lg font-black text-slate-900" 
-                  placeholder="0.00"
-                />
-              </div>
-              <button type="submit" disabled={isMinting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black py-3 rounded-xl shadow-lg transition-all active:scale-[0.98] uppercase tracking-wider">
-                {isMinting ? 'Minting...' : 'Mint SC to Treasury'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+
 
       </div>
   );

@@ -567,6 +567,35 @@ def submit_order(order_data: Order, session: Session = Depends(get_session)):
         "message": "Order saved securely to database!"
     }
 
+@router.post("/api/wallet/topup")
+def initiate_wallet_topup(req: TopUpRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Initiates a Stripe checkout to purchase StreetCoin from the Master Vault."""
+    username = token.get("sub")
+    master = session.exec(select(User).where(User.username == "master_vault")).first()
+    
+    if not master or getattr(master, "wallet_balance", 0) < req.coins:
+        raise HTTPException(status_code=400, detail="Insufficient Genesis supply for this purchase.")
+        
+    # 1 SC = $1 USD. Stripe expects cents.
+    amount_in_cents = req.coins * 100
+    
+    if amount_in_cents < 50:
+        raise HTTPException(status_code=400, detail="Minimum purchase is 1 SC.")
+
+    try:
+        intent = stripe.PaymentIntent.create(
+            amount=amount_in_cents,
+            currency="usd",
+            metadata={
+                "type": "wallet_topup",
+                "username": username,
+                "coins": req.coins
+            }
+        )
+        return {"clientSecret": intent.client_secret}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 class StreetCoinCheckoutRequest(BaseModel):
     items: List[CartItemMinimal]
     promo_code: str | None = None
