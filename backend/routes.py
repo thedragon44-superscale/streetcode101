@@ -826,7 +826,7 @@ def get_public_profile(
     session: Session = Depends(get_session),
     credentials: HTTPAuthorizationCredentials | None = Depends(optional_security)
 ):
-    """Fetches a public profile along with their follower/following stats."""
+    """Fetches a public profile along with their follower/following stats and Trust Score."""
     
     # 1. Figure out who is visiting the profile
     visitor_username = None
@@ -857,6 +857,7 @@ def get_public_profile(
     if username.lower() == "admin":
         return {
             "username": "admin", 
+            "role": "admin",
             "bio": "Official Street Code 101 Storefront", 
             "profile_image_url": "/dragon_logo.png",
             "followers_count": followers_count,
@@ -873,6 +874,8 @@ def get_public_profile(
         
     return {
         "username": user.username,
+        "role": user.role,
+        "primary_trade": getattr(user, "primary_trade", None),
         "bio": user.bio,
         "profile_image_url": user.profile_image_url,
         "followers_count": followers_count,

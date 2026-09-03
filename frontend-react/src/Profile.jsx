@@ -32,9 +32,10 @@ export default function Profile() {
   const [isUploading, setIsUploading] = useState(false);
   const [emailOptIn, setEmailOptIn] = useState(false);
 
-  // --- REVIEWS STATE ---
+  // --- REVIEWS & COMMERCE STATE ---
   const [reviews, setReviews] = useState([]);
-  const [activeProfileTab, setActiveProfileTab] = useState('timeline'); // 'timeline' or 'reviews'
+  const [providerServices, setProviderServices] = useState([]);
+  const [activeProfileTab, setActiveProfileTab] = useState('timeline'); // 'timeline', 'reviews', 'catalog', 'services'
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewPayload, setReviewPayload] = useState({ target_username: '', appointment_id: null, rating: 5, text: '' });
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
@@ -102,6 +103,13 @@ useEffect(() => {
       .then((res) => res.ok ? res.json() : [])
       .then((reviewsData) => {
         setReviews(reviewsData);
+        return fetch(`${API_BASE}/services`);
+      })
+      .then((res) => res.ok ? res.json() : [])
+      .then((servicesData) => {
+        if (fetchedProfileData) {
+          setProviderServices(servicesData.filter(s => s.provider_username === fetchedProfileData.username));
+        }
         setLoading(false);
       })
       .catch((err) => {
@@ -661,19 +669,38 @@ const handleDisputeJob = async (appointmentId) => {
         )}
 
         {/* --- PROFILE TABS --- */}
-        <div className="flex gap-4 mb-8 border-b border-slate-200 pb-2">
+        <div className="flex gap-4 mb-8 border-b border-slate-200 pb-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
           <button 
             onClick={() => setActiveProfileTab('timeline')} 
             className={`text-sm font-black uppercase tracking-widest pb-2 px-2 transition-all ${activeProfileTab === 'timeline' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
           >
             Timeline
           </button>
+
           {(profile?.role?.includes('vendor') || profile?.role?.includes('service_provider')) && (
             <button 
               onClick={() => setActiveProfileTab('reviews')} 
               className={`text-sm font-black uppercase tracking-widest pb-2 px-2 transition-all flex items-center gap-2 ${activeProfileTab === 'reviews' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
             >
               Reviews <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px]">{reviews.length}</span>
+            </button>
+          )}
+
+          {profile?.role?.includes('vendor') && (
+            <button 
+              onClick={() => setActiveProfileTab('catalog')} 
+              className={`text-sm font-black uppercase tracking-widest pb-2 px-2 transition-all flex items-center gap-2 ${activeProfileTab === 'catalog' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Catalog <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px]">{listings.filter(p => p.post_type === 'vendor_drop').length}</span>
+            </button>
+          )}
+
+          {profile?.role?.includes('service_provider') && (
+            <button 
+              onClick={() => setActiveProfileTab('services')} 
+              className={`text-sm font-black uppercase tracking-widest pb-2 px-2 transition-all flex items-center gap-2 ${activeProfileTab === 'services' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Services <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px]">{providerServices.length}</span>
             </button>
           )}
         </div>
@@ -700,6 +727,53 @@ const handleDisputeJob = async (appointmentId) => {
                       </div>
                     </div>
                     <p className="text-sm font-medium text-slate-700 whitespace-pre-wrap">{review.text}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* --- CATALOG VIEW --- */}
+        {activeProfileTab === 'catalog' && (
+          <div className="animate-fade-in grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {listings.filter(p => p.post_type === 'vendor_drop').length === 0 ? (
+               <div className="col-span-full text-center p-10 bg-white rounded-3xl border border-slate-200 border-dashed text-slate-500 font-medium shadow-sm">No products listed.</div>
+            ) : (
+              listings.filter(p => p.post_type === 'vendor_drop').map(item => (
+                <div key={item.id} className="bg-white rounded-3xl p-4 shadow-sm border border-slate-200 flex flex-col hover:border-orange-200 transition-colors">
+                  {item.image_url && <img src={item.image_url} alt={item.title} className="w-full h-40 object-cover rounded-2xl mb-4 bg-slate-50 border border-slate-100" />}
+                  <h3 className="font-bold text-slate-900 uppercase tracking-wide truncate">{item.title}</h3>
+                  <div className="flex justify-between items-center mt-auto pt-4 border-t border-slate-100">
+                    <span className="text-lg font-black text-emerald-600">${item.price?.toFixed(2)}</span>
+                    <button className="bg-slate-900 hover:bg-orange-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm uppercase tracking-widest active:scale-95">
+                      Buy Drop
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* --- SERVICES VIEW --- */}
+        {activeProfileTab === 'services' && (
+          <div className="animate-fade-in grid grid-cols-1 gap-4">
+            {providerServices.length === 0 ? (
+               <div className="text-center p-10 bg-white rounded-3xl border border-slate-200 border-dashed text-slate-500 font-medium shadow-sm">No active services.</div>
+            ) : (
+              providerServices.map(service => (
+                <div key={service.id} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 flex flex-col sm:flex-row gap-5 hover:border-cyan-200 transition-colors">
+                  <img src={service.image_url} alt={service.title} className="w-full sm:w-32 h-32 object-cover rounded-2xl border border-slate-100 bg-slate-50" />
+                  <div className="flex-1 flex flex-col">
+                    <h3 className="font-bold text-slate-900 text-lg uppercase tracking-wide">{service.title}</h3>
+                    <p className="text-sm text-slate-500 font-medium mt-1 line-clamp-2">{service.description}</p>
+                    <div className="mt-auto pt-4 flex justify-between items-center">
+                      <span className="text-lg font-black text-emerald-600">{service.price.toFixed(2)} SC</span>
+                      <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm uppercase tracking-widest active:scale-95 flex items-center gap-2">
+                         <i className="fa-solid fa-calendar-check"></i> Book Job
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
