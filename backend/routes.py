@@ -578,9 +578,9 @@ def checkout_with_streetcoin(req: StreetCoinCheckoutRequest, session: Session = 
     """Processes a cart checkout using StreetCoins and locks funds in Escrow."""
     username = token.get("sub")
     user = session.exec(select(User).where(User.username == username)).first()
-    admin = session.exec(select(User).where(User.username == "admin")).first()
+    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
     
-    if not user or not admin:
+    if not user or not escrow:
         raise HTTPException(status_code=404, detail="System routing error.")
         
     # 1. Calculate final exact total (including promos/vault discounts)
@@ -603,22 +603,22 @@ def checkout_with_streetcoin(req: StreetCoinCheckoutRequest, session: Session = 
     if getattr(user, "wallet_balance", 0) < final_total:
         raise HTTPException(status_code=400, detail="Insufficient StreetCoin balance. Please top up your wallet.")
         
-    # 3. Deduct from Buyer & Hold in Admin Escrow
+    # 3. Deduct from Buyer & Hold in Escrow Vault
     user.wallet_balance -= final_total
-    admin.wallet_balance += final_total
+    escrow.wallet_balance += final_total
     
     # 4. Log Immutable Escrow Transaction
     from models import Transaction
     tx = Transaction(
         sender_username=user.username,
-        receiver_username="admin",
+        receiver_username="escrow_vault",
         amount=final_total,
         transaction_type="escrow_lock",
         status="completed"
     )
     
     session.add(user)
-    session.add(admin)
+    session.add(escrow)
     session.add(tx)
     
     # 5. Generate the Physical Orders
@@ -2227,7 +2227,7 @@ def release_escrow(order_id: int, req: TrackingRequest, session: Session = Depen
     """Logs the tracking number, verifies it against carrier networks, and releases Escrow."""
     username = token.get("sub")
     vendor = session.exec(select(User).where(User.username == username)).first()
-    admin = session.exec(select(User).where(User.username == "admin")).first()
+    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
     
     order = session.get(Order, order_id)
     if not order:
@@ -2247,19 +2247,19 @@ def release_escrow(order_id: int, req: TrackingRequest, session: Session = Depen
     product, price = resolve_product_and_price(session, order.sku)
     payout = price * order.quantity
     
-    if admin and vendor and admin.wallet_balance >= payout:
-        admin.wallet_balance -= payout
+    if escrow and vendor and escrow.wallet_balance >= payout:
+        escrow.wallet_balance -= payout
         vendor.wallet_balance += payout
         
         from models import Transaction
         tx = Transaction(
-            sender_username="admin",
+            sender_username="escrow_vault",
             receiver_username=vendor.username,
             amount=payout,
             transaction_type="escrow_release",
             status="completed"
         )
-        session.add(admin)
+        session.add(escrow)
         session.add(vendor)
         session.add(tx)
         
@@ -2272,45 +2272,7 @@ def release_escrow(order_id: int, req: TrackingRequest, session: Session = Depen
     )
     
     return {"message": "Escrow released successfully."}
-    
-    order = session.get(Order, order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    if order.status == "shipped":
-        raise HTTPException(status_code=400, detail="Escrow already released")
-        
-    order.status = "shipped"
-    order.tracking_number = req.tracking_number
-    
-    # Process the Escrow Release
-    product, price = resolve_product_and_price(session, order.sku)
-    payout = price * order.quantity
-    
-    if admin and vendor and admin.wallet_balance >= payout:
-        admin.wallet_balance -= payout
-        vendor.wallet_balance += payout
-        
-        from models import Transaction
-        tx = Transaction(
-            sender_username="admin",
-            receiver_username=vendor.username,
-            amount=payout,
-            transaction_type="escrow_release",
-            status="completed"
-        )
-        session.add(admin)
-        session.add(vendor)
-        session.add(tx)
-        
-    session.commit()
-    
-    send_automated_email(
-        to_email=order.customer_email,
-        subject=f"Street Code 101 - Order Shipped! #{order.id}",
-        body=f"Great news!\n\nYour drop has officially shipped.\nTracking Number: {req.tracking_number}\n\nStay street."
-    )
-    
-    return {"message": "Escrow released successfully."}
+
 
 class CashoutSubmitRequest(BaseModel):
     amount_coins: float
@@ -2318,12 +2280,12 @@ class CashoutSubmitRequest(BaseModel):
 
 @router.post("/api/vendor/cashout")
 def submit_cashout_request(req: CashoutSubmitRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Locks coins from the vendor's wallet and submits a Zelle cashout request."""
+    """Locks coins from the vendor's wallet into the Escrow Vault."""
     from models import CashoutRequest
     
     username = token.get("sub")
     user = session.exec(select(User).where(User.username == username)).first()
-    admin = session.exec(select(User).where(User.username == "admin")).first()
+    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
     
     if req.amount_coins < 10:
         raise HTTPException(status_code=400, detail="Minimum cashout is 10 SC.")
@@ -2331,12 +2293,10 @@ def submit_cashout_request(req: CashoutSubmitRequest, session: Session = Depends
     if getattr(user, "wallet_balance", 0) < req.amount_coins:
         raise HTTPException(status_code=400, detail="Insufficient StreetCoin balance.")
         
-    # 5% Platform Infrastructure Tax
     usd_payout = req.amount_coins * 0.95
     
-    # Deduct from vendor immediately to prevent double spending
     user.wallet_balance -= req.amount_coins
-    admin.wallet_balance += req.amount_coins
+    escrow.wallet_balance += req.amount_coins
     
     cashout = CashoutRequest(
         username=username,
@@ -2347,7 +2307,7 @@ def submit_cashout_request(req: CashoutSubmitRequest, session: Session = Depends
     )
     
     session.add(user)
-    session.add(admin)
+    session.add(escrow)
     session.add(cashout)
     session.commit()
     
@@ -2362,6 +2322,7 @@ def get_admin_cashouts(session: Session = Depends(get_session), token: dict = De
 
 @router.post("/api/admin/cashouts/{req_id}/approve")
 def approve_cashout(req_id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Admin fulfills Zelle, coins move from Escrow back to Genesis Master Vault."""
     if token.get("sub") != "admin":
         raise HTTPException(status_code=403, detail="Unauthorized")
         
@@ -2371,21 +2332,24 @@ def approve_cashout(req_id: int, session: Session = Depends(get_session), token:
     if not cashout or cashout.status != "pending":
         raise HTTPException(status_code=400, detail="Invalid or already processed request.")
         
-    admin = session.exec(select(User).where(User.username == "admin")).first()
+    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
+    master = session.exec(select(User).where(User.username == "master_vault")).first()
     
-    # Burn the coins from the master vault since fiat has physically left the ecosystem
-    admin.wallet_balance -= cashout.amount_coins
+    # Pull from Escrow and burn to Genesis
+    escrow.wallet_balance -= cashout.amount_coins
+    master.wallet_balance += cashout.amount_coins
     cashout.status = "approved"
     
     tx = Transaction(
-        sender_username="admin",
-        receiver_username=cashout.username,
+        sender_username="escrow_vault",
+        receiver_username="master_vault",
         amount=cashout.amount_coins,
-        transaction_type="offramp",
+        transaction_type="offramp_burn",
         status="completed"
     )
     
-    session.add(admin)
+    session.add(escrow)
+    session.add(master)
     session.add(cashout)
     session.add(tx)
     session.commit()
@@ -2398,8 +2362,7 @@ def approve_cashout(req_id: int, session: Session = Depends(get_session), token:
             body=f"Yo @{vendor.username},\n\nYour cashout of {cashout.amount_coins} SC has been fulfilled. ${cashout.usd_payout:.2f} USD has been dispatched to your Zelle: {cashout.zelle_contact}."
         )
         
-    return {"message": "Cashout approved. Coins removed from circulation."}
-
+    return {"message": "Cashout approved. Coins burned to Master Vault."}
 
 class AdminMintRequest(BaseModel):
     amount: float
@@ -2513,9 +2476,9 @@ def book_service(payload: BookingRequest, session: Session = Depends(get_session
     
     username = token.get("sub")
     client = session.exec(select(User).where(User.username == username)).first()
-    admin = session.exec(select(User).where(User.username == "admin")).first()
+    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
     
-    if not client or not admin:
+    if not client or not escrow:
         raise HTTPException(status_code=404, detail="System routing error.")
 
     # 1. Validate the Service
@@ -2530,14 +2493,14 @@ def book_service(payload: BookingRequest, session: Session = Depends(get_session
     if getattr(client, "wallet_balance", 0) < service.price:
         raise HTTPException(status_code=400, detail="Insufficient StreetCoin balance. Please top up your wallet.")
 
-    # 3. Deduct from Buyer & Hold in Admin Escrow
+    # 3. Deduct from Buyer & Hold in Escrow
     client.wallet_balance -= service.price
-    admin.wallet_balance += service.price
+    escrow.wallet_balance += service.price
     
     # 4. Log Immutable Escrow Transaction
     tx = Transaction(
         sender_username=client.username,
-        receiver_username="admin",
+        receiver_username="escrow_vault",
         amount=service.price,
         transaction_type="service_escrow_lock",
         status="completed"
@@ -2562,7 +2525,7 @@ def book_service(payload: BookingRequest, session: Session = Depends(get_session
     )
 
     session.add(client)
-    session.add(admin)
+    session.add(escrow)
     session.add(tx)
     session.add(new_appt)
     session.commit()
@@ -2703,19 +2666,19 @@ def client_confirm_job(id: int, session: Session = Depends(get_session), token: 
     if appt.status != "pending_confirmation":
         raise HTTPException(status_code=400, detail="Job is not awaiting confirmation.")
         
-    admin = session.exec(select(User).where(User.username == "admin")).first()
+    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
     provider = session.exec(select(User).where(User.username == appt.provider_username)).first()
     
-    if not admin or not provider:
+    if not escrow or not provider:
         raise HTTPException(status_code=500, detail="Critical routing error.")
         
     # ESCROW RELEASE LOGIC
-    if admin.wallet_balance >= appt.escrow_amount:
-        admin.wallet_balance -= appt.escrow_amount
+    if escrow.wallet_balance >= appt.escrow_amount:
+        escrow.wallet_balance -= appt.escrow_amount
         provider.wallet_balance += appt.escrow_amount
         
         tx = Transaction(
-            sender_username="admin",
+            sender_username="escrow_vault",
             receiver_username=provider.username,
             amount=appt.escrow_amount,
             transaction_type="service_escrow_release",
@@ -2725,7 +2688,7 @@ def client_confirm_job(id: int, session: Session = Depends(get_session), token: 
         appt.client_confirmed_at = datetime.utcnow()
         appt.status = "released"
         
-        session.add(admin)
+        session.add(escrow)
         session.add(provider)
         session.add(tx)
         session.add(appt)
@@ -2875,11 +2838,11 @@ def resolve_dispute(id: int, req: DisputeResolutionRequest, session: Session = D
     if not appt or appt.status != "disputed":
         raise HTTPException(status_code=400, detail="Valid disputed appointment not found.")
         
-    admin = session.exec(select(User).where(User.username == "admin")).first()
-    if admin.wallet_balance < appt.escrow_amount:
+    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
+    if escrow.wallet_balance < appt.escrow_amount:
         raise HTTPException(status_code=500, detail="Master Escrow vault lacks funds for this resolution.")
         
-    admin.wallet_balance -= appt.escrow_amount
+    escrow.wallet_balance -= appt.escrow_amount
     
     if req.resolution == "refund_client":
         client = session.exec(select(User).where(User.username == appt.client_username)).first()
@@ -2908,14 +2871,14 @@ def resolve_dispute(id: int, req: DisputeResolutionRequest, session: Session = D
         raise HTTPException(status_code=400, detail="Invalid resolution action.")
         
     tx = Transaction(
-        sender_username="admin",
+        sender_username="escrow_vault",
         receiver_username=receiver,
         amount=appt.escrow_amount,
         transaction_type="dispute_resolution",
         status="completed"
     )
     
-    session.add(admin)
+    session.add(escrow)
     session.add(appt)
     session.add(tx)
     session.commit()
@@ -2996,3 +2959,58 @@ def admin_transfer_funds(username: str, req: AdminTransferRequest, session: Sess
     )
     
     return {"message": f"Successfully routed {req.amount:.2f} SC to @{username}."}
+
+# --- MASTER VAULT ENDPOINTS ---
+
+@router.get("/api/admin/vault/transactions")
+def get_vault_transactions(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Fetches the ledger of all coins that have left the Master Vault."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Master Admin only.")
+    from models import Transaction
+    txs = session.exec(
+        select(Transaction)
+        .where(Transaction.sender_username == "master_vault")
+        .order_by(Transaction.id.desc())
+    ).all()
+    return txs
+
+class VaultMintRequest(BaseModel):
+    amount: float
+
+@router.post("/api/admin/vault/mint")
+def vault_mint_to_admin(req: VaultMintRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Allows Admin to pull SC from Master Vault into Admin Wallet without Stripe fees (Fiat-backed assumed)."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Master Admin only.")
+        
+    from models import User, Transaction
+    master = session.exec(select(User).where(User.username == "master_vault")).first()
+    admin = session.exec(select(User).where(User.username == "admin")).first()
+    
+    if not master or not admin:
+        raise HTTPException(status_code=404, detail="Vaults not found.")
+        
+    if req.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than 0.")
+        
+    if master.wallet_balance < req.amount:
+        raise HTTPException(status_code=400, detail="Insufficient Genesis supply.")
+        
+    master.wallet_balance -= req.amount
+    admin.wallet_balance += req.amount
+    
+    tx = Transaction(
+        sender_username="master_vault",
+        receiver_username="admin",
+        amount=req.amount,
+        transaction_type="fiat_backed_mint",
+        status="completed"
+    )
+    
+    session.add(master)
+    session.add(admin)
+    session.add(tx)
+    session.commit()
+    
+    return {"message": f"Minted {req.amount:.2f} SC directly to Admin Wallet."}
