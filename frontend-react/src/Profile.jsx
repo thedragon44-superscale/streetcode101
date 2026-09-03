@@ -32,6 +32,13 @@ export default function Profile() {
   const [isUploading, setIsUploading] = useState(false);
   const [emailOptIn, setEmailOptIn] = useState(false);
 
+  // --- REVIEWS STATE ---
+  const [reviews, setReviews] = useState([]);
+  const [activeProfileTab, setActiveProfileTab] = useState('timeline'); // 'timeline' or 'reviews'
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewPayload, setReviewPayload] = useState({ target_username: '', appointment_id: null, rating: 5, text: '' });
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
   // --- NEW POST STATE ---
   const [showListingForm, setShowListingForm] = useState(false);
   const [postType, setPostType] = useState('text');
@@ -63,8 +70,8 @@ export default function Profile() {
   const token = localStorage.getItem('pidrop_token');
   const isMyProfile = username === 'me';
 
-  // --- USE EFFECTS (Must remain at top level) ---
-  useEffect(() => {
+  
+useEffect(() => {
     if (isMyProfile && !token) {
       navigate('/login');
       return;
@@ -73,12 +80,15 @@ export default function Profile() {
     const endpoint = isMyProfile ? '/profile/me' : `/profile/${username}`;
     const headers = isMyProfile ? { 'Authorization': `Bearer ${token}` } : {};
 
+    let fetchedProfileData = null;
+
     fetch(`${API_BASE}${endpoint}`, { headers })
       .then((res) => {
         if (!res.ok) throw new Error('Profile not found or unauthorized');
         return res.json();
       })
       .then((data) => {
+        fetchedProfileData = data;
         setProfile(data);
         setNewBio(data.bio || '');
         setEmailOptIn(data.email_opt_in || false);
@@ -87,6 +97,11 @@ export default function Profile() {
       .then((res) => res.json())
       .then((listingsData) => {
         setListings(listingsData);
+        return fetch(`${API_BASE}/reviews/${fetchedProfileData.username}`);
+      })
+      .then((res) => res.ok ? res.json() : [])
+      .then((reviewsData) => {
+        setReviews(reviewsData);
         setLoading(false);
       })
       .catch((err) => {
@@ -131,19 +146,46 @@ export default function Profile() {
     }
   };
 
-  const handleConfirmJob = async (appointmentId) => {
+  const handleConfirmJob = async (appt) => {
     try {
-      const res = await fetch(`${API_BASE}/appointments/${appointmentId}/confirm`, {
+      const res = await fetch(`${API_BASE}/appointments/${appt.id}/confirm`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to release funds');
       
-      toast.success("Job Confirmed! Escrow released to provider.");
-      setClientAppointments(prev => prev.map(a => a.id === appointmentId ? { ...a, status: 'released' } : a));
+      toast.success("Escrow released!");
+      setClientAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: 'released' } : a));
+      
+      // Pop the review modal immediately after successful confirmation
+      setReviewPayload({ target_username: appt.provider_username, appointment_id: appt.id, rating: 5, text: '' });
+      setShowReviewModal(true);
     } catch (err) {
       toast.error(err.message);
+    }
+  };
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!reviewPayload.text.trim()) return toast.error("Please leave a brief written review.");
+    setIsSubmittingReview(true);
+    
+    try {
+      const res = await fetch(`${API_BASE}/reviews`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(reviewPayload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to submit review');
+      
+      toast.success("Review published! Trust score updated.");
+      setShowReviewModal(false);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -534,6 +576,20 @@ const handleDisputeJob = async (appointmentId) => {
                 </div>
               )}
 
+              {profile.role && (profile.role.includes('vendor') || profile.role.includes('service_provider')) && (
+                <div className="mt-6 pb-6 border-b border-slate-100 flex items-center justify-center sm:justify-start gap-4">
+                  <div className="flex text-orange-400 text-xl drop-shadow-sm">
+                    {[...Array(5)].map((_, i) => (
+                      <i key={i} className={`fa-solid fa-star ${i < Math.round(profile.trust_score || 0) ? '' : 'text-slate-200'}`}></i>
+                    ))}
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <span className="font-black text-slate-900 text-lg leading-none">{profile.trust_score?.toFixed(1) || '0.0'} <span className="text-xs text-slate-400 font-bold uppercase tracking-widest ml-1">Trust Score</span></span>
+                    <span className="text-xs font-bold text-slate-500 mt-1">{profile.review_count || 0} Verified Reviews</span>
+                  </div>
+                </div>
+              )}
+
               <div className="mt-6">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Bio / Manifesto</h3>
                 {isMyProfile && isEditingBio && profile.username !== 'admin' ? (
@@ -589,7 +645,7 @@ const handleDisputeJob = async (appointmentId) => {
                   {(appt.status === 'pending_confirmation' || appt.status === 'checked_in') && (
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-4 sm:mt-0">
                       {appt.status === 'pending_confirmation' && (
-                        <button onClick={() => handleConfirmJob(appt.id)} className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-sm active:scale-95 uppercase tracking-wider text-sm">
+                        <button onClick={() => handleConfirmJob(appt)} className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-sm active:scale-95 uppercase tracking-wider text-sm">
                           Confirm & Release
                         </button>
                       )}
@@ -604,8 +660,56 @@ const handleDisputeJob = async (appointmentId) => {
           </div>
         )}
 
+        {/* --- PROFILE TABS --- */}
+        <div className="flex gap-4 mb-8 border-b border-slate-200 pb-2">
+          <button 
+            onClick={() => setActiveProfileTab('timeline')} 
+            className={`text-sm font-black uppercase tracking-widest pb-2 px-2 transition-all ${activeProfileTab === 'timeline' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            Timeline
+          </button>
+          {(profile?.role?.includes('vendor') || profile?.role?.includes('service_provider')) && (
+            <button 
+              onClick={() => setActiveProfileTab('reviews')} 
+              className={`text-sm font-black uppercase tracking-widest pb-2 px-2 transition-all flex items-center gap-2 ${activeProfileTab === 'reviews' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Reviews <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px]">{reviews.length}</span>
+            </button>
+          )}
+        </div>
+
+        {/* --- REVIEWS VIEW --- */}
+        {activeProfileTab === 'reviews' && (
+          <div className="animate-fade-in space-y-4">
+            {reviews.length === 0 ? (
+              <div className="text-center p-10 bg-white rounded-3xl border border-slate-200 border-dashed text-slate-500 font-medium shadow-sm">No reviews yet.</div>
+            ) : (
+              reviews.map(review => (
+                <div key={review.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-4 items-start">
+                  <img src={review.reviewer_avatar} alt={review.reviewer_username} className="w-12 h-12 rounded-full object-cover border border-slate-200" />
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <span className="font-bold text-slate-900 block">@{review.reviewer_username}</span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{new Date(review.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex text-orange-400 text-sm">
+                        {[...Array(5)].map((_, i) => (
+                          <i key={i} className={`fa-solid fa-star ${i < review.rating ? '' : 'text-slate-200'}`}></i>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium text-slate-700 whitespace-pre-wrap">{review.text}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         {/* User Timeline */}
-        <div>
+        {activeProfileTab === 'timeline' && (
+        <div className="animate-fade-in">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-black text-slate-900 uppercase tracking-wide">Timeline</h2>
             {isMyProfile && profile.username !== 'admin' && (
@@ -750,7 +854,53 @@ const handleDisputeJob = async (appointmentId) => {
             )}
           </div>
         </div>
+        )}
       </main>
+
+      {/* --- POST-ESCROW REVIEW MODAL --- */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md flex flex-col relative overflow-hidden">
+            <div className="bg-orange-50 px-6 py-4 flex flex-col items-center border-b border-orange-100 text-center relative">
+              <button onClick={() => setShowReviewModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 font-bold transition">✕</button>
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-orange-200 mb-3">
+                <i className="fa-solid fa-handshake text-2xl text-orange-500"></i>
+              </div>
+              <h3 className="font-black text-xl text-slate-900 uppercase tracking-wide">Rate Your Experience</h3>
+              <p className="text-xs font-bold text-slate-500 mt-1">Help @{reviewPayload.target_username} build their Trust Score.</p>
+            </div>
+            
+            <form onSubmit={handleSubmitReview} className="p-6">
+              <div className="flex justify-center gap-2 mb-6">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button 
+                    key={star} 
+                    type="button" 
+                    onClick={() => setReviewPayload({...reviewPayload, rating: star})}
+                    className="text-4xl transition-transform hover:scale-110 focus:outline-none"
+                  >
+                    <i className={`fa-solid fa-star ${star <= reviewPayload.rating ? 'text-orange-400 drop-shadow-sm' : 'text-slate-200 hover:text-orange-200'}`}></i>
+                  </button>
+                ))}
+              </div>
+              
+              <div className="mb-6">
+                <textarea 
+                  required 
+                  placeholder="How was the service? Drop a quick review..." 
+                  value={reviewPayload.text} 
+                  onChange={(e) => setReviewPayload({...reviewPayload, text: e.target.value})} 
+                  className="w-full p-4 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-orange-500 font-medium bg-slate-50 resize-none h-32" 
+                />
+              </div>
+              
+              <button disabled={isSubmittingReview} type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-xl shadow-lg transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50">
+                {isSubmittingReview ? 'Publishing...' : 'Publish Review'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* --- ONBOARDING MODAL --- */}
       {showUpgradeModal && (
