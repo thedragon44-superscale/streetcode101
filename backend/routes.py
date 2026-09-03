@@ -683,76 +683,76 @@ def checkout_with_streetcoin(req: StreetCoinCheckoutRequest, session: Session = 
     return {"message": "Escrow secured and order placed."}
 
 @router.post("/api/webhook")
-async def stripe_webhook(request: Request, session: Session = Depends(get_session)):
-    """Listens for successful Stripe events."""
+async def stripe_webhook(request: Request, db_session: Session = Depends(get_session)):
+    """Handles Stripe webhooks for fiat-to-crypto purchases and KYC Identity verification."""
     payload = await request.body()
-    sig_header = request.headers.get("stripe-signature")
+    sig_header = request.headers.get("Stripe-Signature")
     
+    # You should have STRIPE_WEBHOOK_SECRET in your .env file
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig_header, os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_fallback")
+            payload, sig_header, webhook_secret
         )
-    except ValueError:
+    except ValueError as e:
+        # Invalid payload
         raise HTTPException(status_code=400, detail="Invalid payload")
-    except stripe.error.SignatureVerificationError:
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    # Native PaymentIntent success (Wallet Top-Up)
+    # ==========================================
+    # 1. FIAT ON-RAMP (BUYING STREETCOIN)
+    # ==========================================
     if event['type'] == 'payment_intent.succeeded':
         payment_intent = event['data']['object']
         metadata = payment_intent.get('metadata', {})
         
         if metadata.get('type') == 'wallet_topup':
             username = metadata.get('username')
-            coins_purchased = float(metadata.get('coins'))
+            coins_purchased = float(metadata.get('coins', 0))
             
-            from models import Transaction
-            # Pull from the Master Vault, NOT admin
-            master_vault = session.exec(select(User).where(User.username == "master_vault")).first()
-            user = session.exec(select(User).where(User.username == username)).first()
+            user = db_session.exec(select(User).where(User.username == username)).first()
+            master_vault = db_session.exec(select(User).where(User.username == "master_vault")).first()
             
-            if master_vault and user and getattr(master_vault, "wallet_balance", 0) >= coins_purchased:
+            if user and master_vault and getattr(master_vault, "wallet_balance", 0) >= coins_purchased:
+                # Deduct from Genesis Vault
                 master_vault.wallet_balance -= coins_purchased
-                user.wallet_balance += coins_purchased
+                # Add to User Wallet
+                user.wallet_balance = getattr(user, "wallet_balance", 0) + coins_purchased
                 
-                tx = Transaction(
-                    sender_username="master_vault",
-                    receiver_username=user.username,
-                    amount=coins_purchased,
-                    transaction_type="onramp",
-                    status="completed"
-                )
-                
-                session.add(master_vault)
-                session.add(user)
-                session.add(tx)
-                session.commit()
-                print(f"💰 NATIVE TOP-UP SUCCESS: {coins_purchased} SC minted to @{username}.")
-                
-            return {"status": "success"}
+                db_session.add(master_vault)
+                db_session.add(user)
+                db_session.commit()
+                print(f"[ECONOMY] @{username} purchased {coins_purchased} SC from the Genesis Vault.")
 
-    # Hosted Checkout success (Physical Dropshipping Orders)
-    elif event['type'] == 'checkout.session.completed':
-        session_data = event['data']['object']
-        metadata = session_data.get('metadata', {})
+    # ==========================================
+    # 2. KYC IDENTITY EVENTS
+    # ==========================================
+    elif event['type'] == 'identity.verification_session.verified':
+        verif_session = event['data']['object']
+        username = verif_session.get('metadata', {}).get('username')
         
-        if metadata.get('type') != 'wallet_topup':
-            customer_email = session_data.get("customer_details", {}).get("email", "unknown@email.com")
-            shipping_details = session_data.get("shipping_details", {}).get("address", {})
-            address_str = f"{shipping_details.get('line1', '')}, {shipping_details.get('city', '')}, {shipping_details.get('state', '')} {shipping_details.get('postal_code', '')}"
-            sku = metadata.get("sku", "UNKNOWN")
-            quantity = int(metadata.get("quantity", 1))
+        if username:
+            user = db_session.exec(select(User).where(User.username == username)).first()
+            if user:
+                user.is_verified = True
+                db_session.add(user)
+                db_session.commit()
+                print(f"[KYC] @{username} successfully verified their identity.")
 
-            new_order = Order(
-                sku=sku,
-                quantity=quantity,
-                customer_email=customer_email,
-                shipping_address=address_str,
-                status="processing"
-            )
-            session.add(new_order)
-            session.commit()
-            return {"status": "success"}
+    elif event['type'] == 'identity.verification_session.requires_input':
+        verif_session = event['data']['object']
+        username = verif_session.get('metadata', {}).get('username')
+        
+        if username:
+            user = db_session.exec(select(User).where(User.username == username)).first()
+            if user:
+                user.is_verified = False
+                db_session.add(user)
+                db_session.commit()
+                print(f"[KYC] @{username} failed verification. Requires input.")
 
     return {"status": "success"}
 
@@ -3145,3 +3145,35 @@ def get_user_reviews(username: str, session: Session = Depends(get_session)):
         })
         
     return formatted_reviews
+
+# --- KYC / IDENTITY VERIFICATION ENDPOINTS ---
+
+@router.post("/api/kyc/create-session")
+def create_kyc_session(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Generates a Stripe Identity Verification Session for vendors/providers."""
+    username = token.get("sub")
+    
+    user = session.exec(select(User).where(User.username == username)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if user.is_verified:
+        raise HTTPException(status_code=400, detail="You are already verified.")
+
+    try:
+        verification_session = stripe.Identity.VerificationSession.create(
+            type="document",
+            metadata={
+                "username": username
+            },
+            # We will use this return_url to bounce them back to their dashboard once finished
+            return_url="https://streetcode101.com/provider-dashboard" 
+        )
+        
+        # We return both the web URL (for React) and the client_secret (for future React Native)
+        return {
+            "url": verification_session.url,
+            "client_secret": verification_session.client_secret
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
