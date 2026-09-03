@@ -308,9 +308,12 @@ def global_search(q: str, session: Session = Depends(get_session)):
         ).limit(10)
     ).all()
     
-    # 2. Search Users
+    # 2. Search Users (excluding system vaults)
+    system_accounts = ["master_vault", "escrow_vault"]
     users = session.exec(
-        select(User).where(User.username.ilike(search_term)).limit(10)
+        select(User)
+        .where(User.username.ilike(search_term), User.username.not_in(system_accounts))
+        .limit(10)
     ).all()
     
     safe_users = [
@@ -2112,12 +2115,18 @@ def subscribe_newsletter(req: SubscribeRequest, session: Session = Depends(get_s
 
 @router.get("/api/admin/users")
 def get_all_users(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Fetches the community roster for the Admin Dashboard."""
+    """Fetches the human community roster for the Admin Dashboard, excluding system vaults."""
     if token.get("sub") != "admin":
         raise HTTPException(status_code=403, detail="Unauthorized")
         
-    users = session.exec(select(User).order_by(User.id.desc())).all()
-    # Strip out password hashes before returning to the frontend
+    # Exclude system vault entities from the human community roster
+    system_accounts = ["master_vault", "escrow_vault"]
+    users = session.exec(
+        select(User)
+        .where(User.username.not_in(system_accounts))
+        .order_by(User.id.desc())
+    ).all()
+    
     return [
         {
             "id": u.id, 
