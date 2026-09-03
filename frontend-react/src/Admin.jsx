@@ -145,7 +145,7 @@ const handleProductImageUpload = async (e) => {
   // ==========================================
   const fetchData = async () => {
     try {
-      const [ordersRes, productsRes, feedRes, promosRes, usersRes, analyticsRes, disputesRes] = await Promise.all([
+      const [ordersRes, productsRes, feedRes, promosRes, usersRes, analyticsRes, disputesRes, vaultTransactionsRes] = await Promise.all([
         fetch(`${API_BASE}/orders`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${API_BASE}/products?limit=100`),
         fetch(`${API_BASE}/posts/feed`),
