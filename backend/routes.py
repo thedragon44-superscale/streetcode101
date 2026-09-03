@@ -643,37 +643,6 @@ def checkout_with_streetcoin(req: StreetCoinCheckoutRequest, session: Session = 
     
     return {"message": "Escrow secured and order placed."}
 
-@router.post("/api/wallet/topup")
-def create_wallet_topup(req: TopUpRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Generates a native Stripe PaymentIntent to buy StreetCoins with exact fee coverage."""
-    username = token.get("sub")
-    user = session.exec(select(User).where(User.username == username)).first()
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-        
-    if req.coins <= 0:
-        raise HTTPException(status_code=400, detail="Must purchase at least 1 coin")
-        
-    # THE SURCHARGE ALGORITHM
-    total_usd = (req.coins + 0.30) / 0.971
-    total_cents = int(round(total_usd * 100))
-    
-    try:
-        intent = stripe.PaymentIntent.create(
-            amount=total_cents,
-            currency="usd",
-            automatic_payment_methods={"enabled": True},
-            metadata={
-                'type': 'wallet_topup',
-                'username': user.username,
-                'coins': str(req.coins)
-            }
-        )
-        return {"clientSecret": intent.client_secret, "totalUsd": total_usd}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.post("/api/webhook")
 async def stripe_webhook(request: Request, session: Session = Depends(get_session)):
     """Listens for successful Stripe events."""
@@ -699,26 +668,27 @@ async def stripe_webhook(request: Request, session: Session = Depends(get_sessio
             coins_purchased = float(metadata.get('coins'))
             
             from models import Transaction
-            admin = session.exec(select(User).where(User.username == "admin")).first()
+            # Pull from the Master Vault, NOT admin
+            master_vault = session.exec(select(User).where(User.username == "master_vault")).first()
             user = session.exec(select(User).where(User.username == username)).first()
             
-            if admin and user and getattr(admin, "wallet_balance", 0) >= coins_purchased:
-                admin.wallet_balance -= coins_purchased
+            if master_vault and user and getattr(master_vault, "wallet_balance", 0) >= coins_purchased:
+                master_vault.wallet_balance -= coins_purchased
                 user.wallet_balance += coins_purchased
                 
                 tx = Transaction(
-                    sender_username="admin",
+                    sender_username="master_vault",
                     receiver_username=user.username,
                     amount=coins_purchased,
                     transaction_type="onramp",
                     status="completed"
                 )
                 
-                session.add(admin)
+                session.add(master_vault)
                 session.add(user)
                 session.add(tx)
                 session.commit()
-                print(f"💰 NATIVE TOP-UP SUCCESS: {coins_purchased} SC transferred to @{username}.")
+                print(f"💰 NATIVE TOP-UP SUCCESS: {coins_purchased} SC minted to @{username}.")
                 
             return {"status": "success"}
 
@@ -2430,40 +2400,6 @@ def approve_cashout(req_id: int, session: Session = Depends(get_session), token:
         
     return {"message": "Cashout approved. Coins removed from circulation."}
 
-@router.get("/api/admin/analytics")
-def get_admin_analytics(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Calculates platform-wide financial metrics for the admin dashboard."""
-    if token.get("sub") != "admin":
-        raise HTTPException(status_code=403, detail="Unauthorized")
-        
-    from models import User, Order, CashoutRequest
-    
-    # 1. Total SC in Circulation (All user wallets combined, excluding admin vault)
-    users = session.exec(select(User).where(User.username != "admin")).all()
-    total_circulation = sum(getattr(u, "wallet_balance", 0.0) for u in users)
-    
-    # 2. Total Escrow Liability (Locked funds awaiting tracking numbers)
-    processing_orders = session.exec(select(Order).where(Order.status == "processing")).all()
-    escrow_liability = 0.0
-    for o in processing_orders:
-        product, price = resolve_product_and_price(session, o.sku)
-        if product:
-            escrow_liability += price * o.quantity
-            
-    # 3. Platform Tax Revenue (The 5% retained from fulfilled cashouts)
-    completed_cashouts = session.exec(select(CashoutRequest).where(CashoutRequest.status == "approved")).all()
-    total_revenue_usd = sum(c.amount_coins - c.usd_payout for c in completed_cashouts)
-    
-    # 4. Admin Treasury Reserve (Unissued Fiat-Backed Coins)
-    admin = session.exec(select(User).where(User.username == "admin")).first()
-    treasury_reserve = getattr(admin, "wallet_balance", 0.0)
-    
-    return {
-        "total_circulation": total_circulation,
-        "escrow_liability": escrow_liability,
-        "total_revenue_usd": total_revenue_usd,
-        "treasury_reserve": treasury_reserve
-    }
 
 class AdminMintRequest(BaseModel):
     amount: float
@@ -2986,12 +2922,39 @@ def resolve_dispute(id: int, req: DisputeResolutionRequest, session: Session = D
     
     return {"message": f"Dispute resolved. Escrow transferred to @{receiver}."}
 
+@router.get("/api/admin/analytics")
+def get_admin_analytics(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Calculates platform-wide financial metrics."""
+    if token.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    from models import User, Order, CashoutRequest
+    
+    master = session.exec(select(User).where(User.username == "master_vault")).first()
+    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
+    
+    # Total circulation is 1 Billion minus whatever is still locked in the master vault
+    master_balance = getattr(master, "wallet_balance", 1000000000.0)
+    total_circulation = 1000000000.0 - master_balance
+    
+    escrow_liability = getattr(escrow, "wallet_balance", 0.0)
+    
+    completed_cashouts = session.exec(select(CashoutRequest).where(CashoutRequest.status == "approved")).all()
+    total_revenue_usd = sum(c.amount_coins - c.usd_payout for c in completed_cashouts)
+    
+    return {
+        "total_circulation": total_circulation,
+        "escrow_liability": escrow_liability,
+        "total_revenue_usd": total_revenue_usd,
+        "treasury_reserve": master_balance
+    }
+
 class AdminTransferRequest(BaseModel):
     amount: float
 
 @router.post("/api/admin/users/{username}/transfer")
 def admin_transfer_funds(username: str, req: AdminTransferRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Allows Master Admin to manually route StreetCoin to a user."""
+    """Routes SC from the Admin's personal wallet to a user."""
     if token.get("sub") != "admin":
         raise HTTPException(status_code=403, detail="Master Admin only.")
         
@@ -3001,12 +2964,15 @@ def admin_transfer_funds(username: str, req: AdminTransferRequest, session: Sess
     admin = session.exec(select(User).where(User.username == "admin")).first()
     
     if not user or not admin:
-        raise HTTPException(status_code=404, detail="User or Admin vault not found.")
+        raise HTTPException(status_code=404, detail="User not found.")
         
     if req.amount <= 0:
         raise HTTPException(status_code=400, detail="Transfer amount must be greater than 0.")
         
-    # Route funds from Admin Master Vault to User
+    # Strict check: Admin must use Stripe to buy their own coins first
+    if admin.wallet_balance < req.amount:
+        raise HTTPException(status_code=400, detail="Insufficient funds in Admin Wallet. Top up via Stripe first.")
+        
     admin.wallet_balance -= req.amount
     user.wallet_balance += req.amount
     
@@ -3023,7 +2989,6 @@ def admin_transfer_funds(username: str, req: AdminTransferRequest, session: Sess
     session.add(tx)
     session.commit()
     
-    # Notify the user of the deposit
     send_automated_email(
         to_email=user.email,
         subject="💰 StreetCoin Deposit Received",
