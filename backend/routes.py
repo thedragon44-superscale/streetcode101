@@ -940,8 +940,6 @@ def reset_password(req: ResetPasswordRequest, session: Session = Depends(get_ses
 def upload_profile_image(file: UploadFile = File(...), session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Uploads a new avatar to MinIO and updates the user's profile (SECURED)."""
     username = token.get("sub")
-    if username == "admin":
-        raise HTTPException(status_code=400, detail="Admin cannot change avatar here")
         
     user = session.exec(select(User).where(User.username == username)).first()
     if not user:
