@@ -353,13 +353,13 @@ def get_catalog(
         query = query.where(Product.category == category)
         
     if search and search.strip():
-            search_term = f"%{search.strip().lower()}%"
-            query = query.where(Product.title.ilike(search_term) | Product.description.ilike(search_term))
-            
-        # Order by SKU to ensure stable pagination
-        query = query.order_by(Product.sku).offset(offset).limit(limit)
+        search_term = f"%{search.strip().lower()}%"
+        query = query.where(Product.title.ilike(search_term) | Product.description.ilike(search_term))
         
-        return session.exec(query).all()
+    # Order by SKU to ensure stable pagination
+    query = query.order_by(Product.sku).offset(offset).limit(limit)
+    
+    return session.exec(query).all()
 
 @router.post("/api/products")
 def create_product(
