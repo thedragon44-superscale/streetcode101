@@ -3158,14 +3158,15 @@ def create_kyc_session(session: Session = Depends(get_session), token: dict = De
             metadata={
                 "username": username
             },
-            # We will use this return_url to bounce them back to their dashboard once finished
             return_url="https://streetcode101.com/provider-dashboard" 
         )
         
-        # We return both the web URL (for React) and the client_secret (for future React Native)
+        # Returns the web URL (for React) AND the mobile SDK keys (for React Native)
         return {
             "url": verification_session.url,
-            "client_secret": verification_session.client_secret
+            "client_secret": verification_session.client_secret,
+            "sessionId": verification_session.id,
+            "ephemeralKeySecret": verification_session.client_secret
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
