@@ -356,9 +356,9 @@ def get_catalog(
             search_term = f"%{search.strip().lower()}%"
             query = query.where(Product.title.ilike(search_term) | Product.description.ilike(search_term))
             
-        # Force the Featured Drop to the very top of Page 1, then order by SKU
-        # Using "== False" safely forces True values to the top without crashing SQLModel
-        query = query.order_by(Product.is_featured == False, Product.sku).offset(offset).limit(limit)
+        # Bypass ORM boolean quirks with raw SQL text sorting
+        from sqlalchemy import text
+        query = query.order_by(text("is_featured DESC"), Product.sku).offset(offset).limit(limit)
         
         return session.exec(query).all()
 
