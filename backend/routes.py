@@ -356,9 +356,8 @@ def get_catalog(
             search_term = f"%{search.strip().lower()}%"
             query = query.where(Product.title.ilike(search_term) | Product.description.ilike(search_term))
             
-        # Bypass ORM boolean quirks with raw SQL text sorting
-        from sqlalchemy import text
-        query = query.order_by(text("is_featured DESC"), Product.sku).offset(offset).limit(limit)
+        # Order by SKU to ensure stable pagination
+        query = query.order_by(Product.sku).offset(offset).limit(limit)
         
         return session.exec(query).all()
 
