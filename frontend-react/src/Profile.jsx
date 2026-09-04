@@ -59,6 +59,7 @@ export default function Profile() {
 
   // --- ONBOARDING MODAL STATE ---
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showKycModal, setShowKycModal] = useState(false);
   const [upgradeRole, setUpgradeRole] = useState(''); 
   const [onboardingData, setOnboardingData] = useState({
     primaryTrade: '', operatingHours: 'Standard 9-5',
@@ -522,13 +523,22 @@ const handleDisputeJob = async (appointmentId) => {
               <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
                 <div>
                   <h1 className="text-3xl font-black text-slate-900">@{profile.username}</h1>
-                  <p className={`text-sm font-bold mt-1 uppercase tracking-widest ${profile.username === 'admin' ? 'text-orange-500' : profile.role?.includes('vendor') || profile.role?.includes('service_provider') ? 'text-cyan-500' : 'text-slate-500'}`}>
-                    {profile.username === 'admin' ? 'Master Admin' : 
-                     [
-                       profile.role?.includes('vendor') ? 'Verified Vendor' : null,
-                       profile.role?.includes('service_provider') ? 'Service Provider' : null
-                     ].filter(Boolean).join(' & ') || 'Community Member'}
-                  </p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <p className={`text-sm font-bold uppercase tracking-widest ${profile.username === 'admin' ? 'text-orange-500' : profile.role?.includes('vendor') || profile.role?.includes('service_provider') ? 'text-cyan-500' : 'text-slate-500'}`}>
+                      {profile.username === 'admin' ? 'Master Admin' : 
+                       [
+                         profile.role?.includes('vendor') ? 'Verified Vendor' : null,
+                         profile.role?.includes('service_provider') ? 'Service Provider' : null
+                       ].filter(Boolean).join(' & ') || 'Community Member'}
+                    </p>
+                    {profile.is_verified ? (
+                      <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border border-emerald-200">✓ Verified</span>
+                    ) : isMyProfile ? (
+                      <button onClick={() => setShowKycModal(true)} className="bg-red-100 text-red-600 hover:bg-red-500 hover:text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border border-red-200 transition-colors shadow-sm">
+                        Verify Identity
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 
                 {!isMyProfile && (
@@ -1089,6 +1099,46 @@ const handleDisputeJob = async (appointmentId) => {
           </div>
         </div>
       )}
+
+      {/* --- WEB-TO-MOBILE KYC HANDOFF MODAL --- */}
+      {showKycModal && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm flex flex-col relative overflow-hidden text-center">
+            <div className="bg-slate-900 px-6 py-6 flex flex-col items-center border-b border-slate-800 relative">
+              <button onClick={() => setShowKycModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white font-bold transition">✕</button>
+              <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center border border-white/20 mb-3">
+                <i className="fa-solid fa-fingerprint text-2xl text-cyan-400"></i>
+              </div>
+              <h3 className="font-black text-xl text-white uppercase tracking-wide">Secure Verification</h3>
+            </div>
+            
+            <div className="p-8 flex flex-col items-center">
+              <p className="text-sm font-medium text-slate-600 mb-6 leading-relaxed">
+                Browser cameras compromise security. To complete your biometric KYC and protect the ecosystem, you must use the native Street Code 101 mobile app.
+              </p>
+              
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-inner mb-6">
+                <img 
+                  src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://streetcode101.com/download" 
+                  alt="Download App QR Code" 
+                  className="w-40 h-40 object-contain mix-blend-multiply" 
+                />
+              </div>
+              
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                Scan to download the app
+              </p>
+            </div>
+            
+            <div className="bg-slate-50 p-4 border-t border-slate-100">
+              <button onClick={() => setShowKycModal(false)} className="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 rounded-xl transition-all active:scale-95 uppercase tracking-wider text-sm">
+                I'll do this later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
