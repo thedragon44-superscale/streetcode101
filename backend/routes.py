@@ -853,19 +853,7 @@ def get_public_profile(
         if check_follow:
             is_following = True
 
-    # 3. Handle Admin override
-    if username.lower() == "admin":
-        return {
-            "username": "admin", 
-            "role": "admin",
-            "bio": "Official Street Code 101 Storefront", 
-            "profile_image_url": "/dragon_logo.png",
-            "followers_count": followers_count,
-            "following_count": following_count,
-            "is_following": is_following,
-            "trust_score": 5.0,
-            "review_count": 999
-        }
+    
         
     # 4. Handle standard users
     user = session.exec(select(User).where(User.username == username)).first()
@@ -1108,9 +1096,7 @@ def get_global_feed(
     for p in posts:
         user = session.exec(select(User).where(User.username == p.username)).first()
         avatar = "/default.png"
-        if p.username == "admin":
-            avatar = "/dragon_logo.png"
-        elif user:
+        if user:
             avatar = user.profile_image_url
             
         like_count = len(session.exec(select(Like).where(Like.post_id == p.id)).all())
@@ -1141,9 +1127,7 @@ def get_single_post(id: int, session: Session = Depends(get_session)):
         
     user = session.exec(select(User).where(User.username == p.username)).first()
     avatar = "/default.png"
-    if p.username == "admin":
-        avatar = "/dragon_logo.png"
-    elif user:
+    if user:
         avatar = user.profile_image_url
         
     like_count = len(session.exec(select(Like).where(Like.post_id == p.id)).all())
