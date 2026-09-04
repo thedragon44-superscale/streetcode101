@@ -3153,12 +3153,12 @@ def create_kyc_session(session: Session = Depends(get_session), token: dict = De
         raise HTTPException(status_code=400, detail="You are already verified.")
 
     try:
-        verification_session = stripe.Identity.VerificationSession.create(
+        # Lowercase 'identity' is required for the Stripe Python SDK
+        verification_session = stripe.identity.VerificationSession.create(
             type="document",
             metadata={
                 "username": username
-            },
-            return_url="https://streetcode101.com/provider-dashboard" 
+            }
         )
         
         # Returns the web URL (for React) AND the mobile SDK keys (for React Native)
