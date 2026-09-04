@@ -358,8 +358,18 @@ def get_catalog(
         
     # Order by SKU to ensure stable pagination
     query = query.order_by(Product.sku).offset(offset).limit(limit)
+    products = list(session.exec(query).all())
     
-    return session.exec(query).all()
+    # Inject the Featured Drop safely at the top for the first page
+    if offset == 0 and (not category or category == "All") and not search:
+        featured = session.exec(select(Product).where(Product.is_featured == True)).first()
+        if featured:
+            # Remove it if it's already in the list to avoid duplicates
+            products = [p for p in products if p.sku != featured.sku]
+            # Prepend it to the absolute top of the feed
+            products.insert(0, featured)
+            
+    return products
 
 @router.post("/api/products")
 def create_product(
