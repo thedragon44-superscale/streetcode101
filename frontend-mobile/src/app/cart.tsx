@@ -111,7 +111,7 @@ export default function CartScreen() {
 
             <TouchableOpacity 
               style={styles.checkoutButton}
-              onPress={() => console.log('Proceed to checkout/shipping form')}
+              onPress={() => router.push('/checkout')}
             >
               <Ionicons name="lock-closed" size={16} color="#000" />
               <Text style={styles.checkoutButtonText}>SECURE CHECKOUT</Text>

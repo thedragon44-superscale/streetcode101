@@ -304,6 +304,7 @@ def get_my_profile(session: Session = Depends(get_session), token: dict = Depend
         
     return {
         "username": user.username,
+        "email": user.email,
         "role": user.role,
         "primary_trade": getattr(user, "primary_trade", None),
         "bio": user.bio,

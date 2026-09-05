@@ -33,11 +33,22 @@ app.add_middleware(
 # Bring in all the endpoints defined in routes.py
 app.include_router(router)
 
+from sqlalchemy import text
+
 @app.on_event("startup")
 def on_startup():
     SQLModel.metadata.create_all(engine)
     
     with Session(engine) as session:
+        # --- AUTO-MIGRATION PATCH ---
+        try:
+            session.execute(text('ALTER TABLE "user" ADD COLUMN push_token VARCHAR;'))
+            session.commit()
+            print("✅ Successfully patched DB: Added push_token column!")
+        except Exception:
+            session.rollback() # Column already exists, safe to ignore
+        # ---------------------------
+        
         existing = session.exec(select(Product)).first()
         if not existing:
             print("Seeding database with initial products...")
