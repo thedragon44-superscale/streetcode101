@@ -103,6 +103,9 @@ class ProfileUpdate(BaseModel):
     bio: str | None = None
     email_opt_in: bool | None = None
 
+class PushTokenUpdate(BaseModel):
+    push_token: str
+
 class ImageUpdate(BaseModel):
     image_url: str
 
@@ -292,12 +295,28 @@ def get_my_profile(session: Session = Depends(get_session), token: dict = Depend
         "bio": user.bio,
         "profile_image_url": user.profile_image_url,
         "email_opt_in": getattr(user, "email_opt_in", False),
+        "push_token": getattr(user, "push_token", None),
         "followers_count": followers_count,
         "following_count": following_count,
         "wallet_balance": getattr(user, "wallet_balance", 0.0),
         "trust_score": round(trust_score, 1),
         "review_count": review_count
     }
+
+@router.patch("/api/profile/me/push-token")
+def update_push_token(payload: PushTokenUpdate, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Registers the mobile device's Expo Push Token to the user's profile."""
+    username = token.get("sub")
+    user = session.exec(select(User).where(User.username == username)).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    user.push_token = payload.push_token
+    session.add(user)
+    session.commit()
+    
+    return {"message": "Push token secured."}
 
 @router.get("/api/search")
 def global_search(q: str, session: Session = Depends(get_session)):

@@ -17,6 +17,7 @@ class User(SQLModel, table=True):
     wallet_balance: float = Field(default=0.0) # The StreetCoin Wallet
     role: str = Field(default="customer")  # Options: "customer", "vendor", "service_provider"
     primary_trade: Optional[str] = Field(default=None)
+    push_token: Optional[str] = None
 
 class Product(SQLModel, table=True):
     sku: str = Field(primary_key=True, index=True)

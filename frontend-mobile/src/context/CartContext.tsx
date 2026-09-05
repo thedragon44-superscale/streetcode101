@@ -18,6 +18,7 @@ type CartContextType = {
   removeFromCart: (sku: string) => void;
   updateQuantity: (sku: string, quantity: number) => void;
   clearCart: () => void;
+  reloadCart: () => Promise<void>;
   isCartOpen: boolean;
   setIsCartOpen: (isOpen: boolean) => void;
   cartTotal: number;
@@ -31,31 +32,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  const reloadCart = async () => {
+    try {
+      const token = await SecureStore.getItemAsync('pidrop_token');
+      if (token) {
+        const res = await fetch(`${API_BASE}/cart`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCart(data);
+        }
+      } else {
+        const localCart = await AsyncStorage.getItem('sc101_cart');
+        if (localCart) setCart(JSON.parse(localCart));
+      }
+    } catch (err) {
+      console.error('Failed to load secure cart', err);
+    } finally {
+      setIsInitialized(true);
+    }
+  };
+
   // 1. Load Cart on Mount (from DB if logged in, else AsyncStorage)
   useEffect(() => {
-    const initializeCart = async () => {
-      try {
-        const token = await SecureStore.getItemAsync('pidrop_token');
-        if (token) {
-          const res = await fetch(`${API_BASE}/cart`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setCart(data);
-          }
-        } else {
-          const localCart = await AsyncStorage.getItem('sc101_cart');
-          if (localCart) setCart(JSON.parse(localCart));
-        }
-      } catch (err) {
-        console.error('Failed to load secure cart', err);
-      } finally {
-        setIsInitialized(true);
-      }
-    };
-
-    initializeCart();
+    reloadCart();
   }, []);
 
   // 2. Sync Cart on Change (to DB if logged in, always to AsyncStorage)
@@ -134,6 +135,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeFromCart, 
       updateQuantity,
       clearCart,
+      reloadCart,
       isCartOpen, 
       setIsCartOpen,
       cartTotal,
