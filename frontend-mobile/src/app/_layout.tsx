@@ -6,8 +6,18 @@ import { Drawer } from 'expo-router/drawer';
 import * as SecureStore from 'expo-secure-store';
 import { useRouter, usePathname } from 'expo-router';
 import { StripeProvider } from '@stripe/stripe-react-native';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 import { CartProvider } from '../context/CartContext';
 import CartModal from '../components/CartModal';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 const API_BASE = "https://streetcode101.com/api";
 const STRIPE_PUBLISHABLE_KEY = "pk_test_YOUR_STRIPE_PUBLISHABLE_KEY";
@@ -21,6 +31,40 @@ function CustomDrawerContent() {
     fetchProfile();
   }, [pathname]);
 
+  const registerForPushNotificationsAsync = async (token: string) => {
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') {
+        return; // User denied permission
+      }
+      
+      try {
+        const pushTokenData = await Notifications.getExpoPushTokenAsync({
+          projectId: '812b46e7-0c50-4520-b0f6-a3339980b709' // Your EAS project ID
+        });
+        
+        // Beam the token directly to the backend
+        await fetch(`${API_BASE}/profile/me/push-token`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ push_token: pushTokenData.data })
+        });
+      } catch (error) {
+        console.error("Failed to get push token", error);
+      }
+    }
+  };
+
   const fetchProfile = async () => {
     try {
       const token = await SecureStore.getItemAsync('pidrop_token');
@@ -29,7 +73,12 @@ function CustomDrawerContent() {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
-          setUser(await res.json());
+          const userData = await res.json();
+          setUser(userData);
+          // If they just logged in, attempt to grab and save their push token
+          if (!userData.push_token) {
+            registerForPushNotificationsAsync(token);
+          }
         } else {
           setUser(null);
         }

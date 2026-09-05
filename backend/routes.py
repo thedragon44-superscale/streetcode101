@@ -143,6 +143,20 @@ def send_automated_email(to_email: str, subject: str, body: str, html_body: str 
     except Exception as e:
         print(f"❌ SMTP ERROR: {str(e)}")
 
+def send_push_notification(push_token: str, title: str, body: str):
+    """Dispatches real-time push notifications to Expo clients."""
+    if not push_token:
+        return
+    try:
+        requests.post(
+            "https://exp.host/--/api/v2/push/send",
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            json={"to": push_token, "title": title, "body": body},
+            timeout=5
+        )
+    except Exception as e:
+        print(f"❌ EXPO PUSH ERROR: {str(e)}")
+
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Validates the JWT token provided in the Authorization header."""
     try:
@@ -1361,12 +1375,15 @@ def toggle_like(post_id: int, session: Session = Depends(get_session), token: di
             session.add(new_notif)
             
             post_owner = session.exec(select(User).where(User.username == post.username)).first()
-            if post_owner and getattr(post_owner, "email_opt_in", False):
-                send_automated_email(
-                    to_email=post_owner.email,
-                    subject="New Like on your Drop!",
-                    body=f"Yo @{post_owner.username},\n\n@{username} just liked your recent post!\nLog in to see who's interacting with your drops."
-                )
+            if post_owner:
+                if getattr(post_owner, "email_opt_in", False):
+                    send_automated_email(
+                        to_email=post_owner.email,
+                        subject="New Like on your Drop!",
+                        body=f"Yo @{post_owner.username},\n\n@{username} just liked your recent post!\nLog in to see who's interacting with your drops."
+                    )
+                if getattr(post_owner, "push_token", None):
+                    send_push_notification(post_owner.push_token, "New Like!", f"@{username} liked your post.")
                 
         session.commit()
         return {"message": "Liked", "liked": True}
@@ -1398,12 +1415,15 @@ def add_comment(post_id: int, payload: CommentCreate, session: Session = Depends
         session.add(new_notif)
         
         post_owner = session.exec(select(User).where(User.username == post.username)).first()
-        if post_owner and getattr(post_owner, "email_opt_in", False):
-            send_automated_email(
-                to_email=post_owner.email,
-                subject="New Comment on your Drop!",
-                body=f"Yo @{post_owner.username},\n\n@{username} just commented on your post:\n\"{payload.text}\"\n\nLog in to reply!"
-            )
+        if post_owner:
+            if getattr(post_owner, "email_opt_in", False):
+                send_automated_email(
+                    to_email=post_owner.email,
+                    subject="New Comment on your Drop!",
+                    body=f"Yo @{post_owner.username},\n\n@{username} just commented on your post:\n\"{payload.text}\"\n\nLog in to reply!"
+                )
+            if getattr(post_owner, "push_token", None):
+                send_push_notification(post_owner.push_token, "New Comment", f"@{username} commented: {payload.text}")
 
     # --- MENTION ENGINE: COMMENTS ---
     mentioned_usernames = set(re.findall(r'@([a-zA-Z0-9_]+)', payload.text))
@@ -2608,13 +2628,15 @@ def book_service(payload: BookingRequest, session: Session = Depends(get_session
         body=f"Yo @{client.username},\n\nYour appointment for '{service.title}' is confirmed for {start_time.strftime('%b %d, %Y at %I:%M %p')}.\n\n{service.price:.2f} SC has been securely locked in the Master Escrow Vault. It will not be released to @{service.provider_username} until the job is completed and verified."
     )
     
-    # Alert Provider
+   # Alert Provider
     if provider:
         send_automated_email(
             to_email=provider.email,
             subject="New Booking Secured!",
             body=f"Yo @{provider.username},\n\n@{client.username} just booked you for '{service.title}' on {start_time.strftime('%b %d, %Y at %I:%M %p')}.\n\nThe funds ({service.price:.2f} SC) are already secured in Escrow. Check your Service Dashboard for address and check-in details."
         )
+        if getattr(provider, "push_token", None):
+            send_push_notification(provider.push_token, "New Booking!", f"@{client.username} booked '{service.title}'. Funds locked in Escrow.")
 
     return {"message": "Booking confirmed and funds secured in Escrow.", "appointment_id": new_appt.id}
 
@@ -2802,6 +2824,8 @@ def client_dispute_job(id: int, session: Session = Depends(get_session), token: 
             subject="🚨 Job Disputed by Client",
             body=f"Yo @{provider.username},\n\n@{username} has filed a dispute for your recent job. The {appt.escrow_amount:.2f} SC in Escrow is currently frozen pending Master Admin review."
         )
+        if getattr(provider, "push_token", None):
+            send_push_notification(provider.push_token, "🚨 Job Disputed", f"@{username} disputed your job. Escrow frozen.")
         
     # Alert Master Admin
     admin = session.exec(select(User).where(User.username == "admin")).first()
