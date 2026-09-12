@@ -1250,14 +1250,32 @@ def edit_post(id: int, payload: PostEditRequest, session: Session = Depends(get_
 from fastapi.responses import HTMLResponse
 
 @router.get("/api/unsubscribe/{email}", response_class=HTMLResponse)
-def unsubscribe_user(email: str, session: Session = Depends(get_session)):
-    # 1. Update the marketing list
-    subscriber = session.query(LedgerSubscriber).filter(LedgerSubscriber.email == email).first()
+def unsubscribe_confirm_page(email: str):
+    """Renders the confirmation page to prevent email pre-fetchers from auto-unsubscribing users."""
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="margin: 0; background-color: #0f172a; color: #f8fafc; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh;">
+        <div style="text-align: center; padding: 40px; border: 1px solid #1e293b; border-radius: 12px; background-color: #020617; max-width: 400px;">
+            <h2 style="margin-top: 0; color: #f8fafc;">Confirm Unsubscribe</h2>
+            <p style="color: #94a3b8; line-height: 1.6;">Are you sure you want to stop receiving marketing updates for <b>{email}</b>?</p>
+            <form method="POST" action="/api/unsubscribe/{email}">
+                <button type="submit" style="background-color: #ef4444; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 20px; width: 100%;">Yes, Unsubscribe Me</button>
+            </form>
+            <a href="https://streetcode101.com" style="color: #94a3b8; text-decoration: underline; font-size: 12px; display: inline-block; margin-top: 20px;">Cancel and return to store</a>
+        </div>
+    </body>
+    </html>
+    """
+
+@router.post("/api/unsubscribe/{email}", response_class=HTMLResponse)
+def unsubscribe_user_action(email: str, session: Session = Depends(get_session)):
+    """Actually mutates the database after intentional user confirmation."""
+    subscriber = session.exec(select(LedgerSubscriber).where(LedgerSubscriber.email == email)).first()
     if subscriber:
         subscriber.is_subscribed = False
         
-    # 2. Update the main User table opt-in flag for maximum coverage
-    user = session.query(User).filter(User.email == email).first()
+    user = session.exec(select(User).where(User.email == email)).first()
     if user:
         user.email_opt_in = False
         

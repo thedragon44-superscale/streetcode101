@@ -41,22 +41,28 @@ export function CartProvider({ children }) {
 
     const token = localStorage.getItem('pidrop_token');
     if (token) {
-      const syncData = {
-        items: cart.map(item => ({
-          sku: item.sku,
-          quantity: item.cart_quantity || 1
-        }))
-      };
+      // Debounce the network request by 800ms to prevent spamming the database
+      const syncTimer = setTimeout(() => {
+        const syncData = {
+          items: cart.map(item => ({
+            sku: item.sku,
+            quantity: item.cart_quantity || 1
+          }))
+        };
 
-      // Silently sync to PostgreSQL in the background
-      fetch(`${API_BASE}/cart/sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(syncData)
-      }).catch(err => console.error('Failed to sync cart to DB', err));
+        // Silently sync to PostgreSQL in the background
+        fetch(`${API_BASE}/cart/sync`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(syncData)
+        }).catch(err => console.error('Failed to sync cart to DB', err));
+      }, 800);
+
+      // Cleanup function clears the timer if cart changes again before 800ms
+      return () => clearTimeout(syncTimer); 
     }
   }, [cart, isInitialized]);
 
