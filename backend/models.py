@@ -18,6 +18,7 @@ class User(SQLModel, table=True):
     role: str = Field(default="customer")  # Options: "customer", "vendor", "service_provider"
     primary_trade: Optional[str] = Field(default=None)
     push_token: Optional[str] = None
+    stripe_account_id: Optional[str] = None
 
 class Product(SQLModel, table=True):
     sku: str = Field(primary_key=True, index=True)

@@ -2344,6 +2344,7 @@ def release_escrow(order_id: int, req: TrackingRequest, session: Session = Depen
     # Process the Escrow Release
     product, price = resolve_product_and_price(session, order.sku)
     payout = price * order.quantity
+    usd_payout = payout * 0.95 # Apply 5% platform tax
     
     if escrow and vendor and escrow.wallet_balance >= payout:
         escrow.wallet_balance -= payout
@@ -2360,6 +2361,23 @@ def release_escrow(order_id: int, req: TrackingRequest, session: Session = Depen
         session.add(escrow)
         session.add(vendor)
         session.add(tx)
+        
+        # AUTOMATIC STRIPE PAYOUT (If onboarded)
+        if vendor.stripe_account_id:
+            try:
+                # Convert to cents
+                transfer_amount = int(usd_payout * 100)
+                stripe.Transfer.create(
+                    amount=transfer_amount,
+                    currency="usd",
+                    destination=vendor.stripe_account_id,
+                    description=f"Payout for Order #{order.id}"
+                )
+                # Deduct transferred amount from their digital wallet so it isn't double-counted
+                vendor.wallet_balance -= usd_payout 
+                print(f"✅ Automated Stripe payout successful for Order #{order.id}")
+            except Exception as e:
+                print(f"❌ Automated payout failed for @{vendor.username}: {str(e)}")
         
     session.commit()
     
@@ -2779,6 +2797,7 @@ def client_confirm_job(id: int, session: Session = Depends(get_session), token: 
     if escrow.wallet_balance >= appt.escrow_amount:
         escrow.wallet_balance -= appt.escrow_amount
         provider.wallet_balance += appt.escrow_amount
+        usd_payout = appt.escrow_amount * 0.95 # Apply 5% platform tax
         
         tx = Transaction(
             sender_username="escrow_vault",
@@ -2795,6 +2814,22 @@ def client_confirm_job(id: int, session: Session = Depends(get_session), token: 
         session.add(provider)
         session.add(tx)
         session.add(appt)
+        
+        # AUTOMATIC STRIPE PAYOUT (If onboarded)
+        if provider.stripe_account_id:
+            try:
+                transfer_amount = int(usd_payout * 100)
+                stripe.Transfer.create(
+                    amount=transfer_amount,
+                    currency="usd",
+                    destination=provider.stripe_account_id,
+                    description=f"Payout for Service Appt #{appt.id}"
+                )
+                provider.wallet_balance -= usd_payout
+                print(f"✅ Automated Stripe payout successful for Appt #{appt.id}")
+            except Exception as e:
+                print(f"❌ Automated payout failed for @{provider.username}: {str(e)}")
+                
         session.commit()
         
         # Notify Provider of the payday
@@ -3195,35 +3230,42 @@ def get_user_reviews(username: str, session: Session = Depends(get_session)):
         
     return formatted_reviews
 
-# --- KYC / IDENTITY VERIFICATION ENDPOINTS ---
+# --- STRIPE CONNECT EXPRESS ENDPOINTS ---
 
-@router.post("/api/kyc/create-session")
-def create_kyc_session(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
-    """Generates a Stripe Identity Verification Session for vendors/providers."""
+@router.post("/api/vendor/onboard")
+@limiter.limit("5/minute")
+def create_connect_session(request: Request, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+    """Generates a Stripe Connect Embedded Onboarding Session."""
     username = token.get("sub")
     
-    user = session.exec(select(User).where(User.username == username)).first()
+    user = session.exec(select(User).where(User.username == username).with_for_update()).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    if user.is_verified:
-        raise HTTPException(status_code=400, detail="You are already verified.")
+    # 1. Create Express Account if they don't have one
+    if not user.stripe_account_id:
+        try:
+            account = stripe.Account.create(
+                type="express",
+                capabilities={"transfers": {"requested": True}},
+                business_type="individual",
+                metadata={"username": username}
+            )
+            user.stripe_account_id = account.id
+            session.add(user)
+            session.commit()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Stripe Account Error: {str(e)}")
 
+    # 2. Generate the Embedded Components Session
     try:
-        # Lowercase 'identity' is required for the Stripe Python SDK
-        verification_session = stripe.identity.VerificationSession.create(
-            type="document",
-            metadata={
-                "username": username
+        account_session = stripe.AccountSession.create(
+            account=user.stripe_account_id,
+            components={
+                "account_onboarding": {"enabled": True},
+                "payouts": {"enabled": True}
             }
         )
-        
-        # Returns the web URL (for React) AND the mobile SDK keys (for React Native)
-        return {
-            "url": verification_session.url,
-            "client_secret": verification_session.client_secret,
-            "sessionId": verification_session.id,
-            "ephemeralKeySecret": verification_session.client_secret
-        }
+        return {"client_secret": account_session.client_secret, "stripe_account_id": user.stripe_account_id}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Stripe Session Error: {str(e)}")

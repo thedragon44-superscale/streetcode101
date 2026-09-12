@@ -54,6 +54,13 @@ def on_startup():
             print("✅ Successfully patched DB: Added push_token column!")
         except Exception:
             session.rollback() # Column already exists, safe to ignore
+            
+        try:
+            session.execute(text('ALTER TABLE "user" ADD COLUMN stripe_account_id VARCHAR;'))
+            session.commit()
+            print("✅ Successfully patched DB: Added stripe_account_id column!")
+        except Exception:
+            session.rollback()
         # ---------------------------
         
         existing = session.exec(select(Product)).first()
