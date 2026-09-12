@@ -759,9 +759,10 @@ async def stripe_webhook(request: Request, db_session: Session = Depends(get_ses
     # 1. FIAT ON-RAMP (BUYING STREETCOIN)
     # ==========================================
     if event['type'] == 'payment_intent.succeeded':
-        payment_intent = event['data']['object']
-        # Safely extract the metadata attribute from the Stripe Object
-        metadata = getattr(payment_intent, 'metadata', {})
+        # Bypass Stripe SDK objects and parse the raw JSON to standard Python dictionaries
+        raw_event = json.loads(payload)
+        payment_intent = raw_event['data']['object']
+        metadata = payment_intent.get('metadata', {})
         
         if metadata.get('type') == 'wallet_topup':
             username = metadata.get('username')
