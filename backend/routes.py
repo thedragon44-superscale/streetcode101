@@ -760,7 +760,8 @@ async def stripe_webhook(request: Request, db_session: Session = Depends(get_ses
     # ==========================================
     if event['type'] == 'payment_intent.succeeded':
         payment_intent = event['data']['object']
-        metadata = payment_intent.get('metadata', {})
+        # Safely extract the metadata attribute from the Stripe Object
+        metadata = getattr(payment_intent, 'metadata', {})
         
         if metadata.get('type') == 'wallet_topup':
             username = metadata.get('username')
