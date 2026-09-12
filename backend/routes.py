@@ -40,6 +40,10 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, W
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import bcrypt
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 from sqlmodel import Session, select
 from typing import List
 
@@ -168,21 +172,22 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 @router.post("/api/auth/register")
-def register_user(request: RegisterRequest, session: Session = Depends(get_session)):
+@limiter.limit("5/minute")
+def register_user(request: Request, payload: RegisterRequest, session: Session = Depends(get_session)):
     """Registers a new public user and triggers a welcome email."""
-    if request.username.lower() == "admin":
+    if payload.username.lower() == "admin":
         raise HTTPException(status_code=400, detail="Reserved username")
         
     # Check if username OR email is already taken
-    existing_user = session.exec(select(User).where((User.username == request.username) | (User.email == request.email))).first()
+    existing_user = session.exec(select(User).where((User.username == payload.username) | (User.email == payload.email))).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username or email already taken")
         
     new_user = User(
-        username=request.username,
-        email=request.email,
-        password_hash=get_password_hash(request.password),
-        role=request.role
+        username=payload.username,
+        email=payload.email,
+        password_hash=get_password_hash(payload.password),
+        role=payload.role
     )
     session.add(new_user)
     session.commit()
@@ -265,19 +270,20 @@ def register_user(request: RegisterRequest, session: Session = Depends(get_sessi
     return {"message": "Registration successful. Check your email."}
 
 @router.post("/api/admin/login")
-def login(request: AuthRequest, session: Session = Depends(get_session)):
+@limiter.limit("10/minute")
+def login(request: Request, payload: AuthRequest, session: Session = Depends(get_session)):
     """Unified login for Master Admin and Public Users."""
     # 1. Check for Master Admin override
-    if request.username.lower() == "admin":
-        if request.password != ADMIN_PASS:
+    if payload.username.lower() == "admin":
+        if payload.password != ADMIN_PASS:
             raise HTTPException(status_code=401, detail="Invalid password")
         expire = datetime.now(timezone.utc) + timedelta(hours=12)
         token = jwt.encode({"sub": "admin", "exp": expire}, SECRET_KEY, algorithm="HS256")
         return {"access_token": token, "is_admin": True}
         
     # 2. Check Postgres for Public Users
-    user = session.exec(select(User).where(User.username == request.username)).first()
-    if not user or not verify_password(request.password, user.password_hash):
+    user = session.exec(select(User).where(User.username == payload.username)).first()
+    if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid username or password")
         
     expire = datetime.now(timezone.utc) + timedelta(days=7)
@@ -622,10 +628,11 @@ def submit_order(order_data: Order, session: Session = Depends(get_session)):
     }
 
 @router.post("/api/wallet/topup")
-def initiate_wallet_topup(req: TopUpRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+@limiter.limit("5/minute")
+def initiate_wallet_topup(request: Request, req: TopUpRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Initiates a Stripe checkout to purchase StreetCoin from the Master Vault."""
     username = token.get("sub")
-    master = session.exec(select(User).where(User.username == "master_vault")).first()
+    master = session.exec(select(User).where(User.username == "master_vault").with_for_update()).first()
     
     if not master or getattr(master, "wallet_balance", 0) < req.coins:
         raise HTTPException(status_code=400, detail="Insufficient Genesis supply for this purchase.")
@@ -657,11 +664,12 @@ class StreetCoinCheckoutRequest(BaseModel):
     shipping_address: str
 
 @router.post("/api/checkout/streetcoin")
-def checkout_with_streetcoin(req: StreetCoinCheckoutRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
+@limiter.limit("3/minute")
+def checkout_with_streetcoin(request: Request, req: StreetCoinCheckoutRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Processes a cart checkout using StreetCoins and locks funds in Escrow."""
     username = token.get("sub")
-    user = session.exec(select(User).where(User.username == username)).first()
-    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
+    user = session.exec(select(User).where(User.username == username).with_for_update()).first()
+    escrow = session.exec(select(User).where(User.username == "escrow_vault").with_for_update()).first()
     
     if not user or not escrow:
         raise HTTPException(status_code=404, detail="System routing error.")
@@ -757,8 +765,9 @@ async def stripe_webhook(request: Request, db_session: Session = Depends(get_ses
             username = metadata.get('username')
             coins_purchased = float(metadata.get('coins', 0))
             
-            user = db_session.exec(select(User).where(User.username == username)).first()
-            master_vault = db_session.exec(select(User).where(User.username == "master_vault")).first()
+            # ROW-LEVEL LOCK: Secure the balances before crediting fiat purchases
+            user = db_session.exec(select(User).where(User.username == username).with_for_update()).first()
+            master_vault = db_session.exec(select(User).where(User.username == "master_vault").with_for_update()).first()
             
             if user and master_vault and getattr(master_vault, "wallet_balance", 0) >= coins_purchased:
                 # Deduct from Genesis Vault
@@ -2314,8 +2323,9 @@ def verify_tracking_live(tracking_number: str) -> tuple[bool, str]:
 def release_escrow(order_id: int, req: TrackingRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Logs the tracking number, verifies it against carrier networks, and releases Escrow."""
     username = token.get("sub")
-    vendor = session.exec(select(User).where(User.username == username)).first()
-    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
+    # ROW-LEVEL LOCK: Secure the balances before releasing escrow
+    vendor = session.exec(select(User).where(User.username == username).with_for_update()).first()
+    escrow = session.exec(select(User).where(User.username == "escrow_vault").with_for_update()).first()
     
     order = session.get(Order, order_id)
     if not order:
@@ -2372,8 +2382,9 @@ def submit_cashout_request(req: CashoutSubmitRequest, session: Session = Depends
     from models import CashoutRequest
     
     username = token.get("sub")
-    user = session.exec(select(User).where(User.username == username)).first()
-    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
+    # ROW-LEVEL LOCK: Secure the balances before locking cashout funds
+    user = session.exec(select(User).where(User.username == username).with_for_update()).first()
+    escrow = session.exec(select(User).where(User.username == "escrow_vault").with_for_update()).first()
     
     if req.amount_coins < 10:
         raise HTTPException(status_code=400, detail="Minimum cashout is 10 SC.")
@@ -2563,8 +2574,9 @@ def book_service(payload: BookingRequest, session: Session = Depends(get_session
     from dateutil import parser
     
     username = token.get("sub")
-    client = session.exec(select(User).where(User.username == username)).first()
-    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
+    # ROW-LEVEL LOCK: Secure the balances before locking service escrow
+    client = session.exec(select(User).where(User.username == username).with_for_update()).first()
+    escrow = session.exec(select(User).where(User.username == "escrow_vault").with_for_update()).first()
     
     if not client or not escrow:
         raise HTTPException(status_code=404, detail="System routing error.")
@@ -2756,8 +2768,9 @@ def client_confirm_job(id: int, session: Session = Depends(get_session), token: 
     if appt.status != "pending_confirmation":
         raise HTTPException(status_code=400, detail="Job is not awaiting confirmation.")
         
-    escrow = session.exec(select(User).where(User.username == "escrow_vault")).first()
-    provider = session.exec(select(User).where(User.username == appt.provider_username)).first()
+    # ROW-LEVEL LOCK: Secure the balances before releasing service escrow
+    escrow = session.exec(select(User).where(User.username == "escrow_vault").with_for_update()).first()
+    provider = session.exec(select(User).where(User.username == appt.provider_username).with_for_update()).first()
     
     if not escrow or not provider:
         raise HTTPException(status_code=500, detail="Critical routing error.")

@@ -62,6 +62,7 @@ s3transfer==0.19.2
 sentry-sdk==2.67.1
 shellingham==1.5.4
 six==1.17.0
+slowapi==0.1.9
 SQLAlchemy==2.0.51
 sqlmodel==0.0.39
 starlette==1.6.0

@@ -64,7 +64,7 @@ export default function Wallet() {
       });
       
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to initialize top-up');
+      if (!res.ok) throw new Error(data.detail || data.error || 'Failed to initialize top-up');
       
       setClientSecret(data.clientSecret);
     } catch (err) {

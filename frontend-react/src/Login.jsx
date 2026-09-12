@@ -33,7 +33,7 @@ export default function Login() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Authentication failed');
+        throw new Error(data.detail || data.error || 'Authentication failed');
       }
 
       if (isRegistering) {

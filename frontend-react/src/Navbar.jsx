@@ -82,7 +82,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
       })
       .then(async res => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Failed to create payment intent');
+        if (!res.ok) throw new Error(data.detail || data.error || 'Failed to create payment intent');
         return data;
       })
       .then(data => {
@@ -199,7 +199,7 @@ export default function Navbar({ showSearch = false, searchQuery, setSearchQuery
       });
       
       const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || 'StreetCoin checkout failed');
+      if (!response.ok) throw new Error(data.detail || data.error || 'StreetCoin checkout failed');
       
       toast.success('Escrow secured! Order placed successfully.');
       
