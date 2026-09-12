@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Navbar from './Navbar';
 import { useCart } from './CartContext';
+import { loadConnectAndInitialize } from '@stripe/connect-js';
+import { ConnectComponentsProvider, ConnectAccountOnboarding } from '@stripe/react-connect-js';
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -68,6 +70,7 @@ export default function Profile() {
     complianceAgreed: false
   });
   const [isLookingUpZip, setIsLookingUpZip] = useState(false);
+  const [stripeConnectInstance, setStripeConnectInstance] = useState(null);
 
   const token = localStorage.getItem('pidrop_token');
   const isMyProfile = username === 'me';
@@ -480,6 +483,33 @@ const handleDisputeJob = async (appointmentId) => {
     }
   };
 
+  const handleInitializeConnect = () => {
+    setShowKycModal(true);
+    const instance = loadConnectAndInitialize({
+      publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
+      fetchClientSecret: async () => {
+        const res = await fetch(`${API_BASE}/vendor/onboard`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch secure token from Vault');
+        const data = await res.json();
+        return data.client_secret;
+      },
+      appearance: {
+        overlays: 'dialog',
+        variables: {
+          colorPrimary: '#f97316',
+          colorBackground: '#0f1115',
+          colorText: '#ffffff',
+          colorDanger: '#ef4444',
+          fontFamily: 'ui-sans-serif, system-ui, sans-serif'
+        }
+      }
+    });
+    setStripeConnectInstance(instance);
+  };
+
   // --- RENDERING CONDITIONS ---
   if (loading) return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
@@ -531,12 +561,14 @@ const handleDisputeJob = async (appointmentId) => {
                          profile.role?.includes('service_provider') ? 'Service Provider' : null
                        ].filter(Boolean).join(' & ') || 'Community Member'}
                     </p>
-                    {profile.is_verified ? (
-                      <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border border-emerald-200">✓ Verified</span>
-                    ) : isMyProfile ? (
-                      <button onClick={() => setShowKycModal(true)} className="bg-red-100 text-red-600 hover:bg-red-500 hover:text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border border-red-200 transition-colors shadow-sm">
-                        Verify Identity
+                    {profile.stripe_account_id ? (
+                      <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border border-emerald-200 shadow-sm">✓ Payouts Active</span>
+                    ) : isMyProfile && (profile.role?.includes('vendor') || profile.role?.includes('service_provider')) ? (
+                      <button onClick={handleInitializeConnect} className="bg-orange-100 text-orange-700 hover:bg-orange-500 hover:text-white px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border border-orange-200 transition-colors shadow-sm">
+                        <i className="fa-brands fa-stripe"></i> Setup Payouts
                       </button>
+                    ) : profile.is_verified ? (
+                      <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border border-emerald-200">✓ Verified</span>
                     ) : null}
                   </div>
                 </div>
@@ -1100,40 +1132,31 @@ const handleDisputeJob = async (appointmentId) => {
         </div>
       )}
 
-      {/* --- WEB-TO-MOBILE KYC HANDOFF MODAL --- */}
+      {/* --- STRIPE CONNECT EMBEDDED KYC MODAL --- */}
       {showKycModal && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm flex flex-col relative overflow-hidden text-center">
-            <div className="bg-slate-900 px-6 py-6 flex flex-col items-center border-b border-slate-800 relative">
-              <button onClick={() => setShowKycModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white font-bold transition">✕</button>
-              <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center border border-white/20 mb-3">
-                <i className="fa-solid fa-fingerprint text-2xl text-cyan-400"></i>
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-8 bg-slate-900/90 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="bg-[#0f1115] border border-slate-800 rounded-3xl shadow-2xl w-full max-w-4xl flex flex-col relative overflow-hidden min-h-[60vh]">
+            <div className="bg-slate-950 px-6 py-4 flex items-center justify-between border-b border-slate-800 sticky top-0 z-10">
+              <div className="flex items-center gap-3">
+                <i className="fa-brands fa-stripe text-3xl text-indigo-500"></i>
+                <h3 className="font-black text-lg text-white uppercase tracking-wide">Identity & Payout Setup</h3>
               </div>
-              <h3 className="font-black text-xl text-white uppercase tracking-wide">Secure Verification</h3>
+              <button onClick={() => { setShowKycModal(false); setStripeConnectInstance(null); window.location.reload(); }} className="text-slate-400 hover:text-white font-bold transition">✕</button>
             </div>
             
-            <div className="p-8 flex flex-col items-center">
-              <p className="text-sm font-medium text-slate-600 mb-6 leading-relaxed">
-                Browser cameras compromise security. To complete your biometric KYC and protect the ecosystem, you must use the native Street Code 101 mobile app.
-              </p>
-              
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-inner mb-6">
-                <img 
-                  src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://streetcode101.com/download" 
-                  alt="Download App QR Code" 
-                  className="w-40 h-40 object-contain mix-blend-multiply" 
-                />
-              </div>
-              
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Scan to download the app
-              </p>
-            </div>
-            
-            <div className="bg-slate-50 p-4 border-t border-slate-100">
-              <button onClick={() => setShowKycModal(false)} className="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 rounded-xl transition-all active:scale-95 uppercase tracking-wider text-sm">
-                I'll do this later
-              </button>
+            <div className="p-4 sm:p-8 flex-1 w-full relative h-[600px] overflow-y-auto">
+              {stripeConnectInstance ? (
+                <ConnectComponentsProvider connectInstance={stripeConnectInstance}>
+                  <ConnectAccountOnboarding 
+                    onExit={() => { setShowKycModal(false); setStripeConnectInstance(null); window.location.reload(); }}
+                  />
+                </ConnectComponentsProvider>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+                  <i className="fa-solid fa-circle-notch fa-spin text-4xl text-orange-500 mb-4"></i>
+                  <p className="font-mono text-sm uppercase font-bold tracking-widest text-slate-400">Establishing Secure Tunnel...</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

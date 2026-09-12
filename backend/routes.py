@@ -317,6 +317,7 @@ def get_my_profile(session: Session = Depends(get_session), token: dict = Depend
         "profile_image_url": user.profile_image_url,
         "email_opt_in": getattr(user, "email_opt_in", False),
         "push_token": getattr(user, "push_token", None),
+        "stripe_account_id": getattr(user, "stripe_account_id", None),
         "followers_count": followers_count,
         "following_count": following_count,
         "wallet_balance": getattr(user, "wallet_balance", 0.0),
