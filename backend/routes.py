@@ -83,6 +83,45 @@ s3_client = boto3.client(
 )
 BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
 
+import io
+from PIL import Image, ImageOps, UnidentifiedImageError
+
+Image.MAX_IMAGE_PIXELS = 25_000_000
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+
+def sanitize_and_upload_image(file: UploadFile, prefix: str = "", max_dim: tuple = (1600, 1600)) -> str:
+    """Validates size/format, strips metadata via Pillow, re-encodes as WebP, and uploads to MinIO."""
+    file.file.seek(0)
+    raw_bytes = file.file.read(MAX_IMAGE_BYTES + 1)
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="Empty image file")
+    if len(raw_bytes) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Image exceeds 5 MB limit")
+
+    try:
+        with Image.open(io.BytesIO(raw_bytes)) as img:
+            img.verify()
+        with Image.open(io.BytesIO(raw_bytes)) as img:
+            img = ImageOps.exif_transpose(img)
+            img = img.convert("RGBA" if img.mode in ("RGBA", "LA", "P") else "RGB")
+            img.thumbnail(max_dim, Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format="WEBP", quality=85, method=4)
+            buf.seek(0)
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError):
+        raise HTTPException(status_code=400, detail="Invalid or unsupported image file")
+
+    folder = f"{prefix.strip('/')}/" if prefix else ""
+    unique_filename = f"{folder}{uuid.uuid4().hex}.webp"
+
+    s3_client.upload_fileobj(
+        buf,
+        BUCKET_NAME,
+        unique_filename,
+        ExtraArgs={"ContentType": "image/webp"}
+    )
+    return f"https://streetcode101.com/{BUCKET_NAME}/{unique_filename}"
+
 class ForgotPasswordRequest(BaseModel):
     email: str
 
@@ -429,16 +468,9 @@ def create_product(
     
     if file:
         try:
-            file_extension = file.filename.split(".")[-1]
-            unique_filename = f"{uuid.uuid4().hex}.{file_extension}"
-            
-            s3_client.upload_fileobj(
-                file.file,
-                BUCKET_NAME,
-                unique_filename,
-                ExtraArgs={"ContentType": file.content_type}
-            )
-            image_url = f"https://streetcode101.com/{BUCKET_NAME}/{unique_filename}"
+            image_url = sanitize_and_upload_image(file, prefix="", max_dim=(1600, 1600))
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
 
@@ -552,6 +584,8 @@ def create_payment_intent(
     
     base_total = 0.0
     for item in req.items:
+        if item.quantity <= 0:
+            raise HTTPException(status_code=400, detail="Invalid item quantity")
         product, item_price = resolve_product_and_price(session, item.sku)
         if not product or not product.in_stock:
             raise HTTPException(status_code=400, detail=f"Product {item.sku} unavailable")
@@ -579,6 +613,7 @@ def create_payment_intent(
             raise HTTPException(status_code=400, detail="Invalid or inactive promo code")
 
     # 3. Final Math
+    total_discount_percent = min(max(total_discount_percent, 0.0), 100.0)
     discount_multiplier = 1 - (total_discount_percent / 100)
     final_total = base_total * discount_multiplier
     amount_in_cents = int(final_total * 100)
@@ -595,7 +630,7 @@ def create_payment_intent(
         return {"clientSecret": intent.client_secret, "finalTotal": final_total}
     except Exception as e:
         print(f"❌ STRIPE ERROR: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Unable to initialize checkout. Please try again later.")
 
 @router.post("/checkout")
 def submit_order(order_data: Order, session: Session = Depends(get_session)):
@@ -990,18 +1025,7 @@ def upload_profile_image(file: UploadFile = File(...), session: Session = Depend
         raise HTTPException(status_code=404, detail="User not found")
         
     try:
-        # Save avatars in a specific folder structure inside your bucket
-        file_extension = file.filename.split(".")[-1]
-        unique_filename = f"avatars/{uuid.uuid4().hex}.{file_extension}"
-        
-        s3_client.upload_fileobj(
-            file.file,
-            BUCKET_NAME,
-            unique_filename,
-            ExtraArgs={"ContentType": file.content_type}
-        )
-        
-        file_url = f"https://streetcode101.com/{BUCKET_NAME}/{unique_filename}"
+        file_url = sanitize_and_upload_image(file, prefix="avatars", max_dim=(512, 512))
         
         # Save the new image URL directly to the user's database record
         user.profile_image_url = file_url
@@ -1011,6 +1035,8 @@ def upload_profile_image(file: UploadFile = File(...), session: Session = Depend
         
         return {"message": "Avatar updated successfully", "profile_image_url": file_url}
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"\n❌ AVATAR UPLOAD CRASHED: {str(e)}\n")
         raise HTTPException(status_code=500, detail=f"Failed to upload avatar: {str(e)}")
@@ -1033,16 +1059,9 @@ def create_social_post(
     
     if file:
         try:
-            file_extension = file.filename.split(".")[-1]
-            unique_filename = f"posts/{uuid.uuid4().hex}.{file_extension}"
-            
-            s3_client.upload_fileobj(
-                file.file,
-                BUCKET_NAME,
-                unique_filename,
-                ExtraArgs={"ContentType": file.content_type}
-            )
-            image_url = f"https://streetcode101.com/{BUCKET_NAME}/{unique_filename}"
+            image_url = sanitize_and_upload_image(file, prefix="posts", max_dim=(1600, 1600))
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
 
@@ -1791,34 +1810,14 @@ import os
 from fastapi import UploadFile, File
 
 @router.post("/admin/upload-image")
-async def upload_marketing_image(file: UploadFile = File(...), token: dict = Depends(verify_token)):
+def upload_marketing_image(file: UploadFile = File(...), token: dict = Depends(verify_token)):
     if token.get("sub") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    
-    # Authenticate with the MinIO bucket
-    s3_client = boto3.client(
-        's3',
-        endpoint_url=os.getenv('AWS_ENDPOINT_URL', 'http://127.0.0.1:9000'),
-        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID', 'stars_admin'),
-        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY', '1234567890'),
-    )
-    bucket_name = os.getenv('AWS_STORAGE_BUCKET_NAME', 'dropship')
-    
-    # Generate a unique filename so old promos aren't overwritten
-    file_ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
-    unique_filename = f"marketing/{uuid.uuid4().hex}.{file_ext}"
-    
     try:
-        # Upload directly to your local bucket
-        s3_client.upload_fileobj(
-            file.file, 
-            bucket_name, 
-            unique_filename,
-            ExtraArgs={"ContentType": file.content_type}
-        )
-        # Construct the live public URL through your domain
-        public_url = f"https://streetcode101.com/{bucket_name}/{unique_filename}"
+        public_url = sanitize_and_upload_image(file, prefix="marketing", max_dim=(1920, 1920))
         return {"url": public_url}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to bucket: {str(e)}")
 
