@@ -38,7 +38,7 @@ app.add_middleware(
 )
 
 # Bring in all the endpoints defined in routes.py
-app.include_router(router)
+app.include_router(router, prefix="/api")
 
 from sqlalchemy import text
 

@@ -171,7 +171,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-@router.post("/api/auth/register")
+@router.post("/auth/register")
 @limiter.limit("5/minute")
 def register_user(request: Request, payload: RegisterRequest, session: Session = Depends(get_session)):
     """Registers a new public user and triggers a welcome email."""
@@ -269,7 +269,7 @@ def register_user(request: Request, payload: RegisterRequest, session: Session =
     
     return {"message": "Registration successful. Check your email."}
 
-@router.post("/api/admin/login")
+@router.post("/admin/login")
 @limiter.limit("10/minute")
 def login(request: Request, payload: AuthRequest, session: Session = Depends(get_session)):
     """Unified login for Master Admin and Public Users."""
@@ -290,7 +290,7 @@ def login(request: Request, payload: AuthRequest, session: Session = Depends(get
     token = jwt.encode({"sub": user.username, "exp": expire}, SECRET_KEY, algorithm="HS256")
     return {"access_token": token, "is_admin": False}
 
-@router.get("/api/profile/me")
+@router.get("/profile/me")
 def get_my_profile(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches the profile of the currently logged-in user (now supports Wallets & Roles)."""
     username = token.get("sub")
@@ -325,7 +325,7 @@ def get_my_profile(session: Session = Depends(get_session), token: dict = Depend
         "review_count": review_count
     }
 
-@router.patch("/api/profile/me/push-token")
+@router.patch("/profile/me/push-token")
 def update_push_token(payload: PushTokenUpdate, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Registers the mobile device's Expo Push Token to the user's profile."""
     username = token.get("sub")
@@ -340,7 +340,7 @@ def update_push_token(payload: PushTokenUpdate, session: Session = Depends(get_s
     
     return {"message": "Push token secured."}
 
-@router.get("/api/search")
+@router.get("/search")
 def global_search(q: str, session: Session = Depends(get_session)):
     """Searches both the Product catalog and the User roster."""
     if not q or len(q.strip()) < 1:
@@ -379,7 +379,7 @@ def global_search(q: str, session: Session = Depends(get_session)):
         "users": safe_users
     }
 
-@router.get("/api/products", response_model=List[Product])
+@router.get("/products", response_model=List[Product])
 def get_catalog(
     offset: int = 0,
     limit: int = 20,
@@ -412,7 +412,7 @@ def get_catalog(
             
     return products
 
-@router.post("/api/products")
+@router.post("/products")
 def create_product(
     sku: str = Form(...),
     title: str = Form(...),
@@ -460,14 +460,14 @@ def create_product(
     
     return new_product
 
-@router.get("/api/products/{sku}", response_model=Product)
+@router.get("/products/{sku}", response_model=Product)
 def get_product(sku: str, session: Session = Depends(get_session)):
     product = session.get(Product, sku)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
-@router.delete("/api/products/{sku}")
+@router.delete("/products/{sku}")
 def delete_product(sku: str, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Deletes a product from the database (SECURED)."""
     product = session.get(Product, sku)
@@ -478,7 +478,7 @@ def delete_product(sku: str, session: Session = Depends(get_session), token: dic
     session.commit()
     return {"message": f"Product {sku} permanently deleted."}
 
-@router.patch("/api/admin/products/{sku}")
+@router.patch("/admin/products/{sku}")
 def edit_product_details(sku: str, payload: dict, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Allows the admin to manually edit any product's details."""
     username = token.get("sub")
@@ -520,7 +520,7 @@ class PromoValidateRequest(BaseModel):
 
 optional_security = HTTPBearer(auto_error=False)
 
-@router.post("/api/validate-promo")
+@router.post("/validate-promo")
 def validate_promo(req: PromoValidateRequest, session: Session = Depends(get_session)):
     """Allows the frontend to visually validate a code before checkout."""
     promo = session.exec(select(PromoCode).where(PromoCode.code == req.code.upper(), PromoCode.is_active == True)).first()
@@ -542,7 +542,7 @@ def resolve_product_and_price(session: Session, sku: str):
                     return p, float(v.get("price", p.price))
     return None, 0.0
 
-@router.post("/api/create-payment-intent")
+@router.post("/create-payment-intent")
 def create_payment_intent(
     req: PaymentIntentRequest, 
     session: Session = Depends(get_session),
@@ -597,7 +597,7 @@ def create_payment_intent(
         print(f"❌ STRIPE ERROR: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/api/checkout")
+@router.post("/checkout")
 def submit_order(order_data: Order, session: Session = Depends(get_session)):
     """Saves a new customer order to the database (Stripe/Card Checkout)."""
     product, _ = resolve_product_and_price(session, order_data.sku)
@@ -628,7 +628,7 @@ def submit_order(order_data: Order, session: Session = Depends(get_session)):
         "message": "Order saved securely to database!"
     }
 
-@router.post("/api/wallet/topup")
+@router.post("/wallet/topup")
 @limiter.limit("5/minute")
 def initiate_wallet_topup(request: Request, req: TopUpRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Initiates a Stripe checkout to purchase StreetCoin from the Master Vault."""
@@ -664,7 +664,7 @@ class StreetCoinCheckoutRequest(BaseModel):
     customer_email: str
     shipping_address: str
 
-@router.post("/api/checkout/streetcoin")
+@router.post("/checkout/streetcoin")
 @limiter.limit("3/minute")
 def checkout_with_streetcoin(request: Request, req: StreetCoinCheckoutRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Processes a cart checkout using StreetCoins and locks funds in Escrow."""
@@ -735,7 +735,7 @@ def checkout_with_streetcoin(request: Request, req: StreetCoinCheckoutRequest, s
     
     return {"message": "Escrow secured and order placed."}
 
-@router.post("/api/webhook")
+@router.post("/webhook")
 async def stripe_webhook(request: Request, db_session: Session = Depends(get_session)):
     """Handles Stripe webhooks for fiat-to-crypto purchases and KYC Identity verification."""
     payload = await request.body()
@@ -812,19 +812,19 @@ async def stripe_webhook(request: Request, db_session: Session = Depends(get_ses
 
     return {"status": "success"}
 
-@router.get("/api/orders", response_model=List[Order])
+@router.get("/orders", response_model=List[Order])
 def get_all_orders(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches all customer orders for the admin dashboard (SECURED)."""
     return session.exec(select(Order)).all()
 
-@router.get("/api/orders/{order_id}")
+@router.get("/orders/{order_id}")
 def get_order_status(order_id: int, session: Session = Depends(get_session)):
     order = session.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     return order
 
-@router.post("/api/admin/trigger-sync")
+@router.post("/admin/trigger-sync")
 def trigger_manual_sync(token: dict = Depends(verify_token)):
     """Triggers the Celery worker to sync inventory in the background (SECURED)."""
     from tasks import sync_inventory_task
@@ -833,7 +833,7 @@ def trigger_manual_sync(token: dict = Depends(verify_token)):
     return {"message": "Background sync triggered successfully", "task_id": task.id}
 
 
-@router.patch("/api/admin/products/{sku}/image")
+@router.patch("/admin/products/{sku}/image")
 def update_product_image(sku: str, payload: ImageUpdate, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Updates a product's image URL in the database (SECURED)."""
     product = session.get(Product, sku)
@@ -847,7 +847,7 @@ def update_product_image(sku: str, payload: ImageUpdate, session: Session = Depe
     
     return {"message": "Product image updated!", "product": product}
 
-@router.patch("/api/admin/orders/{order_id}/status")
+@router.patch("/admin/orders/{order_id}/status")
 def update_order_status(order_id: int, payload: OrderStatusUpdate, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Updates an order's status and triggers fulfillment emails (SECURED)."""
     order = session.get(Order, order_id)
@@ -876,7 +876,7 @@ def update_order_status(order_id: int, payload: OrderStatusUpdate, session: Sess
 # Optional security allows us to see if the visitor is logged in (to check if they follow the user) without blocking guests
 optional_security = HTTPBearer(auto_error=False)
 
-@router.get("/api/profile/{username}")
+@router.get("/profile/{username}")
 def get_public_profile(
     username: str, 
     session: Session = Depends(get_session),
@@ -935,7 +935,7 @@ def get_public_profile(
 RESET_SECRET_KEY = "your_super_secret_jwt_key_here" 
 ALGORITHM = "HS256"
 
-@router.post("/api/auth/forgot-password")
+@router.post("/auth/forgot-password")
 def forgot_password(req: ForgotPasswordRequest, session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.email == req.email)).first()
     
@@ -959,7 +959,7 @@ def forgot_password(req: ForgotPasswordRequest, session: Session = Depends(get_s
     
     return {"message": "If an account exists, a reset link was sent."}
 
-@router.post("/api/auth/reset-password")
+@router.post("/auth/reset-password")
 def reset_password(req: ResetPasswordRequest, session: Session = Depends(get_session)):
     try:
         payload = jwt.decode(req.token, RESET_SECRET_KEY, algorithms=[ALGORITHM])
@@ -980,7 +980,7 @@ def reset_password(req: ResetPasswordRequest, session: Session = Depends(get_ses
     
     return {"message": "Password updated successfully."}
 
-@router.post("/api/profile/me/image")
+@router.post("/profile/me/image")
 def upload_profile_image(file: UploadFile = File(...), session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Uploads a new avatar to MinIO and updates the user's profile (SECURED)."""
     username = token.get("sub")
@@ -1017,7 +1017,7 @@ def upload_profile_image(file: UploadFile = File(...), session: Session = Depend
 class CommentCreate(BaseModel):
     text: str
 
-@router.post("/api/posts")
+@router.post("/posts")
 def create_social_post(
     post_type: str = Form(...),
     description: str = Form(...),
@@ -1094,7 +1094,7 @@ def create_social_post(
         "comments_count": 0
     }
 
-@router.get("/api/posts/user/{target_username}")
+@router.get("/posts/user/{target_username}")
 def get_user_posts(target_username: str, session: Session = Depends(get_session)):
     """Fetches a specific user's wall with engagement metrics."""
     posts = session.exec(
@@ -1120,7 +1120,7 @@ def get_user_posts(target_username: str, session: Session = Depends(get_session)
         })
     return wall
 
-@router.get("/api/posts/feed")
+@router.get("/posts/feed")
 def get_global_feed(
     filter: str = "global",
     offset: int = 0,
@@ -1174,7 +1174,7 @@ def get_global_feed(
         
     return feed
 
-@router.get("/api/posts/{id}")
+@router.get("/posts/{id}")
 def get_single_post(id: int, session: Session = Depends(get_session)):
     """Fetches a single post with engagement metrics for the standalone view."""
     p = session.get(Post, id)
@@ -1203,7 +1203,7 @@ def get_single_post(id: int, session: Session = Depends(get_session)):
         "comments_count": comment_count
     }
 
-@router.delete("/api/posts/{id}")
+@router.delete("/posts/{id}")
 def delete_post(id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Allows Admin (or the author) to delete a post."""
     username = token.get("sub")
@@ -1225,7 +1225,7 @@ class PostEditRequest(BaseModel):
     description: str | None = None
     price: float | None = None
 
-@router.patch("/api/posts/{id}")
+@router.patch("/posts/{id}")
 def edit_post(id: int, payload: PostEditRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Allows the author to edit their own post."""
     username = token.get("sub")
@@ -1251,7 +1251,7 @@ def edit_post(id: int, payload: PostEditRequest, session: Session = Depends(get_
 
 from fastapi.responses import HTMLResponse
 
-@router.get("/api/unsubscribe/{email}", response_class=HTMLResponse)
+@router.get("/unsubscribe/{email}", response_class=HTMLResponse)
 def unsubscribe_confirm_page(email: str):
     """Renders the confirmation page to prevent email pre-fetchers from auto-unsubscribing users."""
     return f"""
@@ -1261,7 +1261,7 @@ def unsubscribe_confirm_page(email: str):
         <div style="text-align: center; padding: 40px; border: 1px solid #1e293b; border-radius: 12px; background-color: #020617; max-width: 400px;">
             <h2 style="margin-top: 0; color: #f8fafc;">Confirm Unsubscribe</h2>
             <p style="color: #94a3b8; line-height: 1.6;">Are you sure you want to stop receiving marketing updates for <b>{email}</b>?</p>
-            <form method="POST" action="/api/unsubscribe/{email}">
+            <form method="POST" action="/unsubscribe/{email}">
                 <button type="submit" style="background-color: #ef4444; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 20px; width: 100%;">Yes, Unsubscribe Me</button>
             </form>
             <a href="https://streetcode101.com" style="color: #94a3b8; text-decoration: underline; font-size: 12px; display: inline-block; margin-top: 20px;">Cancel and return to store</a>
@@ -1270,7 +1270,7 @@ def unsubscribe_confirm_page(email: str):
     </html>
     """
 
-@router.post("/api/unsubscribe/{email}", response_class=HTMLResponse)
+@router.post("/unsubscribe/{email}", response_class=HTMLResponse)
 def unsubscribe_user_action(email: str, session: Session = Depends(get_session)):
     """Actually mutates the database after intentional user confirmation."""
     subscriber = session.exec(select(LedgerSubscriber).where(LedgerSubscriber.email == email)).first()
@@ -1299,7 +1299,7 @@ def unsubscribe_user_action(email: str, session: Session = Depends(get_session))
 
 # --- NEW ENGAGEMENT ENDPOINTS ---
 
-@router.get("/api/notifications")
+@router.get("/notifications")
 def get_my_notifications(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches all notifications for the logged-in user and marks them as read."""
     username = token.get("sub")
@@ -1333,7 +1333,7 @@ def get_my_notifications(session: Session = Depends(get_session), token: dict = 
     # 3. Return the safe data
     return safe_notifs
 
-@router.post("/api/users/{target_username}/follow")
+@router.post("/users/{target_username}/follow")
 def toggle_follow(target_username: str, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Toggles following/unfollowing a user."""
     current_user = token.get("sub")
@@ -1377,7 +1377,7 @@ def toggle_follow(target_username: str, session: Session = Depends(get_session),
         session.commit()
         return {"message": f"Following @{target_username}", "is_following": True}
 
-@router.post("/api/posts/{post_id}/like")
+@router.post("/posts/{post_id}/like")
 def toggle_like(post_id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Toggles a like on or off for the current user."""
     username = token.get("sub")
@@ -1419,12 +1419,12 @@ def toggle_like(post_id: int, session: Session = Depends(get_session), token: di
         session.commit()
         return {"message": "Liked", "liked": True}
 
-@router.get("/api/posts/{post_id}/comments")
+@router.get("/posts/{post_id}/comments")
 def get_comments(post_id: int, session: Session = Depends(get_session)):
     """Fetches all comments for a specific post."""
     return session.exec(select(Comment).where(Comment.post_id == post_id).order_by(Comment.created_at.asc())).all()
 
-@router.post("/api/posts/{post_id}/comments")
+@router.post("/posts/{post_id}/comments")
 def add_comment(post_id: int, payload: CommentCreate, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Posts a new comment."""
     username = token.get("sub")
@@ -1564,7 +1564,7 @@ def fetch_cj_product_data(target_sku: str, cj_api_key: str):
     return {"base_data": p, "variants": parsed_variants}
 
 
-@router.post("/api/admin/sync-cj")
+@router.post("/admin/sync-cj")
 def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches a specific product from CJ Dropshipping API by SKU, including variants."""
     username = token.get("sub")
@@ -1602,7 +1602,7 @@ def sync_cj_dropshipping(payload: CJSyncRequest, session: Session = Depends(get_
     return {"message": f"Successfully imported {new_prod.title} with variants!", "product": new_prod}
 
 
-@router.post("/api/admin/resync-all-variants")
+@router.post("/admin/resync-all-variants")
 def resync_all_variants(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """API endpoint for UI resyncing using the optimized logic."""
     username = token.get("sub")
@@ -1627,7 +1627,7 @@ def resync_all_variants(session: Session = Depends(get_session), token: dict = D
     return {"message": f"Successfully resynced variants for {updated} products!"}
 
 
-@router.patch("/api/admin/products/{sku}/featured")
+@router.patch("/admin/products/{sku}/featured")
 def toggle_featured_product(sku: str, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Sets a product as the Featured Drop and un-features all others."""
     username = token.get("sub")
@@ -1680,7 +1680,7 @@ class BroadcastRequest(BaseModel):
     cta_text: str = "Shop The Drop"
     cta_link: str = "https://streetcode101.com"
 
-@router.post("/api/admin/broadcast")
+@router.post("/admin/broadcast")
 def send_marketing_broadcast(payload: BroadcastRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     # Security Check: Only admin can fire blasts
     if token.get("sub") != "admin":
@@ -1790,7 +1790,7 @@ import uuid
 import os
 from fastapi import UploadFile, File
 
-@router.post("/api/admin/upload-image")
+@router.post("/admin/upload-image")
 async def upload_marketing_image(file: UploadFile = File(...), token: dict = Depends(verify_token)):
     if token.get("sub") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -1822,7 +1822,7 @@ async def upload_marketing_image(file: UploadFile = File(...), token: dict = Dep
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to bucket: {str(e)}")
 
-@router.get("/api/messages/{target_user}")
+@router.get("/messages/{target_user}")
 def get_chat_history(target_user: str, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches historical messages between the logged-in user and the target user."""
     username = token.get("sub")
@@ -1836,7 +1836,7 @@ def get_chat_history(target_user: str, session: Session = Depends(get_session), 
     ).all()
     return messages
 
-@router.websocket("/api/ws/chat/{token}")
+@router.websocket("/ws/chat/{token}")
 async def websocket_chat(websocket: WebSocket, token: str):
     """Real-time WebSocket endpoint for direct messaging."""
     try:
@@ -1877,7 +1877,7 @@ async def websocket_chat(websocket: WebSocket, token: str):
     except WebSocketDisconnect:
         manager.disconnect(username)
 
-@router.get("/api/inbox")
+@router.get("/inbox")
 def get_inbox(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches all active conversations for the logged-in user."""
     username = token.get("sub")
@@ -1908,14 +1908,14 @@ class PromoGenerateRequest(BaseModel):
     base_word: str
     discount_percent: float
 
-@router.get("/api/admin/promos")
+@router.get("/admin/promos")
 def get_all_promos(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches all promo codes for the admin dashboard."""
     if token.get("sub") != "admin":
         raise HTTPException(status_code=403, detail="Unauthorized")
     return session.exec(select(PromoCode).order_by(PromoCode.id.desc())).all()
 
-@router.post("/api/admin/promos")
+@router.post("/admin/promos")
 def generate_promo(req: PromoGenerateRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Generates a secure 16-character promo code."""
     if token.get("sub") != "admin":
@@ -1937,7 +1937,7 @@ def generate_promo(req: PromoGenerateRequest, session: Session = Depends(get_ses
     session.refresh(new_promo)
     return new_promo
 
-@router.patch("/api/admin/promos/{id}/toggle")
+@router.patch("/admin/promos/{id}/toggle")
 def toggle_promo_status(id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Kill switch to instantly activate or deactivate a promo code."""
     if token.get("sub") != "admin":
@@ -1970,7 +1970,7 @@ class CartItemSync(BaseModel):
 class CartSyncRequest(BaseModel):
     items: List[CartItemSync]
 
-@router.get("/api/cart")
+@router.get("/cart")
 def get_user_cart(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches the saved cart for the logged-in user."""
     username = token.get("sub")
@@ -1996,7 +1996,7 @@ def get_user_cart(session: Session = Depends(get_session), token: dict = Depends
             
     return cart_products
 
-@router.post("/api/cart/sync")
+@router.post("/cart/sync")
 def sync_user_cart(req: CartSyncRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Overwrites the user's saved cart in the database with the current browser state."""
     username = token.get("sub")
@@ -2014,7 +2014,7 @@ def sync_user_cart(req: CartSyncRequest, session: Session = Depends(get_session)
     session.commit()
     return {"message": "Cart synchronized securely."}
 
-@router.post("/api/support/message")
+@router.post("/support/message")
 def send_support_message(payload: SupportMessageRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Saves a support message to the DB and emails the Admin via SMTP."""
     username = token.get("sub")
@@ -2052,7 +2052,7 @@ def send_support_message(payload: SupportMessageRequest, session: Session = Depe
 
     return {"message": "Support request transmitted."}
 
-@router.post("/api/support/guest-message")
+@router.post("/support/guest-message")
 def send_guest_support_message(payload: GuestSupportRequest, session: Session = Depends(get_session)):
     """Saves a guest support message and emails the Admin via SMTP."""
     # Prefix the email so you know it's a guest in your DB
@@ -2098,7 +2098,7 @@ class AdminEmailRequest(BaseModel):
     subject: str
     body: str
 
-@router.post("/api/subscribe")
+@router.post("/subscribe")
 def subscribe_newsletter(req: SubscribeRequest, session: Session = Depends(get_session)):
     """Saves marketing leads to the database and issues the vault code."""
     existing = session.exec(select(LedgerSubscriber).where(LedgerSubscriber.email == req.email)).first()
@@ -2193,7 +2193,7 @@ def subscribe_newsletter(req: SubscribeRequest, session: Session = Depends(get_s
     # Return the updated code
     return {"message": "Access Granted", "code": "VAULT-Q70KHNSF5G"}
 
-@router.get("/api/admin/users")
+@router.get("/admin/users")
 def get_all_users(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches the human community roster for the Admin Dashboard, excluding system vaults."""
     if token.get("sub") != "admin":
@@ -2218,7 +2218,7 @@ def get_all_users(session: Session = Depends(get_session), token: dict = Depends
         } for u in users
     ]
 
-@router.patch("/api/admin/users/{username}/discount")
+@router.patch("/admin/users/{username}/discount")
 def update_user_discount(username: str, payload: UserDiscountUpdate, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Allows Admin to permanently adjust a user's base Vault discount."""
     if token.get("sub") != "admin":
@@ -2234,7 +2234,7 @@ def update_user_discount(username: str, payload: UserDiscountUpdate, session: Se
     
     return {"message": f"Updated @{username}'s base discount to {payload.discount_percent}%"}
 
-@router.post("/api/admin/users/{username}/email")
+@router.post("/admin/users/{username}/email")
 def email_user_directly(username: str, payload: AdminEmailRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Utilizes the SMTP dispatcher to email a user directly from the Admin console."""
     if token.get("sub") != "admin":
@@ -2250,7 +2250,7 @@ def email_user_directly(username: str, payload: AdminEmailRequest, session: Sess
 class TrackingRequest(BaseModel):
     tracking_number: str
 
-@router.get("/api/vendor/dashboard")
+@router.get("/vendor/dashboard")
 def get_vendor_dashboard(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches live escrow metrics and fulfillment queue for the vendor."""
     username = token.get("sub")
@@ -2340,7 +2340,7 @@ def verify_tracking_live(tracking_number: str) -> tuple[bool, str]:
         return False, f"Live verification failed: {str(e)}"
 
 
-@router.post("/api/vendor/orders/{order_id}/ship")
+@router.post("/vendor/orders/{order_id}/ship")
 def release_escrow(order_id: int, req: TrackingRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Logs the tracking number, verifies it against carrier networks, and releases Escrow."""
     username = token.get("sub")
@@ -2415,7 +2415,7 @@ class CashoutSubmitRequest(BaseModel):
     amount_coins: float
     zelle_contact: str
 
-@router.post("/api/vendor/cashout")
+@router.post("/vendor/cashout")
 def submit_cashout_request(req: CashoutSubmitRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Locks coins from the vendor's wallet into the Escrow Vault."""
     from models import CashoutRequest
@@ -2451,14 +2451,14 @@ def submit_cashout_request(req: CashoutSubmitRequest, session: Session = Depends
     
     return {"message": "Cashout request submitted securely."}
 
-@router.get("/api/admin/cashouts")
+@router.get("/admin/cashouts")
 def get_admin_cashouts(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     if token.get("sub") != "admin":
         raise HTTPException(status_code=403, detail="Unauthorized")
     from models import CashoutRequest
     return session.exec(select(CashoutRequest).order_by(CashoutRequest.id.desc())).all()
 
-@router.post("/api/admin/cashouts/{req_id}/approve")
+@router.post("/admin/cashouts/{req_id}/approve")
 def approve_cashout(req_id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Admin fulfills Zelle, coins move from Escrow back to Genesis Master Vault."""
     if token.get("sub") != "admin":
@@ -2505,7 +2505,7 @@ def approve_cashout(req_id: int, session: Session = Depends(get_session), token:
 class AdminMintRequest(BaseModel):
     amount: float
 
-@router.post("/api/admin/mint")
+@router.post("/admin/mint")
 def mint_fiat_backed_coins(req: AdminMintRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Mints new SC into the Admin Treasury (represents real fiat deposited)."""
     if token.get("sub") != "admin":
@@ -2547,7 +2547,7 @@ class ServiceCreateRequest(BaseModel):
     service_type: str  # 'in_person' or 'remote'
     image_url: str = "/default_service.png"
 
-@router.post("/api/services")
+@router.post("/services")
 def create_service_listing(payload: ServiceCreateRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Allows a verified Service Provider to post a new service to the catalog."""
     username = token.get("sub")
@@ -2576,7 +2576,7 @@ def create_service_listing(payload: ServiceCreateRequest, session: Session = Dep
     
     return {"message": "Service listing published successfully!", "service": new_service}
 
-@router.get("/api/client/appointments")
+@router.get("/client/appointments")
 def get_client_appointments(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches all service appointments booked by the client."""
     from models import Appointment
@@ -2591,7 +2591,7 @@ def get_client_appointments(session: Session = Depends(get_session), token: dict
     
     return appointments
 
-@router.get("/api/services")
+@router.get("/services")
 def get_service_catalog(session: Session = Depends(get_session)):
     """Fetches all active service listings for the public storefront."""
     from models import ServiceListing
@@ -2606,7 +2606,7 @@ class BookingRequest(BaseModel):
     target_lat: float | None = None
     target_long: float | None = None
 
-@router.post("/api/appointments/book")
+@router.post("/appointments/book")
 def book_service(payload: BookingRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Locks StreetCoin in Escrow and schedules a service appointment."""
     from models import ServiceListing, Appointment, Transaction
@@ -2696,7 +2696,7 @@ class CheckInRequest(BaseModel):
     actual_lat: float
     actual_long: float
 
-@router.post("/api/appointments/{id}/check-in")
+@router.post("/appointments/{id}/check-in")
 def appointment_check_in(id: int, payload: CheckInRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Logs the provider's GPS coordinates to verify they arrived at the job site."""
     from models import Appointment
@@ -2753,7 +2753,7 @@ def appointment_check_in(id: int, payload: CheckInRequest, session: Session = De
 class JobCompleteRequest(BaseModel):
     proof_of_delivery_url: str | None = None
 
-@router.post("/api/appointments/{id}/complete")
+@router.post("/appointments/{id}/complete")
 def provider_complete_job(id: int, payload: JobCompleteRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Provider marks the job as finished and submits optional proof of delivery."""
     from models import Appointment
@@ -2790,7 +2790,7 @@ def provider_complete_job(id: int, payload: JobCompleteRequest, session: Session
         
     return {"message": "Job marked complete. Client notified for final sign-off."}
 
-@router.post("/api/appointments/{id}/confirm")
+@router.post("/appointments/{id}/confirm")
 def client_confirm_job(id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Client confirms the job is done. Escrow releases the StreetCoin to the Provider."""
     from models import Appointment, Transaction
@@ -2864,7 +2864,7 @@ def client_confirm_job(id: int, session: Session = Depends(get_session), token: 
     else:
         raise HTTPException(status_code=500, detail="Master Escrow vault error.")
 
-@router.post("/api/appointments/{id}/dispute")
+@router.post("/appointments/{id}/dispute")
 def client_dispute_job(id: int, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Client flags a job as disputed, freezing escrow and alerting Master Admin."""
     from models import Appointment, User
@@ -2908,7 +2908,7 @@ def client_dispute_job(id: int, session: Session = Depends(get_session), token: 
         
     return {"message": "Dispute filed. Escrow frozen."}
 
-@router.get("/api/provider/appointments")
+@router.get("/provider/appointments")
 def get_provider_schedule(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches all upcoming and active appointments for the logged-in service provider."""
     from models import Appointment
@@ -2931,7 +2931,7 @@ class UpgradeRequest(BaseModel):
     new_role: str
     onboarding_data: Optional[Dict[str, Any]] = None
 
-@router.post("/api/profile/upgrade")
+@router.post("/profile/upgrade")
 def upgrade_account(request: UpgradeRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Upgrades a user to a vendor or service provider, allowing multiple roles."""
     from models import User
@@ -2972,7 +2972,7 @@ def upgrade_account(request: UpgradeRequest, session: Session = Depends(get_sess
 class DisputeResolutionRequest(BaseModel):
     resolution: str  # 'refund_client' or 'release_provider'
 
-@router.get("/api/admin/disputes")
+@router.get("/admin/disputes")
 def get_admin_disputes(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches all frozen/disputed appointments for Master Admin review."""
     if token.get("sub") != "admin":
@@ -2987,7 +2987,7 @@ def get_admin_disputes(session: Session = Depends(get_session), token: dict = De
     
     return disputes
 
-@router.post("/api/admin/disputes/{id}/resolve")
+@router.post("/admin/disputes/{id}/resolve")
 def resolve_dispute(id: int, req: DisputeResolutionRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Forces the release of frozen escrow to either the client or the provider."""
     if token.get("sub") != "admin":
@@ -3046,7 +3046,7 @@ def resolve_dispute(id: int, req: DisputeResolutionRequest, session: Session = D
     
     return {"message": f"Dispute resolved. Escrow transferred to @{receiver}."}
 
-@router.get("/api/admin/analytics")
+@router.get("/admin/analytics")
 def get_admin_analytics(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Calculates platform-wide financial metrics."""
     if token.get("sub") != "admin":
@@ -3076,7 +3076,7 @@ def get_admin_analytics(session: Session = Depends(get_session), token: dict = D
 class AdminTransferRequest(BaseModel):
     amount: float
 
-@router.post("/api/admin/users/{username}/transfer")
+@router.post("/admin/users/{username}/transfer")
 def admin_transfer_funds(username: str, req: AdminTransferRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Routes SC from the Admin's personal wallet to a user."""
     if token.get("sub") != "admin":
@@ -3123,7 +3123,7 @@ def admin_transfer_funds(username: str, req: AdminTransferRequest, session: Sess
 
 # --- MASTER VAULT ENDPOINTS ---
 
-@router.get("/api/admin/vault/transactions")
+@router.get("/admin/vault/transactions")
 def get_vault_transactions(session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Fetches the ledger of all coins that have left the Master Vault."""
     if token.get("sub") != "admin":
@@ -3139,7 +3139,7 @@ def get_vault_transactions(session: Session = Depends(get_session), token: dict 
 class VaultMintRequest(BaseModel):
     amount: float
 
-@router.post("/api/admin/vault/mint")
+@router.post("/admin/vault/mint")
 def vault_mint_to_admin(req: VaultMintRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Allows Admin to pull SC from Master Vault into Admin Wallet without Stripe fees (Fiat-backed assumed)."""
     if token.get("sub") != "admin":
@@ -3185,7 +3185,7 @@ class ReviewCreateRequest(BaseModel):
     rating: int
     text: str
 
-@router.post("/api/reviews")
+@router.post("/reviews")
 def submit_review(req: ReviewCreateRequest, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Submits a star rating and written review for a vendor/provider."""
     username = token.get("sub")
@@ -3230,7 +3230,7 @@ def submit_review(req: ReviewCreateRequest, session: Session = Depends(get_sessi
         
     return {"message": "Review submitted successfully!"}
 
-@router.get("/api/reviews/{username}")
+@router.get("/reviews/{username}")
 def get_user_reviews(username: str, session: Session = Depends(get_session)):
     """Fetches all reviews for a specific user to display on their public profile."""
     reviews = session.exec(
@@ -3253,7 +3253,7 @@ def get_user_reviews(username: str, session: Session = Depends(get_session)):
 
 # --- STRIPE CONNECT EXPRESS ENDPOINTS ---
 
-@router.post("/api/vendor/onboard")
+@router.post("/vendor/onboard")
 @limiter.limit("5/minute")
 def create_connect_session(request: Request, session: Session = Depends(get_session), token: dict = Depends(verify_token)):
     """Generates a Stripe Connect Embedded Onboarding Session."""

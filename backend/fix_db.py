@@ -1,11 +1,13 @@
-from sqlalchemy import text
 from database import engine
+from sqlalchemy import text
 
-print("Connecting to PostgreSQL...")
-with engine.connect() as conn:
-    try:
-        conn.execute(text("ALTER TABLE product ADD COLUMN category VARCHAR DEFAULT 'uncategorized';"))
+print("Upgrading database schema...")
+
+try:
+    with engine.connect() as conn:
+        # This SQL command injects the missing column directly into Postgres
+        conn.execute(text("ALTER TABLE product ADD COLUMN is_featured BOOLEAN DEFAULT FALSE;"))
         conn.commit()
-        print("✅ SUCCESS: Added 'category' column to the Product table!")
-    except Exception as e:
-        print(f"❌ ERROR: {e}")
+    print("✅ Successfully added 'is_featured' column to the database!")
+except Exception as e:
+    print(f"❌ Error (the column might already exist): {e}")

@@ -539,13 +539,29 @@ const handleDisputeJob = async (appointmentId) => {
           </div>
           
           <div className="px-8 pb-8 relative">
-            <div className="relative -mt-16 mb-4 w-32 h-32 mx-auto sm:mx-0">
-              <img src={profile.profile_image_url} alt={profile.username} className="w-full h-full rounded-full object-cover border-4 border-white shadow-lg bg-white" />
-              {isMyProfile && profile.username !== 'admin' && (
-                <label className="absolute bottom-0 right-0 bg-slate-900 text-white p-2 rounded-full cursor-pointer shadow-md hover:bg-orange-500 transition-colors">
-                  <i className="fa-solid fa-camera"></i>
-                  <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={isUploading} />
-                </label>
+            <div
+              className={`relative -mt-16 mb-4 w-32 h-32 mx-auto sm:mx-0 ${isMyProfile ? 'group cursor-pointer' : ''}`}
+              onClick={() => isMyProfile && document.getElementById('avatar-file-input')?.click()}
+            >
+              <img
+                src={profile.profile_image_url || "/default.png"}
+                alt={profile.username}
+                className={`w-full h-full rounded-full object-cover border-4 border-white shadow-lg bg-white ${isMyProfile ? 'group-hover:opacity-90 transition-opacity' : ''}`}
+              />
+              {isMyProfile && (
+                <>
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-semibold">
+                    {isUploading ? 'Uploading...' : 'Change Photo'}
+                  </div>
+                  <input
+                    id="avatar-file-input"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarUpload}
+                    disabled={isUploading}
+                  />
+                </>
               )}
             </div>
 
